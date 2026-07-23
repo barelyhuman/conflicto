@@ -2,7 +2,14 @@ import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron'
 import { fileURLToPath } from 'node:url'
 import path from 'node:path'
 import os from 'node:os'
-import { getFileDiff, listChanges, resolveRepo } from './git'
+import {
+  getCommitFileDiff,
+  getFileDiff,
+  listCommitFiles,
+  listCommits,
+  listChanges,
+  resolveRepo,
+} from './git'
 import type { ChangeSide } from '../../src/types'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
@@ -51,6 +58,21 @@ function registerIpc() {
     'conflicto:get-file-diff',
     async (_event, root: string, filePath: string, side: ChangeSide) => {
       return getFileDiff(root, filePath, side)
+    },
+  )
+
+  ipcMain.handle('conflicto:list-commits', async (_event, root: string, limit?: number) => {
+    return listCommits(root, limit)
+  })
+
+  ipcMain.handle('conflicto:list-commit-files', async (_event, root: string, hash: string) => {
+    return listCommitFiles(root, hash)
+  })
+
+  ipcMain.handle(
+    'conflicto:get-commit-file-diff',
+    async (_event, root: string, hash: string, filePath: string) => {
+      return getCommitFileDiff(root, hash, filePath)
     },
   )
 }

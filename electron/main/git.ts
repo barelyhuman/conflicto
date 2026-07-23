@@ -1,7 +1,7 @@
 import { spawn } from 'node:child_process'
 import { readFile } from 'node:fs/promises'
 import path from 'node:path'
-import type { ChangeEntry, ChangeSide, ChangeStatus, FileDiff, RepoInfo } from '../../src/types'
+import type { ChangeEntry, ChangeSide, ChangeStatus, CommitFile, CommitInfo, FileDiff, RepoInfo } from '../../src/types'
 
 function runGit(cwd: string, args: string[]): Promise<{ stdout: string; stderr: string; code: number }> {
   return new Promise((resolve, reject) => {
@@ -194,5 +194,93 @@ export async function getFileDiff(root: string, filePath: string, side: ChangeSi
     original = await readBlob(root, `HEAD:${filePath}`)
   }
   const modified = await readWorkingTree(root, filePath)
+  return { path: filePath, original, modified, language }
+}
+
+const COMMIT_LIMIT = 80
+
+export async function listCommits(root: string, limit = COMMIT_LIMIT): Promise<CommitInfo[]> {
+  const stdout = await gitOk(root, [
+    'log',
+    `--max-count=${limit}`,
+    '--pretty=format:%H%x00%h%x00%P%x00%s%x00%an%x00%as%x00%D%x1e',
+  ])
+  const records = stdout.split('\x1e').map((r) => r.replace(/^\n/, '').trimEnd()).filter(Boolean)
+  return records.map((record) => {
+    const [hash, shortHash, parents, subject, author, date, refsRaw = ''] = record.split('\0')
+    const refs = refsRaw
+      .split(',')
+      .map((r) => r.trim())
+      .filter(Boolean)
+    return {
+      hash,
+      shortHash,
+      parents: parents ? parents.split(' ').filter(Boolean) : [],
+      subject,
+      author,
+      date,
+      refs,
+    }
+  })
+}
+
+function statusFromNameStatus(code: string): ChangeStatus {
+  switch (code[0]) {
+    case 'A':
+      return 'added'
+    case 'D':
+      return 'deleted'
+    case 'R':
+      return 'renamed'
+    case 'C':
+      return 'copied'
+    default:
+      return 'modified'
+  }
+}
+
+export async function listCommitFiles(root: string, hash: string): Promise<CommitFile[]> {
+  const stdout = await gitOk(root, [
+    'diff-tree',
+    '--no-commit-id',
+    '--name-status',
+    '-r',
+    '-z',
+    hash,
+  ])
+  const parts = stdout.split('\0').filter(Boolean)
+  const files: CommitFile[] = []
+  for (let i = 0; i < parts.length; i++) {
+    const statusCode = parts[i]
+    if (!statusCode || statusCode.length < 1) continue
+    if (statusCode[0] === 'R' || statusCode[0] === 'C') {
+      const oldPath = parts[i + 1]
+      const newPath = parts[i + 2]
+      i += 2
+      files.push({
+        path: newPath,
+        oldPath,
+        status: statusFromNameStatus(statusCode),
+      })
+    } else {
+      const filePath = parts[i + 1]
+      i += 1
+      files.push({
+        path: filePath,
+        status: statusFromNameStatus(statusCode),
+      })
+    }
+  }
+  return files
+}
+
+export async function getCommitFileDiff(
+  root: string,
+  hash: string,
+  filePath: string,
+): Promise<FileDiff> {
+  const language = languageFromPath(filePath)
+  const original = await readBlob(root, `${hash}^:${filePath}`)
+  const modified = await readBlob(root, `${hash}:${filePath}`)
   return { path: filePath, original, modified, language }
 }
