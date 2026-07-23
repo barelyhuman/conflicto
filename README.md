@@ -20,7 +20,7 @@ A fast, VS Code-inspired desktop diff viewer. Point it at a git repo and inspect
 
 ## Agent TODO
 
-- [ ] Git graph
+- [ ] Git graph in the sidebar as an accordion
 
 ## Stack
 
