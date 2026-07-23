@@ -40,7 +40,7 @@ button {
 
 .app {
   display: grid;
-  grid-template-columns: 1fr 280px;
+  grid-template-columns: 1fr 320px;
   height: 100%;
 }
 
@@ -126,6 +126,160 @@ button {
   padding: 16px 12px;
   margin: 0;
   line-height: 1.4;
+}
+
+.sidebar-accordions {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  flex: 1;
+  overflow: hidden;
+}
+
+.accordion {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.accordion.open {
+  flex: 1;
+}
+
+.accordion-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  border: 0;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 8px 12px;
+  cursor: pointer;
+  flex-shrink: 0;
+  text-align: left;
+}
+
+.accordion-header:hover {
+  color: var(--text);
+  background: var(--bg-hover);
+}
+
+.accordion.open > .accordion-header {
+  color: var(--text);
+}
+
+.accordion-chevron {
+  width: 10px;
+  font-size: 10px;
+}
+
+.accordion-body {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  flex: 1;
+  overflow: hidden;
+}
+
+.accordion-body .graph-panel,
+.accordion-body .change-section {
+  min-height: 0;
+}
+
+.graph-panel {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  flex: 1;
+  overflow: hidden;
+}
+
+.commit-list {
+  flex: 1;
+  overflow: auto;
+  min-height: 80px;
+}
+
+.commit-row {
+  display: flex;
+  align-items: stretch;
+  gap: 4px;
+  width: 100%;
+  border: 0;
+  background: transparent;
+  text-align: left;
+  padding: 0 8px 0 4px;
+  cursor: pointer;
+  min-width: 0;
+  color: inherit;
+}
+
+.commit-row:hover {
+  background: var(--bg-hover);
+}
+
+.commit-row.active {
+  background: var(--bg-active);
+}
+
+.graph-glyph {
+  flex-shrink: 0;
+  display: block;
+}
+
+.commit-body {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 1px;
+  min-width: 0;
+  flex: 1;
+  padding: 4px 0;
+}
+
+.commit-subject {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+}
+
+.commit-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.commit-hash {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+.commit-ref {
+  font-size: 10px;
+  color: #75beff;
+  background: #264f78;
+  border-radius: 3px;
+  padding: 0 4px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 110px;
+}
+
+.commit-files {
+  border-top: 1px solid var(--border);
+  max-height: 40%;
+  overflow: auto;
+  flex-shrink: 0;
 }
 
 .change-section {

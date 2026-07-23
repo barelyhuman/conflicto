@@ -6,6 +6,10 @@ const api: ConflictoApi = {
   listChanges: (root) => ipcRenderer.invoke('conflicto:list-changes', root),
   getFileDiff: (root, path, side: ChangeSide) =>
     ipcRenderer.invoke('conflicto:get-file-diff', root, path, side),
+  listCommits: (root, limit) => ipcRenderer.invoke('conflicto:list-commits', root, limit),
+  listCommitFiles: (root, hash) => ipcRenderer.invoke('conflicto:list-commit-files', root, hash),
+  getCommitFileDiff: (root, hash, path) =>
+    ipcRenderer.invoke('conflicto:get-commit-file-diff', root, hash, path),
 }
 
 contextBridge.exposeInMainWorld('conflicto', api)

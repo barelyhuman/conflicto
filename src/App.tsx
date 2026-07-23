@@ -7,7 +7,7 @@ import {
   error,
   loadingDiff,
   openRepository,
-  refreshChanges,
+  refreshAll,
   repo,
   selectedKey,
 } from './state'
@@ -21,13 +21,13 @@ export function App() {
       }
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'r' && repo.value) {
         e.preventDefault()
-        refreshChanges()
+        refreshAll()
       }
     }
     window.addEventListener('keydown', onKey)
 
     const onFocus = () => {
-      if (repo.value) refreshChanges()
+      if (repo.value) refreshAll()
     }
     window.addEventListener('focus', onFocus)
 
@@ -58,7 +58,7 @@ export function App() {
           )}
           {repo.value && !hasSelection && (
             <div class="empty subtle">
-              <p>Select a changed file from the sidebar.</p>
+              <p>Select a file from the sidebar.</p>
             </div>
           )}
           {repo.value && hasSelection && loadingDiff.value && !hasDiff && (

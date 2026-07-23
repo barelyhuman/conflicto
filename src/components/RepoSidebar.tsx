@@ -1,17 +1,21 @@
-import type { ChangeEntry } from '../types'
+import type { ComponentChildren } from 'preact'
+import type { ChangeEntry, CommitFile } from '../types'
+import { GitGraphPanel } from './GitGraphPanel'
 import {
   changeKey,
   loadingChanges,
   openRepository,
-  refreshChanges,
+  refreshAll,
   repo,
   selectChange,
   selectedKey,
+  setViewMode,
   staged,
   unstaged,
+  viewMode,
 } from '../state'
 
-function statusLetter(status: ChangeEntry['status']): string {
+function statusLetter(status: ChangeEntry['status'] | CommitFile['status']): string {
   switch (status) {
     case 'added':
     case 'untracked':
@@ -61,11 +65,36 @@ function Section({ title, entries }: { title: string; entries: ChangeEntry[] }) 
   )
 }
 
+function Accordion({
+  id,
+  title,
+  open,
+  onToggle,
+  children,
+}: {
+  id: 'changes' | 'graph'
+  title: string
+  open: boolean
+  onToggle: () => void
+  children: ComponentChildren
+}) {
+  return (
+    <section class={`accordion ${open ? 'open' : ''}`}>
+      <button type="button" class="accordion-header" onClick={onToggle} aria-expanded={open}>
+        <span class="accordion-chevron">{open ? '▾' : '▸'}</span>
+        <span>{title}</span>
+      </button>
+      {open && <div class="accordion-body">{children}</div>}
+    </section>
+  )
+}
+
 export function RepoSidebar() {
   const current = repo.value
   const stagedEntries = staged.value
   const unstagedEntries = unstaged.value
   const empty = stagedEntries.length === 0 && unstagedEntries.length === 0
+  const mode = viewMode.value
 
   return (
     <aside class="sidebar">
@@ -77,7 +106,7 @@ export function RepoSidebar() {
           type="button"
           class="btn"
           disabled={!current || loadingChanges.value}
-          onClick={() => refreshChanges()}
+          onClick={() => refreshAll()}
           title="Refresh"
         >
           {loadingChanges.value ? '…' : '↻'}
@@ -93,12 +122,31 @@ export function RepoSidebar() {
         <p class="sidebar-empty">Open a git repository to view changes.</p>
       )}
 
-      {current && empty && !loadingChanges.value && (
-        <p class="sidebar-empty">No changes in the working tree.</p>
-      )}
+      {current && (
+        <div class="sidebar-accordions">
+          <Accordion
+            id="changes"
+            title="Changes"
+            open={mode === 'changes'}
+            onToggle={() => setViewMode('changes')}
+          >
+            {empty && !loadingChanges.value && (
+              <p class="sidebar-empty">No changes in the working tree.</p>
+            )}
+            <Section title="Staged" entries={stagedEntries} />
+            <Section title="Working Tree" entries={unstagedEntries} />
+          </Accordion>
 
-      <Section title="Staged" entries={stagedEntries} />
-      <Section title="Changes" entries={unstagedEntries} />
+          <Accordion
+            id="graph"
+            title="Graph"
+            open={mode === 'graph'}
+            onToggle={() => setViewMode('graph')}
+          >
+            <GitGraphPanel />
+          </Accordion>
+        </div>
+      )}
     </aside>
   )
 }
