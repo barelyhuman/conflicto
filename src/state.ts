@@ -4,6 +4,7 @@ import type {
   CommitFile,
   CommitInfo,
   FileDiff,
+  RecentRepo,
   RepoInfo,
   ViewMode,
 } from './types'
@@ -12,6 +13,7 @@ import { DEFAULT_THEME_ID, THEMES } from './theme/themes'
 import type { ThemeId } from './theme/tokens'
 
 export const repo = signal<RepoInfo | null>(null)
+export const recentRepos = signal<RecentRepo[]>([])
 export const changes = signal<ChangeEntry[]>([])
 export const selectedKey = signal<string | null>(null)
 export const diff = signal<FileDiff | null>(null)
@@ -49,18 +51,50 @@ export function findSelected(): ChangeEntry | null {
   return changes.value.find((c) => changeKey(c) === key) ?? null
 }
 
+export async function loadRecentRepos() {
+  try {
+    recentRepos.value = await window.conflicto.getRecentRepos()
+  } catch {
+    recentRepos.value = []
+  }
+}
+
+async function applyRepo(info: RepoInfo) {
+  repo.value = info
+  selectedKey.value = null
+  diff.value = null
+  selectedCommitHash.value = null
+  commitFiles.value = []
+  commits.value = []
+  changes.value = []
+  await Promise.all([refreshChanges(), refreshCommits(), loadRecentRepos()])
+}
+
 export async function openRepository() {
   error.value = null
   try {
     const info = await window.conflicto.openRepo()
     if (!info) return
-    repo.value = info
-    selectedKey.value = null
-    diff.value = null
-    selectedCommitHash.value = null
-    commitFiles.value = []
-    commits.value = []
-    await Promise.all([refreshChanges(), refreshCommits()])
+    await applyRepo(info)
+  } catch (e) {
+    error.value = e instanceof Error ? e.message : String(e)
+  }
+}
+
+export async function openRepositoryPath(dir: string) {
+  error.value = null
+  try {
+    const info = await window.conflicto.openRepoPath(dir)
+    await applyRepo(info)
+  } catch (e) {
+    error.value = e instanceof Error ? e.message : String(e)
+    throw e instanceof Error ? e : new Error(String(e))
+  }
+}
+
+export async function forgetRecentRepo(root: string) {
+  try {
+    recentRepos.value = await window.conflicto.removeRecentRepo(root)
   } catch (e) {
     error.value = e instanceof Error ? e.message : String(e)
   }

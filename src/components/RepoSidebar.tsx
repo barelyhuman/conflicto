@@ -1,11 +1,11 @@
 import type { ComponentChildren } from 'preact'
 import type { ChangeEntry, CommitFile } from '../types'
 import { GitGraphPanel } from './GitGraphPanel'
+import { RepoSwitcher } from './RepoSwitcher'
 import {
   changeKey,
   loadingChanges,
   loadingCommits,
-  openRepository,
   refreshAll,
   repo,
   selectChange,
@@ -96,24 +96,20 @@ export function RepoSidebar() {
   const unstagedEntries = unstaged.value
   const empty = stagedEntries.length === 0 && unstagedEntries.length === 0
   const mode = viewMode.value
+  const refreshing = mode === 'graph' ? loadingCommits.value : loadingChanges.value
 
   return (
     <aside class="sidebar">
       <div class="sidebar-header">
-        <button type="button" class="btn primary" onClick={() => openRepository()}>
-          Open Repo
-        </button>
+        <RepoSwitcher />
         <button
           type="button"
           class="btn"
-          disabled={
-            !current ||
-            (mode === 'graph' ? loadingCommits.value : loadingChanges.value)
-          }
+          disabled={!current || refreshing}
           onClick={() => refreshAll()}
           title="Refresh (⌘R)"
         >
-          {loadingChanges.value ? '…' : '↻'}
+          {refreshing ? '…' : '↻'}
         </button>
       </div>
 

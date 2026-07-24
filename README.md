@@ -15,7 +15,7 @@ A fast, VS Code-inspired desktop diff viewer. Point it at a git repo and inspect
     - [ ] Open the PR in a worktree locally if needed
 - [ ] Add options to see diff with whitespace disabled 
 - [ ] A very simple terminal integration
-- [ ] Better theme arch
+- [x] Better theme arch
     - [x] Create an adaptive theme that uses the monaco themes to create the rest of the UI
 
 ## Agent TODO

@@ -5,6 +5,7 @@ import { MonacoDiffView } from './components/MonacoDiffView'
 import {
   diff,
   error,
+  loadRecentRepos,
   loadingDiff,
   openRepository,
   refreshAll,
@@ -14,6 +15,8 @@ import {
 
 export function App() {
   useEffect(() => {
+    void loadRecentRepos()
+
     const onKey = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'o') {
         e.preventDefault()

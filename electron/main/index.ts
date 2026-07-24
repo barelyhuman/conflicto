@@ -10,6 +10,7 @@ import {
   listChanges,
   resolveRepo,
 } from './git'
+import { listRecentRepos, recordRecentRepo, removeRecentRepo } from './recentRepos'
 import type { ChangeSide } from '../../src/types'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
@@ -41,13 +42,32 @@ const preload = path.join(__dirname, '../preload/index.mjs')
 const indexHtml = path.join(RENDERER_DIST, 'index.html')
 
 function registerIpc() {
+  ipcMain.handle('conflicto:get-recent-repos', async () => {
+    return listRecentRepos()
+  })
+
+  ipcMain.handle('conflicto:remove-recent-repo', async (_event, root: string) => {
+    return removeRecentRepo(root)
+  })
+
   ipcMain.handle('conflicto:open-repo', async () => {
     const result = await dialog.showOpenDialog(win!, {
       properties: ['openDirectory'],
       title: 'Open Git Repository',
     })
     if (result.canceled || result.filePaths.length === 0) return null
-    return resolveRepo(result.filePaths[0])
+    const info = await resolveRepo(result.filePaths[0])
+    await recordRecentRepo(info.root)
+    return info
+  })
+
+  ipcMain.handle('conflicto:open-repo-path', async (_event, dir: string) => {
+    if (typeof dir !== 'string' || !dir.trim()) {
+      throw new Error('Path is required')
+    }
+    const info = await resolveRepo(dir.trim())
+    await recordRecentRepo(info.root)
+    return info
   })
 
   ipcMain.handle('conflicto:list-changes', async (_event, root: string) => {

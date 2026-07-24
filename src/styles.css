@@ -69,14 +69,187 @@ button {
   padding: 8px 12px;
   flex-shrink: 0;
   -webkit-app-region: drag;
+  position: relative;
+  z-index: 20;
 }
 
-.sidebar-header .btn {
+.sidebar-header .btn,
+.sidebar-header .repo-switcher {
   -webkit-app-region: no-drag;
 }
 
-.sidebar-header .btn.primary {
+.repo-switcher {
+  position: relative;
   flex: 1;
+  min-width: 0;
+}
+
+.repo-switcher-trigger {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  border: 1px solid var(--border);
+  background: var(--btn-bg);
+  border-radius: 4px;
+  padding: 4px 8px;
+  cursor: pointer;
+  text-align: left;
+}
+
+.repo-switcher-trigger:hover {
+  background: var(--btn-hover);
+}
+
+.repo-switcher.open .repo-switcher-trigger {
+  border-color: var(--accent);
+}
+
+.repo-switcher-label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+}
+
+.repo-switcher-chevron {
+  color: var(--text-muted);
+  font-size: 11px;
+  flex-shrink: 0;
+}
+
+.repo-switcher-popover {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-sidebar);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+  overflow: hidden;
+  z-index: 30;
+}
+
+.repo-switcher-input {
+  width: 100%;
+  border: none;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text);
+  padding: 8px 10px;
+  outline: none;
+  font: inherit;
+}
+
+.repo-switcher-input::placeholder {
+  color: var(--text-muted);
+}
+
+.repo-switcher-results {
+  max-height: 220px;
+  overflow: auto;
+}
+
+.repo-switcher-empty {
+  margin: 0;
+  padding: 12px 10px;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.repo-switcher-row-wrap {
+  display: flex;
+  align-items: stretch;
+  gap: 0;
+}
+
+.repo-switcher-row-wrap.highlight,
+.repo-switcher-row.highlight {
+  background: var(--bg-hover);
+}
+
+.repo-switcher-row-wrap.active .repo-switcher-name {
+  color: var(--accent);
+}
+
+.repo-switcher-row {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+  border: none;
+  background: transparent;
+  padding: 8px 10px;
+  cursor: pointer;
+  text-align: left;
+}
+
+.repo-switcher-row:hover,
+.repo-switcher-row-wrap:hover {
+  background: var(--bg-hover);
+}
+
+.repo-switcher-name {
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  width: 100%;
+}
+
+.repo-switcher-path {
+  color: var(--text-muted);
+  font-size: 11px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  width: 100%;
+}
+
+.repo-switcher-forget {
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  padding: 0 10px;
+  cursor: pointer;
+  opacity: 0;
+  flex-shrink: 0;
+}
+
+.repo-switcher-row-wrap:hover .repo-switcher-forget,
+.repo-switcher-row-wrap.highlight .repo-switcher-forget {
+  opacity: 1;
+}
+
+.repo-switcher-forget:hover {
+  color: var(--text);
+}
+
+.repo-switcher-browse {
+  border: none;
+  border-top: 1px solid var(--border);
+  background: transparent;
+  color: var(--text);
+  padding: 8px 10px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.repo-switcher-browse:hover:not(:disabled) {
+  background: var(--bg-hover);
+}
+
+.repo-switcher-browse:disabled,
+.repo-switcher-row:disabled {
+  opacity: 0.45;
+  cursor: default;
 }
 
 .btn {

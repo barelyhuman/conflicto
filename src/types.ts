@@ -17,6 +17,12 @@ export interface RepoInfo {
   branch: string
 }
 
+export interface RecentRepo {
+  root: string
+  name: string
+  openedAt: number
+}
+
 export interface FileDiff {
   path: string
   original: string
@@ -42,6 +48,9 @@ export interface CommitFile {
 
 export interface ConflictoApi {
   openRepo: () => Promise<RepoInfo | null>
+  openRepoPath: (path: string) => Promise<RepoInfo>
+  getRecentRepos: () => Promise<RecentRepo[]>
+  removeRecentRepo: (root: string) => Promise<RecentRepo[]>
   listChanges: (root: string) => Promise<ChangeEntry[]>
   getFileDiff: (root: string, path: string, side: ChangeSide) => Promise<FileDiff>
   listCommits: (root: string, limit?: number) => Promise<CommitInfo[]>
