@@ -7,6 +7,8 @@ const api: ConflictoApi = {
   getRecentRepos: () => ipcRenderer.invoke('conflicto:get-recent-repos'),
   removeRecentRepo: (root) => ipcRenderer.invoke('conflicto:remove-recent-repo', root),
   listChanges: (root) => ipcRenderer.invoke('conflicto:list-changes', root),
+  stagePaths: (root, paths) => ipcRenderer.invoke('conflicto:stage-paths', root, paths),
+  unstagePaths: (root, paths) => ipcRenderer.invoke('conflicto:unstage-paths', root, paths),
   getFileDiff: (root, path, side: ChangeSide) =>
     ipcRenderer.invoke('conflicto:get-file-diff', root, path, side),
   listCommits: (root, limit) => ipcRenderer.invoke('conflicto:list-commits', root, limit),

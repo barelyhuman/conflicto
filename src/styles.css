@@ -355,8 +355,12 @@ button {
 }
 
 .accordion-chevron {
-  width: 10px;
-  font-size: 10px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
 }
 
 .accordion-body {
@@ -499,22 +503,63 @@ button {
 .file-row {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 2px;
   width: 100%;
+  min-width: 0;
+  padding-right: 4px;
+}
+
+button.file-row {
+  gap: 8px;
   border: 0;
   background: transparent;
   text-align: left;
   padding: 4px 12px;
   cursor: pointer;
-  min-width: 0;
+  color: inherit;
 }
 
-.file-row:hover {
+.file-row:hover,
+.file-row.active {
   background: var(--bg-hover);
 }
 
 .file-row.active {
   background: var(--bg-active);
+}
+
+.file-row-main {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  text-align: left;
+  padding: 4px 8px 4px 12px;
+  cursor: pointer;
+  color: inherit;
+}
+
+.file-row-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  opacity: 0;
+  padding: 2px;
+  color: var(--text-muted);
+}
+
+.file-row:hover .file-row-action,
+.file-row.active .file-row-action,
+.file-row-action:focus-visible {
+  opacity: 1;
+}
+
+.file-row-action:hover:not(:disabled) {
+  color: var(--text);
 }
 
 .file-path {

@@ -15,6 +15,7 @@
   "dependencies": {
     "@preact/signals": "^2.3.2",
     "@rose-pine/palette": "^4.0.1",
+    "@tabler/icons-preact": "^3.45.0",
     "monaco-editor": "^0.52.2",
     "preact": "^10.26.9"
   },
@@ -26,5 +27,6 @@
     "vite": "^6.3.5",
     "vite-plugin-electron": "^0.29.0",
     "vite-plugin-electron-renderer": "^0.14.6"
-  }
+  },
+  "packageManager": "pnpm@10.19.1-oidc-test.3+sha512.e5961a4b56bb37620f97b65da4ca56216634bf39ed358eda925f0f036534d458fa249d93ed0021410523f8bb7ed8512b61fe5532ed3e81777793366c6be026b5"
 }

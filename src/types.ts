@@ -52,6 +52,8 @@ export interface ConflictoApi {
   getRecentRepos: () => Promise<RecentRepo[]>
   removeRecentRepo: (root: string) => Promise<RecentRepo[]>
   listChanges: (root: string) => Promise<ChangeEntry[]>
+  stagePaths: (root: string, paths: string[]) => Promise<void>
+  unstagePaths: (root: string, paths: string[]) => Promise<void>
   getFileDiff: (root: string, path: string, side: ChangeSide) => Promise<FileDiff>
   listCommits: (root: string, limit?: number) => Promise<CommitInfo[]>
   listCommitFiles: (root: string, hash: string) => Promise<CommitFile[]>

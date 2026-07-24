@@ -183,6 +183,30 @@ export async function selectChange(entry: ChangeEntry) {
   }
 }
 
+export async function stageChange(entry: ChangeEntry) {
+  const current = repo.value
+  if (!current || entry.side !== 'unstaged') return
+  error.value = null
+  try {
+    await window.conflicto.stagePaths(current.root, [entry.path])
+    await refreshChanges()
+  } catch (e) {
+    error.value = e instanceof Error ? e.message : String(e)
+  }
+}
+
+export async function unstageChange(entry: ChangeEntry) {
+  const current = repo.value
+  if (!current || entry.side !== 'staged') return
+  error.value = null
+  try {
+    await window.conflicto.unstagePaths(current.root, [entry.path])
+    await refreshChanges()
+  } catch (e) {
+    error.value = e instanceof Error ? e.message : String(e)
+  }
+}
+
 export async function selectCommit(hash: string) {
   const current = repo.value
   if (!current) return

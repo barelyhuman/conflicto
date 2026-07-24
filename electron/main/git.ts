@@ -121,6 +121,16 @@ export async function listChanges(root: string): Promise<ChangeEntry[]> {
   return entries
 }
 
+export async function stagePaths(root: string, paths: string[]): Promise<void> {
+  if (paths.length === 0) return
+  await gitOk(root, ['add', '--', ...paths])
+}
+
+export async function unstagePaths(root: string, paths: string[]): Promise<void> {
+  if (paths.length === 0) return
+  await gitOk(root, ['restore', '--staged', '--', ...paths])
+}
+
 function languageFromPath(filePath: string): string {
   const ext = path.extname(filePath).toLowerCase()
   const map: Record<string, string> = {

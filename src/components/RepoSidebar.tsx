@@ -1,4 +1,11 @@
 import type { ComponentChildren } from 'preact'
+import {
+  IconChevronDown,
+  IconChevronRight,
+  IconMinus,
+  IconPlus,
+  IconRefresh,
+} from '@tabler/icons-preact'
 import type { ChangeEntry, CommitFile } from '../types'
 import { GitGraphPanel } from './GitGraphPanel'
 import { RepoSwitcher } from './RepoSwitcher'
@@ -11,7 +18,9 @@ import {
   selectChange,
   selectedKey,
   setViewMode,
+  stageChange,
   staged,
+  unstageChange,
   unstaged,
   viewMode,
 } from '../state'
@@ -35,17 +44,31 @@ function statusLetter(status: ChangeEntry['status'] | CommitFile['status']): str
 function FileRow({ entry }: { entry: ChangeEntry }) {
   const key = changeKey(entry)
   const active = selectedKey.value === key
+  const isStaged = entry.side === 'staged'
+  const actionLabel = isStaged ? 'Unstage' : 'Stage'
+
   return (
-    <button
-      type="button"
-      class={`file-row ${active ? 'active' : ''}`}
-      onClick={() => selectChange(entry)}
-    >
-      <span class={`status status-${entry.status}`}>{statusLetter(entry.status)}</span>
-      <span class="file-path" title={entry.path}>
-        {entry.path}
-      </span>
-    </button>
+    <div class={`file-row ${active ? 'active' : ''}`}>
+      <button type="button" class="file-row-main" onClick={() => selectChange(entry)}>
+        <span class={`status status-${entry.status}`}>{statusLetter(entry.status)}</span>
+        <span class="file-path" title={entry.path}>
+          {entry.path}
+        </span>
+      </button>
+      <button
+        type="button"
+        class="btn file-row-action"
+        title={actionLabel}
+        aria-label={`${actionLabel} ${entry.path}`}
+        onClick={(e) => {
+          e.stopPropagation()
+          if (isStaged) void unstageChange(entry)
+          else void stageChange(entry)
+        }}
+      >
+        {isStaged ? <IconMinus size={14} stroke={1.5} /> : <IconPlus size={14} stroke={1.5} />}
+      </button>
+    </div>
   )
 }
 
@@ -67,13 +90,11 @@ function Section({ title, entries }: { title: string; entries: ChangeEntry[] }) 
 }
 
 function Accordion({
-  id,
   title,
   open,
   onToggle,
   children,
 }: {
-  id: 'changes' | 'graph'
   title: string
   open: boolean
   onToggle: () => void
@@ -82,7 +103,13 @@ function Accordion({
   return (
     <section class={`accordion ${open ? 'open' : ''}`}>
       <button type="button" class="accordion-header" onClick={onToggle} aria-expanded={open}>
-        <span class="accordion-chevron">{open ? '▾' : '▸'}</span>
+        <span class="accordion-chevron">
+          {open ? (
+            <IconChevronDown size={14} stroke={1.5} />
+          ) : (
+            <IconChevronRight size={14} stroke={1.5} />
+          )}
+        </span>
         <span>{title}</span>
       </button>
       {open && <div class="accordion-body">{children}</div>}
@@ -108,8 +135,9 @@ export function RepoSidebar() {
           disabled={!current || refreshing}
           onClick={() => refreshAll()}
           title="Refresh (⌘R)"
+          aria-label="Refresh"
         >
-          {refreshing ? '…' : '↻'}
+          {refreshing ? '…' : <IconRefresh size={16} stroke={1.5} />}
         </button>
       </div>
 
@@ -124,12 +152,7 @@ export function RepoSidebar() {
 
       {current && (
         <div class="sidebar-accordions">
-          <Accordion
-            id="changes"
-            title="Changes"
-            open={mode === 'changes'}
-            onToggle={() => setViewMode('changes')}
-          >
+          <Accordion title="Changes" open={mode === 'changes'} onToggle={() => setViewMode('changes')}>
             {empty && !loadingChanges.value && (
               <p class="sidebar-empty">No changes in the working tree.</p>
             )}
@@ -137,12 +160,7 @@ export function RepoSidebar() {
             <Section title="Working Tree" entries={unstagedEntries} />
           </Accordion>
 
-          <Accordion
-            id="graph"
-            title="Graph"
-            open={mode === 'graph'}
-            onToggle={() => setViewMode('graph')}
-          >
+          <Accordion title="Graph" open={mode === 'graph'} onToggle={() => setViewMode('graph')}>
             <GitGraphPanel />
           </Accordion>
         </div>

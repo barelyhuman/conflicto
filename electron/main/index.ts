@@ -9,6 +9,8 @@ import {
   listCommits,
   listChanges,
   resolveRepo,
+  stagePaths,
+  unstagePaths,
 } from './git'
 import { listRecentRepos, recordRecentRepo, removeRecentRepo } from './recentRepos'
 import type { ChangeSide } from '../../src/types'
@@ -72,6 +74,14 @@ function registerIpc() {
 
   ipcMain.handle('conflicto:list-changes', async (_event, root: string) => {
     return listChanges(root)
+  })
+
+  ipcMain.handle('conflicto:stage-paths', async (_event, root: string, paths: string[]) => {
+    await stagePaths(root, paths)
+  })
+
+  ipcMain.handle('conflicto:unstage-paths', async (_event, root: string, paths: string[]) => {
+    await unstagePaths(root, paths)
   })
 
   ipcMain.handle(
