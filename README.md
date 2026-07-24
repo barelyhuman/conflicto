@@ -7,8 +7,9 @@ A fast, VS Code-inspired desktop diff viewer. Point it at a git repo and inspect
 - [ ] Git staged/unstaged/merged view 
     - [ ] Watcher Arch
         - [ ] Verify watching arch before doing anything 
+    - [ ] Branch switcher 
     - [ ] Git graph
-- [ ] History on the sidebar for all added / watching folders 
+- [x] History on the sidebar for all added / watching folders 
 - [ ] Ability to connect to github to see PR's and check their diffs 
     - [ ] View / hide PR comments 
     - [ ] Ability to approve / merged / open the PR 
