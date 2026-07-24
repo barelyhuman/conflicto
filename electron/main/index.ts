@@ -75,6 +75,11 @@ function registerIpc() {
       return getCommitFileDiff(root, hash, filePath)
     },
   )
+
+  ipcMain.handle('conflicto:set-chrome-color', async (_event, hex: string) => {
+    if (!win || typeof hex !== 'string' || !/^#[0-9a-fA-F]{6}$/.test(hex)) return
+    win.setBackgroundColor(hex)
+  })
 }
 
 async function createWindow() {

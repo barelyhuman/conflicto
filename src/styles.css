@@ -9,10 +9,18 @@
   --text-muted: #858585;
   --accent: #0078d4;
   --accent-hover: #1c8adb;
+  --btn-bg: #3c3c3c;
+  --btn-hover: #464647;
+  --btn-fg: #ffffff;
   --status-m: #e2c08d;
   --status-a: #73c991;
   --status-d: #f14c4c;
   --status-r: #73c991;
+  --danger-bg: #5a1d1d;
+  --danger-border: #f14c4c;
+  --danger-fg: #f8d7da;
+  --ref-fg: #75beff;
+  --ref-bg: #264f78;
   --font-ui: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
   --font-mono: Menlo, Monaco, 'Courier New', monospace;
 }
@@ -73,14 +81,14 @@ button {
 
 .btn {
   border: 1px solid transparent;
-  background: #3c3c3c;
+  background: var(--btn-bg);
   border-radius: 4px;
   padding: 4px 8px;
   cursor: pointer;
 }
 
 .btn:hover:not(:disabled) {
-  background: #464647;
+  background: var(--btn-hover);
 }
 
 .btn:disabled {
@@ -90,7 +98,7 @@ button {
 
 .btn.primary {
   background: var(--accent);
-  color: #fff;
+  color: var(--btn-fg);
 }
 
 .btn.primary:hover:not(:disabled) {
@@ -99,7 +107,7 @@ button {
 
 .btn.toggle.active {
   border-color: var(--accent);
-  color: #fff;
+  color: var(--btn-fg);
 }
 
 .repo-meta {
@@ -265,8 +273,8 @@ button {
 
 .commit-ref {
   font-size: 10px;
-  color: #75beff;
-  background: #264f78;
+  color: var(--ref-fg);
+  background: var(--ref-bg);
   border-radius: 3px;
   padding: 0 4px;
   overflow: hidden;
@@ -302,7 +310,7 @@ button {
 
 .section-header .count {
   color: var(--text);
-  background: #3c3c3c;
+  background: var(--btn-bg);
   border-radius: 8px;
   padding: 0 6px;
   font-size: 11px;
@@ -391,7 +399,50 @@ button {
 }
 
 .diff-toolbar .toolbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   -webkit-app-region: no-drag;
+}
+
+.theme-picker {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-muted);
+  font-size: 11px;
+}
+
+.theme-picker .theme-label {
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.theme-picker select {
+  appearance: none;
+  background: var(--btn-bg);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 4px 24px 4px 8px;
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+  background-image: linear-gradient(45deg, transparent 50%, var(--text-muted) 50%),
+    linear-gradient(135deg, var(--text-muted) 50%, transparent 50%);
+  background-position:
+    calc(100% - 12px) calc(50% - 2px),
+    calc(100% - 8px) calc(50% - 2px);
+  background-size:
+    4px 4px,
+    4px 4px;
+  background-repeat: no-repeat;
+}
+
+.theme-picker select:hover,
+.theme-picker select:focus {
+  border-color: var(--accent);
+  outline: none;
 }
 
 .diff-path {
@@ -482,9 +533,9 @@ button {
   left: 50%;
   transform: translateX(-50%);
   z-index: 5;
-  background: #5a1d1d;
-  border: 1px solid #f14c4c;
-  color: #f8d7da;
+  background: var(--danger-bg);
+  border: 1px solid var(--danger-border);
+  color: var(--danger-fg);
   padding: 8px 12px;
   border-radius: 4px;
   max-width: 80%;

@@ -10,6 +10,7 @@ const api: ConflictoApi = {
   listCommitFiles: (root, hash) => ipcRenderer.invoke('conflicto:list-commit-files', root, hash),
   getCommitFileDiff: (root, hash, path) =>
     ipcRenderer.invoke('conflicto:get-commit-file-diff', root, hash, path),
+  setChromeColor: (hex) => ipcRenderer.invoke('conflicto:set-chrome-color', hex),
 }
 
 contextBridge.exposeInMainWorld('conflicto', api)

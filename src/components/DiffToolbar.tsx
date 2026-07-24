@@ -1,4 +1,5 @@
-import { diff, findSelected, selectedCommit, sideBySide, viewMode } from '../state'
+import { diff, findSelected, selectedCommit, setAppTheme, sideBySide, THEMES, themeId, viewMode } from '../state'
+import type { ThemeId } from '../theme/tokens'
 
 export function DiffToolbar() {
   const current = diff.value
@@ -32,6 +33,22 @@ export function DiffToolbar() {
         )}
       </div>
       <div class="toolbar-actions">
+        <label class="theme-picker">
+          <span class="theme-label">Theme</span>
+          <select
+            value={themeId.value}
+            onChange={(e) => {
+              const next = (e.currentTarget as HTMLSelectElement).value as ThemeId
+              void setAppTheme(next)
+            }}
+          >
+            {THEMES.map((t) => (
+              <option key={t.id} value={t.id}>
+                {t.label}
+              </option>
+            ))}
+          </select>
+        </label>
         <button
           type="button"
           class={`btn toggle ${sideBySide.value ? 'active' : ''}`}

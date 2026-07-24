@@ -1,4 +1,5 @@
 import type * as Monaco from 'monaco-editor'
+import { registerMonacoThemes } from '../theme/registerMonacoThemes'
 
 let monacoPromise: Promise<typeof Monaco> | null = null
 
@@ -44,6 +45,7 @@ export function loadMonaco(): Promise<typeof Monaco> {
         },
       }
 
+      registerMonacoThemes(monaco)
       return monaco
     })()
   }

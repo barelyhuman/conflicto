@@ -1,8 +1,10 @@
 import { useEffect, useRef } from 'preact/hooks'
 import { useSignalEffect } from '@preact/signals'
 import type { editor } from 'monaco-editor'
-import { diff, sideBySide } from '../state'
+import { diff, sideBySide, themeId } from '../state'
 import { loadMonaco } from '../lib/monaco'
+import { getTheme } from '../theme/themes'
+import { registerMonacoThemes } from '../theme/registerMonacoThemes'
 
 export function MonacoDiffView() {
   const containerRef = useRef<HTMLDivElement>(null)
@@ -23,12 +25,15 @@ export function MonacoDiffView() {
       const monaco = await loadMonaco()
       if (disposed || !containerRef.current) return
 
+      registerMonacoThemes(monaco)
+      const theme = getTheme(themeId.value).monacoThemeId
+
       const ed = monaco.editor.createDiffEditor(containerRef.current, {
         automaticLayout: true,
         readOnly: true,
         originalEditable: false,
         renderSideBySide: sideBySide.value,
-        theme: 'vs-dark',
+        theme,
         scrollBeyondLastLine: false,
         minimap: { enabled: false },
         renderIndicators: true,
@@ -59,11 +64,24 @@ export function MonacoDiffView() {
   }, [])
 
   useSignalEffect(() => {
-    // Read the signal first so we always subscribe, even before the editor exists.
     const renderSideBySide = sideBySide.value
     const ed = editorRef.current
     if (!ed || !readyRef.current) return
     ed.updateOptions({ renderSideBySide })
+  })
+
+  useSignalEffect(() => {
+    const id = themeId.value
+    let cancelled = false
+    ;(async () => {
+      const monaco = await loadMonaco()
+      if (cancelled) return
+      registerMonacoThemes(monaco)
+      monaco.editor.setTheme(getTheme(id).monacoThemeId)
+    })()
+    return () => {
+      cancelled = true
+    }
   })
 
   useSignalEffect(() => {

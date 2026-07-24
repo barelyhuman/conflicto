@@ -4,6 +4,7 @@ import { GitGraphPanel } from './GitGraphPanel'
 import {
   changeKey,
   loadingChanges,
+  loadingCommits,
   openRepository,
   refreshAll,
   repo,
@@ -105,9 +106,12 @@ export function RepoSidebar() {
         <button
           type="button"
           class="btn"
-          disabled={!current || loadingChanges.value}
+          disabled={
+            !current ||
+            (mode === 'graph' ? loadingCommits.value : loadingChanges.value)
+          }
           onClick={() => refreshAll()}
-          title="Refresh"
+          title="Refresh (⌘R)"
         >
           {loadingChanges.value ? '…' : '↻'}
         </button>

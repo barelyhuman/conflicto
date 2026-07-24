@@ -47,6 +47,7 @@ export interface ConflictoApi {
   listCommits: (root: string, limit?: number) => Promise<CommitInfo[]>
   listCommitFiles: (root: string, hash: string) => Promise<CommitFile[]>
   getCommitFileDiff: (root: string, hash: string, path: string) => Promise<FileDiff>
+  setChromeColor: (hex: string) => Promise<void>
 }
 
 declare global {

@@ -7,6 +7,9 @@ import type {
   RepoInfo,
   ViewMode,
 } from './types'
+import { applyTheme } from './theme/applyTheme'
+import { DEFAULT_THEME_ID, THEMES } from './theme/themes'
+import type { ThemeId } from './theme/tokens'
 
 export const repo = signal<RepoInfo | null>(null)
 export const changes = signal<ChangeEntry[]>([])
@@ -23,6 +26,8 @@ export const loadingCommits = signal(false)
 export const selectedCommitHash = signal<string | null>(null)
 export const commitFiles = signal<CommitFile[]>([])
 export const loadingCommitFiles = signal(false)
+
+export const themeId = signal<ThemeId>(DEFAULT_THEME_ID)
 
 export const staged = computed(() => changes.value.filter((c) => c.side === 'staged'))
 export const unstaged = computed(() => changes.value.filter((c) => c.side === 'unstaged'))
@@ -74,8 +79,10 @@ export async function refreshChanges() {
     changes.value = await window.conflicto.listChanges(current.root)
     if (viewMode.value !== 'changes') return
     const key = selectedKey.value
-    const stillPresent = key != null && changes.value.some((c) => changeKey(c) === key)
-    if (!stillPresent) {
+    const stillPresent = key != null ? changes.value.find((c) => changeKey(c) === key) : null
+    if (stillPresent) {
+      await selectChange(stillPresent)
+    } else {
       selectedKey.value = null
       diff.value = null
       const next = firstChange()
@@ -183,8 +190,24 @@ export async function selectCommitFile(hash: string, path: string) {
 
 export async function refreshAll() {
   if (viewMode.value === 'graph') {
+    const hash = selectedCommitHash.value
+    const key = selectedKey.value
+    const path =
+      hash && key?.startsWith(`commit:${hash}:`) ? key.slice(`commit:${hash}:`.length) : null
     await refreshCommits()
+    if (!hash) return
+    await selectCommit(hash)
+    if (path && commitFiles.value.some((f) => f.path === path)) {
+      await selectCommitFile(hash, path)
+    }
   } else {
     await refreshChanges()
   }
 }
+
+export async function setAppTheme(id: ThemeId) {
+  themeId.value = id
+  await applyTheme(id)
+}
+
+export { THEMES }
