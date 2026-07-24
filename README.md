@@ -18,6 +18,7 @@ A fast, VS Code-inspired desktop diff viewer. Point it at a git repo and inspect
 - [ ] A very simple terminal integration
 - [x] Better theme arch
     - [x] Create an adaptive theme that uses the monaco themes to create the rest of the UI
+- [ ] Updater
 
 ## Agent TODO
 
