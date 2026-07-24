@@ -26,12 +26,13 @@ export type UiVarName = (typeof UI_VAR_NAMES)[number]
 
 export type UiVars = Record<UiVarName, string>
 
-export type MonacoBase = 'vs' | 'vs-dark' | 'hc-black'
+export type ColorScheme = 'light' | 'dark'
 
 export type ThemeId =
-  | 'vs-dark'
-  | 'vs'
-  | 'hc-black'
+  | 'pierre-dark'
+  | 'pierre-light'
+  | 'dark-plus'
+  | 'light-plus'
   | 'rose-pine'
   | 'rose-pine-moon'
   | 'rose-pine-dawn'

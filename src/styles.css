@@ -1,26 +1,26 @@
 :root {
   color-scheme: dark;
-  --bg: #1e1e1e;
-  --bg-sidebar: #252526;
-  --bg-hover: #2a2d2e;
-  --bg-active: #37373d;
-  --border: #2b2b2b;
-  --text: #cccccc;
-  --text-muted: #858585;
-  --accent: #0078d4;
-  --accent-hover: #1c8adb;
-  --btn-bg: #3c3c3c;
-  --btn-hover: #464647;
+  --bg: #1a1a1a;
+  --bg-sidebar: #141416;
+  --bg-hover: #27272a;
+  --bg-active: #3b2f5a;
+  --border: #3f3f46;
+  --text: #e4e4e7;
+  --text-muted: #71717a;
+  --accent: #a78bfa;
+  --accent-hover: #c4b5fd;
+  --btn-bg: #3f3f46;
+  --btn-hover: #52525b;
   --btn-fg: #ffffff;
-  --status-m: #e2c08d;
-  --status-a: #73c991;
-  --status-d: #f14c4c;
-  --status-r: #73c991;
+  --status-m: #fbbf24;
+  --status-a: #4ade80;
+  --status-d: #f87171;
+  --status-r: #4ade80;
   --danger-bg: #5a1d1d;
-  --danger-border: #f14c4c;
+  --danger-border: #f87171;
   --danger-fg: #f8d7da;
-  --ref-fg: #75beff;
-  --ref-bg: #264f78;
+  --ref-fg: #c4b5fd;
+  --ref-bg: #3b2f5a;
   --font-ui: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
   --font-mono: Menlo, Monaco, 'Courier New', monospace;
 }
@@ -703,6 +703,13 @@ button.file-row {
   flex: 1;
   min-height: 0;
   width: 100%;
+  overflow: auto;
+}
+
+.diff-editor diffs-container {
+  display: block;
+  width: 100%;
+  min-height: 100%;
 }
 
 .empty {

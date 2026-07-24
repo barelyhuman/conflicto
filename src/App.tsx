@@ -1,7 +1,7 @@
 import { useEffect } from 'preact/hooks'
 import { RepoSidebar } from './components/RepoSidebar'
 import { DiffToolbar } from './components/DiffToolbar'
-import { MonacoDiffView } from './components/MonacoDiffView'
+import { PierreDiffView } from './components/PierreDiffView'
 import {
   diff,
   error,
@@ -69,7 +69,7 @@ export function App() {
               <p>Loading diff…</p>
             </div>
           )}
-          {hasDiff && <MonacoDiffView />}
+          {hasDiff && <PierreDiffView />}
         </div>
       </main>
       <RepoSidebar />

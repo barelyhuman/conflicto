@@ -1,6 +1,6 @@
-import type { MonacoBase, UiVars } from './tokens'
+import type { ColorScheme, UiVars } from './tokens'
 
-/** Ensure #rrggbb (Monaco accepts with or without #; CSS vars need #). */
+/** Ensure #rrggbb (CSS vars need #). */
 export function normalizeHex(color: string | undefined, fallback: string): string {
   if (!color) return fallback
   const c = color.trim()
@@ -45,11 +45,11 @@ export function darken(hex: string, t: number): string {
 type ColorMap = Record<string, string>
 
 /**
- * Map Monaco workbench/editor colors into Conflicto UI CSS variables.
+ * Map VS Code–style workbench/editor colors into Conflicto UI CSS variables.
  * Missing keys are derived from background/foreground so every theme stays complete.
  */
-export function deriveUiVars(colors: ColorMap, base: MonacoBase): UiVars {
-  const isLight = base === 'vs'
+export function deriveUiVars(colors: ColorMap, scheme: ColorScheme): UiVars {
+  const isLight = scheme === 'light'
   const bg = normalizeHex(colors['editor.background'], isLight ? '#ffffff' : '#1e1e1e')
   const fg = normalizeHex(colors['editor.foreground'], isLight ? '#000000' : '#cccccc')
   const sidebar = normalizeHex(

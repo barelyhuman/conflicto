@@ -74,12 +74,6 @@ export default defineConfig(({ command }) => {
         renderer: {},
       }),
     ],
-    worker: {
-      format: 'es',
-    },
-    optimizeDeps: {
-      exclude: ['monaco-editor'],
-    },
     clearScreen: false,
   }
 })

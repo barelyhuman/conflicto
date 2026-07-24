@@ -13,10 +13,10 @@
     "cdp": "node scripts/cdp-status.mjs"
   },
   "dependencies": {
+    "@pierre/diffs": "^1.2.12",
     "@preact/signals": "^2.3.2",
     "@rose-pine/palette": "^4.0.1",
     "@tabler/icons-preact": "^3.45.0",
-    "monaco-editor": "^0.52.2",
     "preact": "^10.26.9"
   },
   "devDependencies": {
