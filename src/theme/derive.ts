@@ -56,6 +56,18 @@ export function deriveUiVars(colors: ColorMap, scheme: ColorScheme): UiVars {
     colors['sideBar.background'] ?? colors['editorWidget.background'],
     isLight ? darken(bg, 0.03) : lighten(bg, 0.04),
   )
+  const surfaceFallback = isLight ? darken(bg, 0.04) : lighten(bg, 0.06)
+  let surface = normalizeHex(
+    colors['editorWidget.background'] ?? colors['panel.background'],
+    surfaceFallback,
+  )
+  // Keep chrome strips readable when widget bg matches sidebar or editor.
+  if (surface.toLowerCase() === bg.toLowerCase() || surface.toLowerCase() === sidebar.toLowerCase()) {
+    surface = isLight ? darken(sidebar, 0.04) : lighten(sidebar, 0.05)
+    if (surface.toLowerCase() === sidebar.toLowerCase() || surface.toLowerCase() === bg.toLowerCase()) {
+      surface = isLight ? darken(bg, 0.06) : lighten(bg, 0.08)
+    }
+  }
   const border = normalizeHex(
     colors['editorWidget.border'] ?? colors['panel.border'],
     isLight ? darken(bg, 0.12) : lighten(bg, 0.12),
@@ -86,6 +98,7 @@ export function deriveUiVars(colors: ColorMap, scheme: ColorScheme): UiVars {
   return {
     '--bg': bg,
     '--bg-sidebar': sidebar,
+    '--bg-surface': surface,
     '--bg-hover': hover,
     '--bg-active': active,
     '--border': border,

@@ -2,6 +2,7 @@
   color-scheme: dark;
   --bg: #1a1a1a;
   --bg-sidebar: #141416;
+  --bg-surface: #222226;
   --bg-hover: #27272a;
   --bg-active: #3b2f5a;
   --border: #3f3f46;
@@ -56,7 +57,6 @@ button {
   display: flex;
   flex-direction: column;
   background: var(--bg-sidebar);
-  border-left: 1px solid var(--border);
   min-width: 0;
   overflow: hidden;
 }
@@ -253,8 +253,12 @@ button {
 }
 
 .btn {
+  appearance: none;
+  -webkit-appearance: none;
   border: 1px solid transparent;
   background: var(--btn-bg);
+  color: var(--text);
+  font: inherit;
   border-radius: 4px;
   padding: 4px 8px;
   cursor: pointer;
@@ -280,12 +284,17 @@ button {
 
 .btn.toggle.active {
   border-color: var(--accent);
-  color: var(--btn-fg);
+  background: var(--bg-active);
+  color: var(--text);
+}
+
+.btn.toggle.active:hover:not(:disabled) {
+  background: var(--bg-hover);
+  border-color: var(--accent-hover);
 }
 
 .repo-meta {
   padding: 0 12px 12px;
-  border-bottom: 1px solid var(--border);
   min-width: 0;
 }
 
@@ -321,7 +330,6 @@ button {
   display: flex;
   flex-direction: column;
   min-height: 0;
-  border-bottom: 1px solid var(--border);
 }
 
 .accordion.open {
@@ -334,7 +342,7 @@ button {
   gap: 6px;
   width: 100%;
   border: 0;
-  background: transparent;
+  background: var(--bg-surface);
   color: var(--text-muted);
   font-size: 11px;
   text-transform: uppercase;
@@ -461,7 +469,7 @@ button {
 }
 
 .commit-files {
-  border-top: 1px solid var(--border);
+  background: var(--bg-surface);
   max-height: 40%;
   overflow: auto;
   flex-shrink: 0;
@@ -610,8 +618,7 @@ button.file-row {
   margin-top: 2px;
   margin-bottom: 2px;
   padding: 0 12px 0 80px;
-  border-bottom: 1px solid var(--border);
-  background: var(--bg);
+  background: var(--bg-surface);
   flex-shrink: 0;
   -webkit-app-region: drag;
 }
@@ -703,7 +710,6 @@ button.file-row {
   display: flex;
   flex-direction: column;
   flex-shrink: 0;
-  border-top: 1px solid var(--border);
   background: var(--bg);
   position: relative;
   min-height: 120px;
@@ -736,7 +742,7 @@ button.file-row {
   gap: 8px;
   height: 28px;
   padding: 0 10px;
-  border-bottom: 1px solid var(--border);
+  background: var(--bg-surface);
   color: var(--text-muted);
   font-size: 11px;
   text-transform: uppercase;

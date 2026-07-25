@@ -1,6 +1,7 @@
 export const UI_VAR_NAMES = [
   '--bg',
   '--bg-sidebar',
+  '--bg-surface',
   '--bg-hover',
   '--bg-active',
   '--border',

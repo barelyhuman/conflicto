@@ -14,3 +14,4 @@ release
 /test-results/
 /playwright-report/
 /playwright/.cache/
+native/target/

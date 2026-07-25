@@ -1,0 +1,16 @@
+[package]
+name = "conflicto"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "conflicto"
+path = "src/main.rs"
+
+[dependencies]
+conflicto_core = { workspace = true }
+eframe = { workspace = true }
+egui = { workspace = true }
+rfd = { workspace = true }
+similar = { workspace = true }

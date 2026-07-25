@@ -1,6 +1,8 @@
 # Conflicto
 
-A fast, VS Code-inspired desktop diff viewer. Point it at a git repo and inspect staged / unstaged file diffs in Monaco.
+A fast, VS Code-inspired desktop diff viewer. Point it at a git repo and inspect staged / unstaged file diffs.
+
+> **Native rewrite in progress** — see [`SPEC.md`](SPEC.md) and [`native/`](native/) (Rust + egui). Goal: same job without Electron’s ~300MB Chromium tax.
 
 ## Human TODO
 
@@ -27,16 +29,29 @@ A fast, VS Code-inspired desktop diff viewer. Point it at a git repo and inspect
 
 ## Stack
 
+**Electron (current):**
 - Electron + Vite
 - Preact + `@preact/signals`
-- Monaco DiffEditor
+- Pierre Diffs (Shiki)
 - System `git` via the Electron main process
 
-## Develop
+**Native (v1, see SPEC.md):**
+- Rust + egui / eframe
+- System `git`
+- Themes, diffs (editable unstaged), graph
+
+## Develop (Electron)
 
 ```bash
 pnpm install
 pnpm dev
+```
+
+## Develop (native)
+
+```bash
+cd native
+cargo run -p conflicto
 ```
 
 Requires `git` on your PATH.
@@ -58,5 +73,5 @@ If Electron boots but `import 'electron'` fails (API is a path string), check th
 
 - `⌘O` / `Ctrl+O` — open repository
 - `⌘R` / `Ctrl+R` — refresh changes
-- `` ⌘` `` / `` Ctrl+` `` — toggle terminal
-
+- `` ⌘` `` / `` Ctrl+` `` — toggle terminal (Electron)
+- `⌘S` / `Ctrl+S` — save unstaged edits (native)
