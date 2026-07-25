@@ -2,12 +2,18 @@
 
 use std::path::Path;
 
-use conflicto_core::{themes, AppState, ChangeEntry, ChangeSide, CommitFile, ViewMode};
+use conflicto_core::{
+    graph_row_glyph, themes, AppState, ChangeEntry, ChangeSide, CommitFile, ViewMode,
+};
 use gpui::prelude::*;
 use gpui::*;
 
-use crate::actions::{Commit, OpenRepo, Refresh, Save, ToggleSideBySide};
+use crate::actions::{
+    Commit, Fetch, OpenRepo, Pull, Push, Quit, Refresh, Save, ToggleCommandPalette,
+    ToggleSideBySide,
+};
 use crate::color::rgb3;
+use crate::command_palette::{CommandPalette, CommandPaletteEvent};
 use crate::commit_input::{CommitMessageEvent, CommitMessageField};
 use crate::diff::{DiffPane, DiffPaneEvent};
 
@@ -21,9 +27,11 @@ pub struct ConflictoApp {
     state: AppState,
     diff: Entity<DiffPane>,
     commit_input: Entity<CommitMessageField>,
+    palette: Entity<CommandPalette>,
     repo_menu_open: bool,
     theme_menu_open: bool,
     settings_menu_open: bool,
+    branch_menu_open: bool,
     focus_handle: FocusHandle,
 }
 
@@ -33,18 +41,22 @@ impl ConflictoApp {
         let ui = state.ui_vars.clone();
         let diff = cx.new(DiffPane::new);
         let commit_input = cx.new(|cx| CommitMessageField::new(&ui, cx));
+        let palette = cx.new(|cx| CommandPalette::new(&ui, cx));
         let mut app = Self {
             state,
             diff: diff.clone(),
             commit_input: commit_input.clone(),
+            palette: palette.clone(),
             repo_menu_open: false,
             theme_menu_open: false,
             settings_menu_open: false,
+            branch_menu_open: false,
             focus_handle: cx.focus_handle(),
         };
         cx.subscribe(&diff, Self::on_diff_event).detach();
         cx.subscribe(&commit_input, Self::on_commit_input_event)
             .detach();
+        cx.subscribe(&palette, Self::on_palette_event).detach();
         app.sync_diff(cx);
         window.focus(&app.focus_handle);
         app
@@ -124,6 +136,42 @@ impl ConflictoApp {
         self.commit_staged(cx);
     }
 
+    fn quit(&mut self, _: &Quit, _window: &mut Window, cx: &mut Context<Self>) {
+        cx.quit();
+    }
+
+    fn toggle_palette(
+        &mut self,
+        _: &ToggleCommandPalette,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        self.repo_menu_open = false;
+        self.theme_menu_open = false;
+        self.settings_menu_open = false;
+        self.branch_menu_open = false;
+        self.palette.update(cx, |p, cx| p.toggle(window, cx));
+        cx.notify();
+    }
+
+    fn fetch(&mut self, _: &Fetch, _window: &mut Window, cx: &mut Context<Self>) {
+        self.state.fetch_remote();
+        self.sync_diff(cx);
+        cx.notify();
+    }
+
+    fn pull(&mut self, _: &Pull, _window: &mut Window, cx: &mut Context<Self>) {
+        self.state.pull_remote();
+        self.sync_diff(cx);
+        cx.notify();
+    }
+
+    fn push(&mut self, _: &Push, _window: &mut Window, cx: &mut Context<Self>) {
+        self.state.push_remote();
+        self.sync_diff(cx);
+        cx.notify();
+    }
+
     fn commit_staged(&mut self, cx: &mut Context<Self>) {
         let msg = self.commit_input.read(cx).content().to_string();
         self.state.commit_message = msg;
@@ -163,6 +211,74 @@ impl ConflictoApp {
             }
         }
     }
+
+    fn on_palette_event(
+        &mut self,
+        _palette: Entity<CommandPalette>,
+        event: &CommandPaletteEvent,
+        cx: &mut Context<Self>,
+    ) {
+        match event {
+            CommandPaletteEvent::Run(id) => match *id {
+                "open_repo" => self.open_repo_dialog(cx),
+                "refresh" => {
+                    if self.state.guard_dirty() {
+                        self.state.refresh_all();
+                        self.sync_diff(cx);
+                    }
+                    cx.notify();
+                }
+                "save" => {
+                    self.state.save_edit();
+                    self.sync_diff(cx);
+                    cx.notify();
+                }
+                "toggle_sxs" => {
+                    self.state.side_by_side = !self.state.side_by_side;
+                    self.sync_diff(cx);
+                    cx.notify();
+                }
+                "commit" => self.commit_staged(cx),
+                "fetch" => {
+                    self.state.fetch_remote();
+                    self.sync_diff(cx);
+                    cx.notify();
+                }
+                "pull" => {
+                    self.state.pull_remote();
+                    self.sync_diff(cx);
+                    cx.notify();
+                }
+                "push" => {
+                    self.state.push_remote();
+                    self.sync_diff(cx);
+                    cx.notify();
+                }
+                "view_changes" => {
+                    if self.state.guard_dirty() {
+                        self.state.view_mode = ViewMode::Changes;
+                    }
+                    cx.notify();
+                }
+                "view_graph" => {
+                    if self.state.guard_dirty() {
+                        self.state.view_mode = ViewMode::Graph;
+                    }
+                    cx.notify();
+                }
+                "view_prs" => {
+                    if self.state.guard_dirty() {
+                        self.state.view_mode = ViewMode::PullRequests;
+                        self.state.refresh_pull_requests();
+                    }
+                    cx.notify();
+                }
+                "quit" => cx.quit(),
+                _ => {}
+            },
+            CommandPaletteEvent::Closed => cx.notify(),
+        }
+    }
 }
 
 impl Render for ConflictoApp {
@@ -178,6 +294,7 @@ impl Render for ConflictoApp {
         div()
             .id("root")
             .track_focus(&self.focus_handle)
+            .relative()
             .flex()
             .flex_row()
             .size_full()
@@ -189,6 +306,11 @@ impl Render for ConflictoApp {
             .on_action(cx.listener(Self::save))
             .on_action(cx.listener(Self::toggle_sxs))
             .on_action(cx.listener(Self::commit))
+            .on_action(cx.listener(Self::quit))
+            .on_action(cx.listener(Self::toggle_palette))
+            .on_action(cx.listener(Self::fetch))
+            .on_action(cx.listener(Self::pull))
+            .on_action(cx.listener(Self::push))
             .child(
                 div()
                     .flex()
@@ -218,6 +340,7 @@ impl Render for ConflictoApp {
                     }),
             )
             .child(sidebar(self, cx))
+            .child(self.palette.clone())
     }
 }
 
@@ -228,6 +351,7 @@ fn toolbar(app: &mut ConflictoApp, cx: &mut Context<ConflictoApp>) -> impl IntoE
     let settings_open = app.settings_menu_open;
     let current = app.state.prefs.theme_id;
     let sxs = app.state.side_by_side;
+    let has_repo = app.state.repo.is_some();
 
     div()
         .flex()
@@ -248,8 +372,58 @@ fn toolbar(app: &mut ConflictoApp, cx: &mut Context<ConflictoApp>) -> impl IntoE
                 .text_color(rgb3(u.text_muted))
                 .child(if dirty { "• Unsaved edits" } else { "" }),
         )
+        .when(has_repo, |el| {
+            el.child(toolbar_action_btn("Fetch", "fetch-btn", &u, cx, |this, _, _, cx| {
+                this.state.fetch_remote();
+                this.sync_diff(cx);
+                cx.notify();
+            }))
+            .child(toolbar_action_btn("Pull", "pull-btn", &u, cx, |this, _, _, cx| {
+                this.state.pull_remote();
+                this.sync_diff(cx);
+                cx.notify();
+            }))
+            .child(toolbar_action_btn("Push", "push-btn", &u, cx, |this, _, _, cx| {
+                this.state.push_remote();
+                this.sync_diff(cx);
+                cx.notify();
+            }))
+        })
+        .child(toolbar_action_btn("⌘P", "palette-btn", &u, cx, |this, _, window, cx| {
+            this.toggle_palette(&ToggleCommandPalette, window, cx);
+        }))
         .child(theme_dropdown_button(current, theme_open, &u, cx))
         .child(settings_cog_button(sxs, settings_open, &u, cx))
+}
+
+fn toolbar_action_btn(
+    label: &'static str,
+    id: &'static str,
+    u: &conflicto_core::UiVars,
+    cx: &mut Context<ConflictoApp>,
+    on_click: impl Fn(&mut ConflictoApp, &ClickEvent, &mut Window, &mut Context<ConflictoApp>)
+        + 'static,
+) -> impl IntoElement {
+    let u = u.clone();
+    div()
+        .id(id)
+        .flex()
+        .items_center()
+        .h(px(28.))
+        .px_2()
+        .rounded_sm()
+        .border_1()
+        .border_color(rgb3(u.border))
+        .bg(rgb3(u.bg))
+        .cursor_pointer()
+        .hover(|s| s.bg(rgb3(u.bg_hover)))
+        .on_click(cx.listener(on_click))
+        .child(
+            div()
+                .text_xs()
+                .text_color(rgb3(u.text))
+                .child(label),
+        )
 }
 
 /// Overlay popover — absolute + deferred so it does not grow the toolbar.
@@ -329,6 +503,7 @@ fn theme_dropdown_button(
                                     this.theme_menu_open = false;
                                     let ui = this.state.ui_vars.clone();
                                     this.commit_input.update(cx, |field, _| field.set_ui(&ui));
+                                    this.palette.update(cx, |p, _| p.set_ui(&ui));
                                     this.sync_diff(cx);
                                     cx.notify();
                                 }))
@@ -471,6 +646,7 @@ fn sidebar(app: &mut ConflictoApp, cx: &mut Context<ConflictoApp>) -> impl IntoE
                 .child(match app.state.view_mode {
                     ViewMode::Changes => changes_list(app, cx).into_any_element(),
                     ViewMode::Graph => graph_list(app, cx).into_any_element(),
+                    ViewMode::PullRequests => pr_list(app, cx).into_any_element(),
                 }),
         )
 }
@@ -557,16 +733,115 @@ fn repo_header(app: &mut ConflictoApp, cx: &mut Context<ConflictoApp>) -> impl I
                 ),
         )
         .when(!branch.is_empty(), |el| {
+            let branch_open = app.branch_menu_open;
             el.child(
                 div()
+                    .relative()
                     .px_3()
                     .pb_1()
-                    .text_xs()
-                    .text_color(rgb3(u.text_muted))
-                    .child(branch),
+                    .child(
+                        div()
+                            .id("branch-switcher")
+                            .flex()
+                            .flex_row()
+                            .items_center()
+                            .gap_1()
+                            .px_2()
+                            .py_1()
+                            .rounded_sm()
+                            .border_1()
+                            .border_color(rgb3(u.border))
+                            .bg(rgb3(u.bg))
+                            .cursor_pointer()
+                            .hover(|s| s.bg(rgb3(u.bg_hover)))
+                            .on_click(cx.listener(|this, _, _, cx| {
+                                this.branch_menu_open = !this.branch_menu_open;
+                                this.repo_menu_open = false;
+                                this.theme_menu_open = false;
+                                this.settings_menu_open = false;
+                                cx.notify();
+                            }))
+                            .child(
+                                div()
+                                    .text_xs()
+                                    .text_color(rgb3(u.text_muted))
+                                    .child(format!("⎇ {branch}")),
+                            )
+                            .child(
+                                div()
+                                    .text_xs()
+                                    .text_color(rgb3(u.text_muted))
+                                    .child(if branch_open { "▴" } else { "▾" }),
+                            ),
+                    )
+                    .when(branch_open, |el| el.child(branch_menu(app, cx))),
             )
         })
         .when(menu_open, |el| el.child(repo_menu(app, cx)))
+}
+
+fn branch_menu(app: &mut ConflictoApp, cx: &mut Context<ConflictoApp>) -> impl IntoElement {
+    let u = app.state.ui_vars.clone();
+    let branches = app.state.branches.clone();
+    deferred(
+        div()
+            .id("branch-menu")
+            .absolute()
+            .top(px(28.))
+            .left_0()
+            .right_0()
+            .max_h(px(240.))
+            .overflow_scroll()
+            .rounded_sm()
+            .border_1()
+            .border_color(rgb3(u.border))
+            .bg(rgb3(u.bg_surface))
+            .shadow_md()
+            .py_1()
+            .occlude()
+            .children(branches.into_iter().map(|b| {
+                let name = b.name.clone();
+                let current = b.current;
+                let remote = b.remote;
+                let u = u.clone();
+                div()
+                    .id(SharedString::from(format!("branch-{name}")))
+                    .flex()
+                    .flex_row()
+                    .items_center()
+                    .h(px(26.))
+                    .px_2()
+                    .when(current, |el| el.bg(rgb3(u.bg_active)))
+                    .cursor_pointer()
+                    .hover(|s| s.bg(rgb3(u.bg_hover)))
+                    .on_click(cx.listener({
+                        let name = name.clone();
+                        move |this, _, _, cx| {
+                            if !current {
+                                this.state.switch_branch(&name);
+                                this.sync_diff(cx);
+                            }
+                            this.branch_menu_open = false;
+                            cx.notify();
+                        }
+                    }))
+                    .child(
+                        div()
+                            .flex_1()
+                            .min_w_0()
+                            .text_xs()
+                            .text_color(rgb3(if current { u.accent } else { u.text }))
+                            .overflow_hidden()
+                            .text_ellipsis()
+                            .child(if remote {
+                                format!("☁ {name}")
+                            } else {
+                                name
+                            }),
+                    )
+            })),
+    )
+    .with_priority(100)
 }
 
 fn repo_menu(app: &mut ConflictoApp, cx: &mut Context<ConflictoApp>) -> impl IntoElement {
@@ -649,6 +924,7 @@ fn repo_menu(app: &mut ConflictoApp, cx: &mut Context<ConflictoApp>) -> impl Int
 fn view_tabs(app: &mut ConflictoApp, cx: &mut Context<ConflictoApp>) -> impl IntoElement {
     let u = app.state.ui_vars.clone();
     let mode = app.state.view_mode;
+    let show_prs = app.state.github.is_some();
     div()
         .flex()
         .flex_row()
@@ -656,7 +932,16 @@ fn view_tabs(app: &mut ConflictoApp, cx: &mut Context<ConflictoApp>) -> impl Int
         .px_2()
         .py_1()
         .child(tab_btn("Changes", mode == ViewMode::Changes, u.clone(), cx, ViewMode::Changes))
-        .child(tab_btn("Graph", mode == ViewMode::Graph, u, cx, ViewMode::Graph))
+        .child(tab_btn("Graph", mode == ViewMode::Graph, u.clone(), cx, ViewMode::Graph))
+        .when(show_prs, |el| {
+            el.child(tab_btn(
+                "PRs",
+                mode == ViewMode::PullRequests,
+                u,
+                cx,
+                ViewMode::PullRequests,
+            ))
+        })
 }
 
 fn tab_btn(
@@ -680,6 +965,9 @@ fn tab_btn(
                 return;
             }
             this.state.view_mode = mode;
+            if mode == ViewMode::PullRequests {
+                this.state.refresh_pull_requests();
+            }
             cx.notify();
         }))
         .child(
@@ -960,7 +1248,8 @@ fn graph_list(app: &mut ConflictoApp, cx: &mut Context<ConflictoApp>) -> impl In
             let hash = row.commit.hash.clone();
             let short = row.commit.short_hash.clone();
             let subject = row.commit.subject.clone();
-            let lane = row.lane;
+            let glyph = graph_row_glyph(&row);
+            let refs = row.commit.refs.iter().take(2).cloned().collect::<Vec<_>>();
             let is_sel = selected.as_ref() == Some(&hash);
             let u = u.clone();
             let files = if is_sel {
@@ -999,14 +1288,15 @@ fn graph_list(app: &mut ConflictoApp, cx: &mut Context<ConflictoApp>) -> impl In
                         .child(
                             div()
                                 .text_xs()
-                                .text_color(rgb3(u.text_muted))
-                                .child(format!("{}", "│".repeat(lane.saturating_add(1)))),
+                                .font_family("Menlo")
+                                .text_color(rgb3(u.accent))
+                                .child(glyph),
                         )
                         .child(
                             div()
                                 .text_xs()
                                 .font_family("Menlo")
-                                .text_color(rgb3(u.accent))
+                                .text_color(rgb3(u.text_muted))
                                 .child(short),
                         )
                         .child(
@@ -1017,7 +1307,17 @@ fn graph_list(app: &mut ConflictoApp, cx: &mut Context<ConflictoApp>) -> impl In
                                 .overflow_hidden()
                                 .text_ellipsis()
                                 .child(subject),
-                        ),
+                        )
+                        .children(refs.into_iter().map(|r| {
+                            let u = u.clone();
+                            div()
+                                .px_1()
+                                .rounded_sm()
+                                .bg(rgb3(u.bg))
+                                .text_xs()
+                                .text_color(rgb3(u.accent))
+                                .child(r)
+                        })),
                 )
                 .child(
                     div()
@@ -1026,6 +1326,130 @@ fn graph_list(app: &mut ConflictoApp, cx: &mut Context<ConflictoApp>) -> impl In
                         .pl_4()
                         .pb_1()
                         .children(file_rows),
+                )
+        }))
+}
+
+fn pr_list(app: &mut ConflictoApp, cx: &mut Context<ConflictoApp>) -> impl IntoElement {
+    let u = app.state.ui_vars.clone();
+    let prs = app.state.pull_requests.clone();
+    let selected = app.state.selected_pr;
+    let github = app.state.github.clone();
+
+    div()
+        .id("pull-requests")
+        .flex()
+        .flex_col()
+        .flex_1()
+        .min_h_0()
+        .overflow_scroll()
+        .p_2()
+        .gap_1()
+        .child(
+            div()
+                .flex()
+                .flex_row()
+                .items_center()
+                .justify_between()
+                .px_1()
+                .pb_1()
+                .child(
+                    div()
+                        .text_xs()
+                        .text_color(rgb3(u.text_muted))
+                        .child(match &github {
+                            Some(g) => format!("{}/{}", g.owner, g.repo),
+                            None => "No GitHub remote".into(),
+                        }),
+                )
+                .child(
+                    div()
+                        .id("refresh-prs")
+                        .px_2()
+                        .py_1()
+                        .rounded_sm()
+                        .border_1()
+                        .border_color(rgb3(u.border))
+                        .bg(rgb3(u.bg))
+                        .cursor_pointer()
+                        .hover(|s| s.bg(rgb3(u.bg_hover)))
+                        .on_click(cx.listener(|this, _, _, cx| {
+                            this.state.refresh_pull_requests();
+                            cx.notify();
+                        }))
+                        .child(
+                            div()
+                                .text_xs()
+                                .text_color(rgb3(u.text))
+                                .child("Refresh"),
+                        ),
+                ),
+        )
+        .when(prs.is_empty(), |el| {
+            el.child(
+                div()
+                    .px_2()
+                    .py_3()
+                    .text_xs()
+                    .text_color(rgb3(u.text_muted))
+                    .child("No open pull requests (requires `gh` auth)."),
+            )
+        })
+        .children(prs.into_iter().map(|pr| {
+            let number = pr.number;
+            let title = pr.title.clone();
+            let meta = format!(
+                "#{} {} → {} · {}",
+                pr.number, pr.head_ref, pr.base_ref, pr.author
+            );
+            let draft = pr.is_draft;
+            let is_sel = selected == Some(number);
+            let u = u.clone();
+            div()
+                .id(SharedString::from(format!("pr-{number}")))
+                .flex()
+                .flex_col()
+                .gap_1()
+                .px_2()
+                .py_2()
+                .rounded_sm()
+                .when(is_sel, |el| el.bg(rgb3(u.bg_active)))
+                .cursor_pointer()
+                .hover(|s| s.bg(rgb3(u.bg_hover)))
+                .on_click(cx.listener(move |this, _, _, cx| {
+                    this.state.open_pull_request(number);
+                    this.sync_diff(cx);
+                    cx.notify();
+                }))
+                .child(
+                    div()
+                        .flex()
+                        .flex_row()
+                        .items_center()
+                        .gap_1()
+                        .child(
+                            div()
+                                .flex_1()
+                                .min_w_0()
+                                .text_sm()
+                                .overflow_hidden()
+                                .text_ellipsis()
+                                .child(title),
+                        )
+                        .when(draft, |el| {
+                            el.child(
+                                div()
+                                    .text_xs()
+                                    .text_color(rgb3(u.text_muted))
+                                    .child("draft"),
+                            )
+                        }),
+                )
+                .child(
+                    div()
+                        .text_xs()
+                        .text_color(rgb3(u.text_muted))
+                        .child(meta),
                 )
         }))
 }
@@ -1086,5 +1510,15 @@ pub fn bind_keys(cx: &mut App) {
         KeyBinding::new("ctrl-\\", ToggleSideBySide, None),
         KeyBinding::new("cmd-enter", Commit, None),
         KeyBinding::new("ctrl-enter", Commit, None),
+        KeyBinding::new("cmd-q", Quit, None),
+        KeyBinding::new("alt-f4", Quit, None),
+        KeyBinding::new("cmd-p", ToggleCommandPalette, None),
+        KeyBinding::new("ctrl-p", ToggleCommandPalette, None),
+        KeyBinding::new("cmd-shift-f", Fetch, None),
+        KeyBinding::new("ctrl-shift-f", Fetch, None),
+        KeyBinding::new("cmd-shift-l", Pull, None),
+        KeyBinding::new("ctrl-shift-l", Pull, None),
+        KeyBinding::new("cmd-shift-p", Push, None),
+        KeyBinding::new("ctrl-shift-p", Push, None),
     ]);
 }

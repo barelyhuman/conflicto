@@ -1,16 +1,19 @@
 mod actions;
 mod app;
 mod color;
+mod command_palette;
 mod commit_input;
 mod diff;
 
 use gpui::*;
 
+use crate::actions::Quit;
 use crate::app::{bind_keys, ConflictoApp};
 
 fn main() {
     Application::new().run(|cx: &mut App| {
         bind_keys(cx);
+        cx.on_action(|_: &Quit, cx| cx.quit());
         cx.activate(true);
         cx.open_window(
             WindowOptions {

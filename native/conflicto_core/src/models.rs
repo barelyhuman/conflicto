@@ -61,6 +61,30 @@ pub struct RepoInfo {
     pub branch: String,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BranchInfo {
+    pub name: String,
+    pub current: bool,
+    pub remote: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct GithubRemote {
+    pub owner: String,
+    pub repo: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PullRequestInfo {
+    pub number: u64,
+    pub title: String,
+    pub author: String,
+    pub head_ref: String,
+    pub base_ref: String,
+    pub url: String,
+    pub is_draft: bool,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RecentRepo {
     pub root: String,

@@ -3,11 +3,14 @@
 use std::path::{Path, PathBuf};
 
 use crate::git::{
-    commit, get_commit_file_diff, get_file_diff, list_changes, list_commit_files, list_commits,
-    resolve_repo, stage_paths, unstage_paths, write_working_tree_file,
+    checkout_branch, commit, fetch, get_commit_file_diff, get_file_diff, github_remote,
+    list_branches, list_changes, list_commit_files, list_commits, pull, push, resolve_repo,
+    stage_paths, unstage_paths, write_working_tree_file,
 };
+use crate::github::{checkout_pull_request, list_pull_requests};
 use crate::graph::layout_commit_graph;
 use crate::highlight::HighlightPalette;
+use crate::lsp::LspSession;
 use crate::models::*;
 use crate::prefs::{
     load_preferences, load_recent_repos, remember_repo, remove_recent_repo, save_preferences,
@@ -31,6 +34,11 @@ pub struct AppState {
     pub graph_rows: Vec<crate::graph::GraphRow>,
     pub selected_commit: Option<String>,
     pub commit_files: Vec<CommitFile>,
+    pub branches: Vec<BranchInfo>,
+    pub github: Option<GithubRemote>,
+    pub pull_requests: Vec<PullRequestInfo>,
+    pub selected_pr: Option<u64>,
+    pub lsp: LspSession,
     pub error: Option<String>,
     pub status: Option<String>,
     /// Draft commit message for the Changes sidebar.
@@ -57,6 +65,11 @@ impl AppState {
             graph_rows: Vec::new(),
             selected_commit: None,
             commit_files: Vec::new(),
+            branches: Vec::new(),
+            github: None,
+            pull_requests: Vec::new(),
+            selected_pr: None,
+            lsp: LspSession::new(),
             error: None,
             status: None,
             commit_message: String::new(),
@@ -99,6 +112,10 @@ impl AppState {
                 self.session.clear();
                 self.selected_commit = None;
                 self.commit_files.clear();
+                self.branches.clear();
+                self.pull_requests.clear();
+                self.selected_pr = None;
+                self.github = None;
                 self.refresh_all();
             }
             Err(e) => self.error = Some(e.to_string()),
@@ -156,6 +173,162 @@ impl AppState {
         if let Ok(info) = resolve_repo(&root) {
             self.repo = Some(info);
         }
+        match list_branches(&root) {
+            Ok(branches) => self.branches = branches,
+            Err(e) => self.error = Some(e.to_string()),
+        }
+        match github_remote(&root) {
+            Ok(remote) => self.github = remote,
+            Err(e) => self.error = Some(e.to_string()),
+        }
+        if self.view_mode == ViewMode::PullRequests {
+            self.refresh_pull_requests();
+        }
+        self.sync_lsp_document();
+    }
+
+    fn sync_lsp_document(&mut self) {
+        let Some(diff) = self.session.diff.as_ref() else {
+            return;
+        };
+        let path = PathBuf::from(&diff.path);
+        let text = if self.session.can_edit() {
+            self.session.edit_buffer.clone()
+        } else {
+            diff.modified.clone()
+        };
+        if self.lsp.document(&path).is_some() {
+            self.lsp.update(&path, text);
+        } else {
+            self.lsp.open(path, text);
+        }
+    }
+
+    pub fn refresh_pull_requests(&mut self) {
+        let Some(repo) = self.repo.clone() else {
+            return;
+        };
+        if self.github.is_none() {
+            self.pull_requests.clear();
+            self.status = Some("No GitHub remote (origin) detected".into());
+            return;
+        }
+        match list_pull_requests(Path::new(&repo.root), 30) {
+            Ok(prs) => {
+                self.pull_requests = prs;
+                self.error = None;
+            }
+            Err(e) => self.error = Some(e.to_string()),
+        }
+    }
+
+    pub fn switch_branch(&mut self, name: &str) {
+        if !self.guard_dirty() {
+            return;
+        }
+        let Some(repo) = self.repo.clone() else {
+            self.error = Some("No repository open".into());
+            return;
+        };
+        match checkout_branch(Path::new(&repo.root), name) {
+            Ok(()) => {
+                self.status = Some(format!("Switched to {name}"));
+                self.error = None;
+                self.session.clear();
+                self.selected_commit = None;
+                self.commit_files.clear();
+                self.refresh_all();
+            }
+            Err(e) => self.error = Some(e.to_string()),
+        }
+    }
+
+    pub fn fetch_remote(&mut self) {
+        let Some(repo) = self.repo.clone() else {
+            self.error = Some("No repository open".into());
+            return;
+        };
+        match fetch(Path::new(&repo.root)) {
+            Ok(msg) => {
+                self.status = Some(if msg.is_empty() {
+                    "Fetched".into()
+                } else {
+                    msg.lines().next().unwrap_or("Fetched").to_string()
+                });
+                self.error = None;
+                self.refresh_all();
+            }
+            Err(e) => self.error = Some(e.to_string()),
+        }
+    }
+
+    pub fn pull_remote(&mut self) {
+        if !self.guard_dirty() {
+            return;
+        }
+        let Some(repo) = self.repo.clone() else {
+            self.error = Some("No repository open".into());
+            return;
+        };
+        match pull(Path::new(&repo.root)) {
+            Ok(msg) => {
+                self.status = Some(if msg.is_empty() {
+                    "Pulled".into()
+                } else {
+                    msg.lines().next().unwrap_or("Pulled").to_string()
+                });
+                self.error = None;
+                self.session.clear();
+                self.refresh_all();
+            }
+            Err(e) => self.error = Some(e.to_string()),
+        }
+    }
+
+    pub fn push_remote(&mut self) {
+        let Some(repo) = self.repo.clone() else {
+            self.error = Some("No repository open".into());
+            return;
+        };
+        match push(Path::new(&repo.root)) {
+            Ok(msg) => {
+                self.status = Some(if msg.is_empty() {
+                    "Pushed".into()
+                } else {
+                    msg.lines().next().unwrap_or("Pushed").to_string()
+                });
+                self.error = None;
+                self.refresh_all();
+            }
+            Err(e) => self.error = Some(e.to_string()),
+        }
+    }
+
+    pub fn open_pull_request(&mut self, number: u64) {
+        if !self.guard_dirty() {
+            return;
+        }
+        let Some(repo) = self.repo.clone() else {
+            self.error = Some("No repository open".into());
+            return;
+        };
+        match checkout_pull_request(Path::new(&repo.root), number) {
+            Ok(msg) => {
+                self.selected_pr = Some(number);
+                self.status = Some(if msg.is_empty() {
+                    format!("Checked out PR #{number}")
+                } else {
+                    msg.lines()
+                        .next()
+                        .unwrap_or("Checked out PR")
+                        .to_string()
+                });
+                self.error = None;
+                self.session.clear();
+                self.refresh_all();
+            }
+            Err(e) => self.error = Some(e.to_string()),
+        }
     }
 
     pub fn load_change_diff(&mut self, path: &str, side: ChangeSide, old_path: Option<&str>) {
@@ -171,6 +344,7 @@ impl AppState {
                     diff,
                 );
                 self.error = None;
+                self.sync_lsp_document();
             }
             Err(e) => self.error = Some(e.to_string()),
         }

@@ -2,8 +2,9 @@ mod common;
 use common::TempRepo;
 
 use conflicto_core::{
-    commit, get_file_diff, layout_commit_graph, list_changes, list_commits, resolve_repo,
-    stage_paths, unstage_paths, write_working_tree_file, ChangeSide, ChangeStatus,
+    checkout_branch, commit, get_file_diff, graph_row_glyph, layout_commit_graph, list_branches,
+    list_changes, list_commits, parse_github_remote, resolve_repo, stage_paths, unstage_paths,
+    write_working_tree_file, ChangeSide, ChangeStatus,
 };
 
 #[test]
@@ -154,4 +155,51 @@ fn commit_rejects_empty_message() {
 
     let err = commit(repo.path(), "   ").unwrap_err();
     assert!(err.to_string().contains("empty"));
+}
+
+#[test]
+fn list_and_switch_branches() {
+    let repo = TempRepo::new();
+    repo.write("a.txt", "1\n");
+    repo.add_all();
+    repo.commit("init");
+    std::process::Command::new("git")
+        .args(["checkout", "-b", "feature"])
+        .current_dir(repo.path())
+        .output()
+        .unwrap();
+    repo.write("a.txt", "2\n");
+    repo.add_all();
+    repo.commit("feat");
+
+    let branches = list_branches(repo.path()).unwrap();
+    assert!(branches.iter().any(|b| b.name == "main" || b.name == "master"));
+    assert!(branches.iter().any(|b| b.name == "feature" && b.current));
+
+    checkout_branch(repo.path(), "main").or_else(|_| checkout_branch(repo.path(), "master")).unwrap();
+    let info = resolve_repo(repo.path()).unwrap();
+    assert!(info.branch == "main" || info.branch == "master");
+}
+
+#[test]
+fn parse_github_remote_urls() {
+    let a = parse_github_remote("git@github.com:barelyhuman/conflicto.git").unwrap();
+    assert_eq!(a.owner, "barelyhuman");
+    assert_eq!(a.repo, "conflicto");
+    let b = parse_github_remote("https://github.com/barelyhuman/conflicto").unwrap();
+    assert_eq!(b.owner, "barelyhuman");
+    assert_eq!(b.repo, "conflicto");
+    assert!(parse_github_remote("https://gitlab.com/x/y").is_none());
+}
+
+#[test]
+fn graph_glyph_marks_commit_lane() {
+    let repo = TempRepo::new();
+    repo.write("a.txt", "1\n");
+    repo.add_all();
+    repo.commit("first");
+    let commits = list_commits(repo.path(), None).unwrap();
+    let rows = layout_commit_graph(&commits);
+    let glyph = graph_row_glyph(&rows[0]);
+    assert!(glyph.contains('●'));
 }

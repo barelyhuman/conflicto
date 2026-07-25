@@ -101,3 +101,49 @@ pub fn layout_commit_graph(commits: &[CommitInfo]) -> Vec<GraphRow> {
 
     rows
 }
+
+/// Compact unicode glyph for a graph row (lane columns + commit marker).
+pub fn graph_row_glyph(row: &GraphRow) -> String {
+    let width = row.lane_count.max(1);
+    let mut cols: Vec<char> = vec![' '; width];
+    for &lane in &row.active_lanes {
+        if lane < cols.len() {
+            cols[lane] = '│';
+        }
+    }
+    for edge in &row.edges {
+        match edge.kind {
+            GraphEdgeKind::Pass => {
+                if edge.from_lane < cols.len() {
+                    cols[edge.from_lane] = '│';
+                }
+            }
+            GraphEdgeKind::Merge | GraphEdgeKind::Branch => {
+                let a = edge.from_lane.min(edge.to_lane);
+                let b = edge.from_lane.max(edge.to_lane);
+                for i in a..=b {
+                    if i >= cols.len() {
+                        break;
+                    }
+                    if i == edge.from_lane {
+                        cols[i] = if edge.from_lane < edge.to_lane {
+                            '╭'
+                        } else if edge.from_lane > edge.to_lane {
+                            '╮'
+                        } else {
+                            '●'
+                        };
+                    } else if i == edge.to_lane {
+                        cols[i] = '│';
+                    } else if cols[i] == ' ' || cols[i] == '│' {
+                        cols[i] = '─';
+                    }
+                }
+            }
+        }
+    }
+    if row.lane < cols.len() {
+        cols[row.lane] = '●';
+    }
+    cols.into_iter().collect()
+}

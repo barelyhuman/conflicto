@@ -7,6 +7,7 @@ pub enum ViewMode {
     #[default]
     Changes,
     Graph,
+    PullRequests,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

@@ -353,3 +353,156 @@ pub fn get_commit_file_diff(
         modified,
     })
 }
+
+pub fn list_branches(root: &Path) -> Result<Vec<crate::models::BranchInfo>, GitError> {
+    let stdout = git_ok(
+        root,
+        &[
+            "for-each-ref",
+            "--format=%(refname:short)%00%(HEAD)%00%(refname)",
+            "refs/heads",
+            "refs/remotes",
+        ],
+    )?;
+    let mut locals = Vec::new();
+    let mut remotes = Vec::new();
+    let mut seen_local = std::collections::HashSet::new();
+    for line in stdout.lines() {
+        let mut parts = line.split('\0');
+        let short = parts.next().unwrap_or("").trim();
+        let head = parts.next().unwrap_or("");
+        let full = parts.next().unwrap_or("");
+        if short.is_empty() {
+            continue;
+        }
+        if full.starts_with("refs/heads/") {
+            seen_local.insert(short.to_string());
+            locals.push(crate::models::BranchInfo {
+                name: short.to_string(),
+                current: head == "*",
+                remote: false,
+            });
+        } else if full.starts_with("refs/remotes/") {
+            if short.ends_with("/HEAD") {
+                continue;
+            }
+            remotes.push(short.to_string());
+        }
+    }
+    let mut branches = locals;
+    for short in remotes {
+        let local_equiv = short
+            .strip_prefix("origin/")
+            .or_else(|| short.split_once('/').map(|(_, rest)| rest))
+            .unwrap_or(short.as_str());
+        if seen_local.contains(local_equiv) {
+            continue;
+        }
+        branches.push(crate::models::BranchInfo {
+            name: short,
+            current: false,
+            remote: true,
+        });
+    }
+    branches.sort_by(|a, b| match (a.current, b.current) {
+        (true, false) => std::cmp::Ordering::Less,
+        (false, true) => std::cmp::Ordering::Greater,
+        _ => match (a.remote, b.remote) {
+            (false, true) => std::cmp::Ordering::Less,
+            (true, false) => std::cmp::Ordering::Greater,
+            _ => a.name.cmp(&b.name),
+        },
+    });
+    Ok(branches)
+}
+
+pub fn checkout_branch(root: &Path, name: &str) -> Result<(), GitError> {
+    let name = name.trim();
+    if name.is_empty() {
+        return Err(GitError::Message("Branch name is empty".into()));
+    }
+    // Detach remote-tracking names to a local branch when needed.
+    if let Some(local) = name.strip_prefix("origin/") {
+        let locals = list_branches(root)?;
+        if locals.iter().any(|b| !b.remote && b.name == local) {
+            git_ok(root, &["checkout", local])?;
+        } else {
+            git_ok(root, &["checkout", "-b", local, "--track", name])?;
+        }
+        return Ok(());
+    }
+    git_ok(root, &["checkout", name])?;
+    Ok(())
+}
+
+pub fn fetch(root: &Path) -> Result<String, GitError> {
+    let (stdout, stderr, code) = run_git(root, &["fetch", "--all", "--prune"])?;
+    if code != 0 {
+        return Err(GitError::Message(
+            stderr.trim().to_string().if_empty(|| "git fetch failed".into()),
+        ));
+    }
+    Ok(format!("{}{}", stdout, stderr).trim().to_string())
+}
+
+pub fn pull(root: &Path) -> Result<String, GitError> {
+    let (stdout, stderr, code) = run_git(root, &["pull", "--ff-only"])?;
+    if code != 0 {
+        return Err(GitError::Message(
+            stderr
+                .trim()
+                .to_string()
+                .if_empty(|| "git pull --ff-only failed".into()),
+        ));
+    }
+    Ok(format!("{}{}", stdout, stderr).trim().to_string())
+}
+
+pub fn push(root: &Path) -> Result<String, GitError> {
+    let (stdout, stderr, code) = run_git(root, &["push", "-u", "origin", "HEAD"])?;
+    if code != 0 {
+        return Err(GitError::Message(
+            stderr.trim().to_string().if_empty(|| "git push failed".into()),
+        ));
+    }
+    Ok(format!("{}{}", stdout, stderr).trim().to_string())
+}
+
+/// Parse `origin` remote URL into owner/repo when it looks like GitHub.
+pub fn github_remote(root: &Path) -> Result<Option<crate::models::GithubRemote>, GitError> {
+    let url = match git_soft(root, &["remote", "get-url", "origin"]) {
+        Ok(s) => s.trim().to_string(),
+        Err(_) => return Ok(None),
+    };
+    if url.is_empty() {
+        return Ok(None);
+    }
+    Ok(parse_github_remote(&url))
+}
+
+pub fn parse_github_remote(url: &str) -> Option<crate::models::GithubRemote> {
+    let url = url.trim().trim_end_matches(".git");
+    // git@github.com:owner/repo
+    if let Some(rest) = url.strip_prefix("git@github.com:") {
+        let mut parts = rest.split('/');
+        let owner = parts.next()?.to_string();
+        let repo = parts.next()?.to_string();
+        if owner.is_empty() || repo.is_empty() {
+            return None;
+        }
+        return Some(crate::models::GithubRemote { owner, repo });
+    }
+    // https://github.com/owner/repo
+    for prefix in ["https://github.com/", "http://github.com/", "ssh://git@github.com/"] {
+        if let Some(rest) = url.strip_prefix(prefix) {
+            let mut parts = rest.split('/');
+            let owner = parts.next()?.to_string();
+            let repo = parts.next()?.to_string();
+            if owner.is_empty() || repo.is_empty() {
+                return None;
+            }
+            return Some(crate::models::GithubRemote { owner, repo });
+        }
+    }
+    None
+}

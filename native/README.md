@@ -9,7 +9,7 @@ cd native
 cargo run -p conflicto
 ```
 
-Requires `git` on PATH.
+Requires `git` on PATH. GitHub PR listing uses `gh` when available and authenticated.
 
 On macOS, GPUI needs the Xcode Metal toolchain once:
 
@@ -36,22 +36,28 @@ Unstaged side-by-side: left = read-only hunk chrome; right = editable Equal/Inse
 - ⌘/Ctrl+R — refresh
 - ⌘/Ctrl+S — save unstaged edits
 - ⌘/Ctrl+\ — toggle side-by-side / inline
+- ⌘/Ctrl+P — command palette
+- ⌘/Ctrl+Enter — commit staged changes
+- ⌘Q / Alt+F4 — quit
+- ⌘/Ctrl+C / V / X / A — copy / paste / cut / select-all in editors
+- Shift+wheel — horizontal scroll in the diff (line numbers stay sticky)
+- Alt+click — add an extra caret in the editable diff
 
-## TODO 
+## TODO
 
-- [ ] Git 
-    - [ ] Ability to switch branches 
-    - [ ] Make commits 
-    - [ ] Ability to push/pull/fetch 
-    - [ ] Visualise the history graph
-    - [ ] Connect to Github 
-        - [ ] Ability to view a github PR
-- [ ] File/Diff Viewer 
-    - [ ] Ability to veritical scroll while keeping the line number sticky 
-    - [ ] Multi-cursor selection for edits 
-    - [ ] Blinking cursor
-    - [ ] LSP
-- [ ] Keyboard
-    - [ ] Basic Ctrl/CMD+C,Ctrl/CMD+V,Ctrl/CMD+A doesn't work in editors today
-    - [ ] Ability to quit the app with CMD+Q (Alt+f4)
-    - [ ] A ctrl/cmd+P for showing all possible options 
+- [x] Git
+    - [x] Ability to switch branches
+    - [x] Make commits
+    - [x] Ability to push/pull/fetch
+    - [x] Visualise the history graph
+    - [x] Connect to Github
+        - [x] Ability to view a github PR
+- [x] File/Diff Viewer
+    - [x] Ability to vertical scroll while keeping the line number sticky
+    - [x] Multi-cursor selection for edits
+    - [x] Blinking cursor
+    - [ ] LSP *(scaffold only — `LspSession` tracks docs; no language-server process yet)*
+- [x] Keyboard
+    - [x] Basic Ctrl/CMD+C,Ctrl/CMD+V,Ctrl/CMD+A doesn't work in editors today
+    - [x] Ability to quit the app with CMD+Q (Alt+f4)
+    - [x] A ctrl/cmd+P for showing all possible options

@@ -1,9 +1,11 @@
 //! Diff pane: side-by-side / inline, linked scroll, minimap, editable unstaged lines.
 //! Manual scroll + row virtualization so wheel events re-render the visible window.
+//! Sticky line-number gutters stay fixed while text scrolls horizontally.
 
 use std::cell::Cell;
 use std::ops::Range;
 use std::rc::Rc;
+use std::time::Duration;
 
 use conflicto_core::{
     apply_line_edits, get_theme, highlight_color, DiffLine, DiffViewCache, HighlightPalette,
@@ -14,6 +16,14 @@ use gpui::*;
 
 use super::minimap::{self, MINIMAP_W, ROW_HEIGHT};
 use crate::color::{hsla3, rgb3, tint};
+
+const GUTTER_W: f32 = 44.0;
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+struct Caret {
+    row: usize,
+    col: usize,
+}
 
 pub struct DiffPane {
     pub cache: DiffViewCache,
@@ -26,11 +36,18 @@ pub struct DiffPane {
     pub ui: UiVars,
     pub palette: HighlightPalette,
     pub focus_handle: FocusHandle,
-    pub focused_row: Option<usize>,
-    pub cursor: usize,
+    /// Primary caret (also selection end).
+    primary: Option<Caret>,
+    /// Selection anchor; equals primary when collapsed.
+    sel_anchor: Option<Caret>,
+    /// Additional carets (Alt+click). Edits apply to all carets on a line when possible.
+    extra_carets: Vec<Caret>,
     /// Document scroll offset in pixels (manual — drives virtualization).
     pub scroll_y: f32,
+    /// Horizontal text scroll; gutters stay fixed.
+    pub scroll_x: f32,
     viewport_h: Rc<Cell<f32>>,
+    viewport_w: Rc<Cell<f32>>,
     minimap_bounds: Rc<Cell<Bounds<Pixels>>>,
 }
 
@@ -52,10 +69,13 @@ impl DiffPane {
             ui: pack.ui.clone(),
             palette: HighlightPalette::from_ui(&pack.ui, pack.scheme),
             focus_handle: cx.focus_handle(),
-            focused_row: None,
-            cursor: 0,
+            primary: None,
+            sel_anchor: None,
+            extra_carets: Vec::new(),
             scroll_y: 0.0,
+            scroll_x: 0.0,
             viewport_h: Rc::new(Cell::new(400.0)),
+            viewport_w: Rc::new(Cell::new(600.0)),
             minimap_bounds: Rc::new(Cell::new(Bounds::default())),
         }
     }
@@ -89,8 +109,10 @@ impl DiffPane {
         self.cache.ensure(path, original, &self.edit_buffer);
         if path_changed {
             self.scroll_y = 0.0;
-            self.focused_row = None;
-            self.cursor = 0;
+            self.scroll_x = 0.0;
+            self.primary = None;
+            self.sel_anchor = None;
+            self.extra_carets.clear();
         }
         self.clamp_scroll();
     }
@@ -103,6 +125,22 @@ impl DiffPane {
         }
     }
 
+    fn edit_lines(&self) -> &[DiffLine] {
+        if self.side_by_side {
+            &self.cache.right_lines
+        } else {
+            &self.cache.unified_lines
+        }
+    }
+
+    fn edit_lines_mut(&mut self) -> &mut Vec<DiffLine> {
+        if self.side_by_side {
+            &mut self.cache.right_lines
+        } else {
+            &mut self.cache.unified_lines
+        }
+    }
+
     fn content_h(&self) -> f32 {
         (self.row_count() as f32 * ROW_HEIGHT).max(1.0)
     }
@@ -111,9 +149,31 @@ impl DiffPane {
         (self.content_h() - self.viewport_h.get().max(1.0)).max(0.0)
     }
 
+    fn max_scroll_x(&self) -> f32 {
+        // Soft cap; long lines can scroll a few screens of monospace text.
+        let approx = self
+            .edit_lines()
+            .iter()
+            .map(|l| l.text.chars().count())
+            .max()
+            .unwrap_or(0) as f32
+            * 7.5;
+        let view = (self.viewport_w.get() - GUTTER_W).max(1.0);
+        (approx - view).max(0.0)
+    }
+
     fn clamp_scroll(&mut self) {
-        let max = self.max_scroll_y();
-        self.scroll_y = self.scroll_y.clamp(0.0, max);
+        self.scroll_y = self.scroll_y.clamp(0.0, self.max_scroll_y());
+        self.scroll_x = self.scroll_x.clamp(0.0, self.max_scroll_x());
+    }
+
+    fn set_caret(&mut self, caret: Caret, extend: bool) {
+        self.primary = Some(caret);
+        if !extend {
+            self.sel_anchor = Some(caret);
+        } else if self.sel_anchor.is_none() {
+            self.sel_anchor = Some(caret);
+        }
     }
 
     fn commit_lines(
@@ -123,11 +183,7 @@ impl DiffPane {
         split: Option<(usize, usize)>,
         merge: Option<usize>,
     ) {
-        let lines = if self.side_by_side {
-            &self.cache.right_lines
-        } else {
-            &self.cache.unified_lines
-        };
+        let lines = self.edit_lines();
         if let Some(new_buf) = apply_line_edits(lines, self.cache.trailing, changed, split, merge)
         {
             self.edit_buffer = new_buf.clone();
@@ -145,78 +201,405 @@ impl DiffPane {
         cx: &mut Context<Self>,
     ) {
         let delta = event.delta.pixel_delta(px(ROW_HEIGHT));
-        self.scroll_y = (self.scroll_y - f32::from(delta.y)).clamp(0.0, self.max_scroll_y());
+        if event.modifiers.shift {
+            self.scroll_x = (self.scroll_x - f32::from(delta.y)).clamp(0.0, self.max_scroll_x());
+        } else {
+            self.scroll_y = (self.scroll_y - f32::from(delta.y)).clamp(0.0, self.max_scroll_y());
+            self.scroll_x = (self.scroll_x - f32::from(delta.x)).clamp(0.0, self.max_scroll_x());
+        }
         cx.notify();
     }
 
-    fn on_key_down(&mut self, event: &KeyDownEvent, _window: &mut Window, cx: &mut Context<Self>) {
+    fn select_all(&mut self, cx: &mut Context<Self>) {
+        let lines = self.edit_lines();
+        if lines.is_empty() {
+            return;
+        }
+        let last = lines.len() - 1;
+        let last_col = lines[last].text.chars().count();
+        self.sel_anchor = Some(Caret { row: 0, col: 0 });
+        self.primary = Some(Caret {
+            row: last,
+            col: last_col,
+        });
+        self.extra_carets.clear();
+        cx.notify();
+    }
+
+    fn copy_selection(&self, cx: &mut Context<Self>) {
+        let Some(text) = self.selected_text() else {
+            return;
+        };
+        cx.write_to_clipboard(ClipboardItem::new_string(text));
+    }
+
+    fn selected_text(&self) -> Option<String> {
+        let (Some(a), Some(b)) = (self.sel_anchor, self.primary) else {
+            return None;
+        };
+        if a == b {
+            return None;
+        }
+        let lines = self.edit_lines();
+        let (start, end) = if (a.row, a.col) <= (b.row, b.col) {
+            (a, b)
+        } else {
+            (b, a)
+        };
+        if start.row == end.row {
+            let line = &lines.get(start.row)?.text;
+            let s = char_byte(line, start.col);
+            let e = char_byte(line, end.col);
+            return Some(line[s..e].to_string());
+        }
+        let mut out = String::new();
+        for row in start.row..=end.row {
+            let line = &lines.get(row)?.text;
+            if row == start.row {
+                out.push_str(&line[char_byte(line, start.col)..]);
+                out.push('\n');
+            } else if row == end.row {
+                out.push_str(&line[..char_byte(line, end.col)]);
+            } else {
+                out.push_str(line);
+                out.push('\n');
+            }
+        }
+        Some(out)
+    }
+
+    fn delete_selection(&mut self) -> bool {
+        let (Some(a), Some(b)) = (self.sel_anchor, self.primary) else {
+            return false;
+        };
+        if a == b {
+            return false;
+        }
+        let (start, end) = if (a.row, a.col) <= (b.row, b.col) {
+            (a, b)
+        } else {
+            (b, a)
+        };
+        // Restrict to single-line delete for edit-buffer integrity; multi-line → join via buffer rebuild.
+        if start.row == end.row {
+            let lines = self.edit_lines_mut();
+            if start.row >= lines.len() {
+                return false;
+            }
+            if !matches!(lines[start.row].kind, LineKind::Equal | LineKind::Insert) {
+                return false;
+            }
+            let text = &mut lines[start.row].text;
+            let s = char_byte(text, start.col);
+            let e = char_byte(text, end.col);
+            text.replace_range(s..e, "");
+            self.primary = Some(start);
+            self.sel_anchor = Some(start);
+            self.extra_carets.clear();
+            return true;
+        }
+        // Multi-line: replace selected span with empty by rebuilding from selected_text removal.
+        let Some(selected) = self.selected_text() else {
+            return false;
+        };
+        let buffer = self.edit_buffer.clone();
+        if let Some(pos) = buffer.find(&selected) {
+            let mut new_buf = buffer;
+            new_buf.replace_range(pos..pos + selected.len(), "");
+            self.edit_buffer = new_buf;
+            self.cache
+                .ensure(&self.path, &self.original, &self.edit_buffer);
+            self.primary = Some(Caret {
+                row: start.row,
+                col: start.col,
+            });
+            self.sel_anchor = self.primary;
+            self.extra_carets.clear();
+            return true;
+        }
+        false
+    }
+
+    fn paste(&mut self, cx: &mut Context<Self>) {
         if !self.editable {
             return;
         }
-        let Some(row) = self.focused_row else {
+        let Some(text) = cx.read_from_clipboard().and_then(|item| item.text()) else {
             return;
         };
-        let lines = if self.side_by_side {
-            &mut self.cache.right_lines
-        } else {
-            &mut self.cache.unified_lines
+        let first_line = text.lines().next().unwrap_or("").to_string();
+        if self.delete_selection() {
+            // already mutated lines or buffer
+        }
+        let Some(caret) = self.primary else {
+            return;
         };
-        if row >= lines.len() {
+        let lines = self.edit_lines_mut();
+        if caret.row >= lines.len() {
             return;
         }
-        if !matches!(lines[row].kind, LineKind::Equal | LineKind::Insert) {
+        if !matches!(lines[caret.row].kind, LineKind::Equal | LineKind::Insert) {
+            return;
+        }
+        let text_ref = &mut lines[caret.row].text;
+        let byte = char_byte(text_ref, caret.col);
+        text_ref.insert_str(byte, &first_line);
+        let n = first_line.chars().count();
+        self.primary = Some(Caret {
+            row: caret.row,
+            col: caret.col + n,
+        });
+        self.sel_anchor = self.primary;
+        self.commit_lines(cx, true, None, None);
+    }
+
+    fn cut(&mut self, cx: &mut Context<Self>) {
+        if !self.editable {
+            self.copy_selection(cx);
+            return;
+        }
+        self.copy_selection(cx);
+        if self.delete_selection() {
+            // If multi-line path already rebuilt buffer:
+            if self.cache.right_lines.is_empty() && self.cache.unified_lines.is_empty() {
+                // unreachable normally
+            }
+            cx.emit(DiffPaneEvent::BufferChanged(self.edit_buffer.clone()));
+            self.commit_lines(cx, true, None, None);
+        }
+    }
+
+    fn all_carets(&self) -> Vec<Caret> {
+        let mut out = Vec::new();
+        if let Some(p) = self.primary {
+            out.push(p);
+        }
+        for c in &self.extra_carets {
+            if !out.contains(c) {
+                out.push(*c);
+            }
+        }
+        out.sort_by(|a, b| b.row.cmp(&a.row).then(b.col.cmp(&a.col)));
+        out
+    }
+
+    fn on_key_down(&mut self, event: &KeyDownEvent, _window: &mut Window, cx: &mut Context<Self>) {
+        let key = event.keystroke.key.as_str();
+        let mods = &event.keystroke.modifiers;
+        let chord = mods.control || mods.platform;
+        let shift = mods.shift;
+
+        if chord {
+            match key {
+                "a" => {
+                    self.select_all(cx);
+                    return;
+                }
+                "c" => {
+                    self.copy_selection(cx);
+                    return;
+                }
+                "x" => {
+                    self.cut(cx);
+                    return;
+                }
+                "v" => {
+                    self.paste(cx);
+                    return;
+                }
+                _ => return,
+            }
+        }
+
+        if !self.editable {
+            // Allow copy/select-all above; navigation still useful for selection.
+            if matches!(key, "left" | "right" | "up" | "down" | "home" | "end") {
+                // fall through with read-only caret moves if we have a caret
+            } else {
+                return;
+            }
+        }
+
+        let Some(caret) = self.primary else {
+            return;
+        };
+
+        if key == "left" {
+            let mut c = caret;
+            if c.col > 0 {
+                c.col -= 1;
+            } else if c.row > 0 {
+                c.row -= 1;
+                c.col = self
+                    .edit_lines()
+                    .get(c.row)
+                    .map(|l| l.text.chars().count())
+                    .unwrap_or(0);
+            }
+            self.set_caret(c, shift);
+            cx.notify();
+            return;
+        }
+        if key == "right" {
+            let mut c = caret;
+            let len = self
+                .edit_lines()
+                .get(c.row)
+                .map(|l| l.text.chars().count())
+                .unwrap_or(0);
+            if c.col < len {
+                c.col += 1;
+            } else if c.row + 1 < self.row_count() {
+                c.row += 1;
+                c.col = 0;
+            }
+            self.set_caret(c, shift);
+            cx.notify();
+            return;
+        }
+        if key == "up" {
+            let mut c = caret;
+            if c.row > 0 {
+                c.row -= 1;
+                let len = self.edit_lines()[c.row].text.chars().count();
+                c.col = c.col.min(len);
+            }
+            self.set_caret(c, shift);
+            cx.notify();
+            return;
+        }
+        if key == "down" {
+            let mut c = caret;
+            if c.row + 1 < self.row_count() {
+                c.row += 1;
+                let len = self.edit_lines()[c.row].text.chars().count();
+                c.col = c.col.min(len);
+            }
+            self.set_caret(c, shift);
+            cx.notify();
+            return;
+        }
+        if key == "home" {
+            self.set_caret(Caret { row: caret.row, col: 0 }, shift);
+            cx.notify();
+            return;
+        }
+        if key == "end" {
+            let len = self
+                .edit_lines()
+                .get(caret.row)
+                .map(|l| l.text.chars().count())
+                .unwrap_or(0);
+            self.set_caret(Caret { row: caret.row, col: len }, shift);
+            cx.notify();
             return;
         }
 
-        let key = &event.keystroke.key;
+        if !self.editable {
+            return;
+        }
+
+        let lines = self.edit_lines();
+        if caret.row >= lines.len() {
+            return;
+        }
+        if !matches!(lines[caret.row].kind, LineKind::Equal | LineKind::Insert) {
+            return;
+        }
+
         if key == "enter" {
-            let cc = self.cursor;
-            self.commit_lines(cx, false, Some((row, cc)), None);
-            self.focused_row = Some(row + 1);
-            self.cursor = 0;
+            let cc = caret.col;
+            self.commit_lines(cx, false, Some((caret.row, cc)), None);
+            self.set_caret(
+                Caret {
+                    row: caret.row + 1,
+                    col: 0,
+                },
+                false,
+            );
+            self.extra_carets.clear();
             return;
         }
         if key == "backspace" {
-            if self.cursor == 0 {
-                let can_merge = lines[..row]
-                    .iter()
-                    .any(|l| matches!(l.kind, LineKind::Equal | LineKind::Insert));
-                if can_merge {
-                    self.commit_lines(cx, false, None, Some(row));
+            if self.delete_selection() {
+                self.commit_lines(cx, true, None, None);
+                return;
+            }
+            // Apply backspace to all carets (primary + extras), bottom-up.
+            let carets = self.all_carets();
+            let mut primary = caret;
+            for c in carets {
+                let lines = self.edit_lines_mut();
+                if c.row >= lines.len() {
+                    continue;
                 }
-            } else {
-                let text = &mut lines[row].text;
-                if let Some((byte_i, _)) = text.char_indices().nth(self.cursor - 1) {
-                    let end = text
-                        .char_indices()
-                        .nth(self.cursor)
-                        .map(|(i, _)| i)
-                        .unwrap_or(text.len());
-                    text.replace_range(byte_i..end, "");
-                    self.cursor -= 1;
-                    self.commit_lines(cx, true, None, None);
+                if !matches!(lines[c.row].kind, LineKind::Equal | LineKind::Insert) {
+                    continue;
+                }
+                if c.col == 0 {
+                    continue;
+                }
+                let text = &mut lines[c.row].text;
+                let start = char_byte(text, c.col - 1);
+                let end = char_byte(text, c.col);
+                text.replace_range(start..end, "");
+                if c == caret {
+                    primary.col -= 1;
                 }
             }
+            self.primary = Some(primary);
+            self.sel_anchor = Some(primary);
+            // Adjust extra carets on same lines roughly.
+            for c in &mut self.extra_carets {
+                if c.col > 0 {
+                    c.col -= 1;
+                }
+            }
+            self.commit_lines(cx, true, None, None);
             return;
         }
-        if key.len() == 1
-            && !event.keystroke.modifiers.control
-            && !event.keystroke.modifiers.platform
-        {
+
+        if key.len() == 1 {
             let ch = key.chars().next().unwrap();
-            if !ch.is_control() {
-                let text = &mut lines[row].text;
-                let byte_i = text
-                    .char_indices()
-                    .nth(self.cursor)
-                    .map(|(i, _)| i)
-                    .unwrap_or(text.len());
-                text.insert(byte_i, ch);
-                self.cursor += 1;
-                self.commit_lines(cx, true, None, None);
+            if ch.is_control() {
+                return;
             }
+            if self.delete_selection() {
+                // selection cleared
+            }
+            let carets = self.all_carets();
+            let mut primary = self.primary.unwrap_or(caret);
+            // Insert bottom-up so columns on same line stay valid.
+            for c in carets {
+                let lines = self.edit_lines_mut();
+                if c.row >= lines.len() {
+                    continue;
+                }
+                if !matches!(lines[c.row].kind, LineKind::Equal | LineKind::Insert) {
+                    continue;
+                }
+                let text = &mut lines[c.row].text;
+                let byte = char_byte(text, c.col);
+                text.insert(byte, ch);
+                if c.row == primary.row && c.col <= primary.col {
+                    primary.col += 1;
+                }
+            }
+            for c in &mut self.extra_carets {
+                c.col += 1;
+            }
+            self.primary = Some(primary);
+            self.sel_anchor = Some(primary);
+            self.commit_lines(cx, true, None, None);
         }
     }
+}
+
+fn char_byte(s: &str, col: usize) -> usize {
+    s.char_indices()
+        .nth(col)
+        .map(|(i, _)| i)
+        .unwrap_or(s.len())
 }
 
 impl EventEmitter<DiffPaneEvent> for DiffPane {}
@@ -232,8 +615,9 @@ impl Render for DiffPane {
         let u = self.ui.clone();
         let side_by_side = self.side_by_side;
         let editable = self.editable;
-        let focused_row = self.focused_row;
-        let cursor = self.cursor;
+        let primary = self.primary;
+        let sel_anchor = self.sel_anchor;
+        let extra_carets = self.extra_carets.clone();
         let palette = self.palette.clone();
         let left = self.cache.left_lines.clone();
         let right = self.cache.right_lines.clone();
@@ -243,7 +627,9 @@ impl Render for DiffPane {
         let unified_hls = self.cache.unified_line_hls.clone();
         let path = self.path.clone();
         let viewport_h = self.viewport_h.clone();
+        let viewport_w = self.viewport_w.clone();
         let minimap_bounds = self.minimap_bounds.clone();
+        let scroll_x = self.scroll_x;
 
         let row_count = if side_by_side {
             left.len()
@@ -317,10 +703,11 @@ impl Render for DiffPane {
                             .on_scroll_wheel(cx.listener(Self::on_scroll_wheel))
                             .child({
                                 let vh_cell = viewport_h.clone();
+                                let vw_cell = viewport_w.clone();
                                 canvas(
                                     move |bounds, _, _| {
-                                        // Only the editor viewport owns scroll metrics.
                                         vh_cell.set(f32::from(bounds.size.height));
+                                        vw_cell.set(f32::from(bounds.size.width));
                                     },
                                     |_bounds, _, _, _| {},
                                 )
@@ -348,8 +735,10 @@ impl Render for DiffPane {
                                                     &u,
                                                     &palette,
                                                     editable,
-                                                    focused_row,
-                                                    cursor,
+                                                    primary,
+                                                    sel_anchor,
+                                                    &extra_carets,
+                                                    scroll_x,
                                                     cx,
                                                 )
                                                 .into_any_element()
@@ -361,8 +750,10 @@ impl Render for DiffPane {
                                                     &u,
                                                     &palette,
                                                     editable,
-                                                    focused_row,
-                                                    cursor,
+                                                    primary,
+                                                    sel_anchor,
+                                                    &extra_carets,
+                                                    scroll_x,
                                                     cx,
                                                 )
                                                 .into_any_element()
@@ -446,8 +837,10 @@ fn sxs_content(
     u: &UiVars,
     palette: &HighlightPalette,
     editable: bool,
-    focused_row: Option<usize>,
-    cursor: usize,
+    primary: Option<Caret>,
+    sel_anchor: Option<Caret>,
+    extra_carets: &[Caret],
+    scroll_x: f32,
     cx: &mut Context<DiffPane>,
 ) -> impl IntoElement {
     let n = left.len().min(right.len());
@@ -464,7 +857,9 @@ fn sxs_content(
             palette,
             false,
             None,
-            0,
+            None,
+            &[],
+            scroll_x,
             cx,
         ))
         .child(div().w(px(1.)).bg(rgb3(u.border)))
@@ -476,8 +871,10 @@ fn sxs_content(
             u,
             palette,
             editable,
-            focused_row,
-            cursor,
+            primary,
+            sel_anchor,
+            extra_carets,
+            scroll_x,
             cx,
         ))
 }
@@ -489,8 +886,10 @@ fn inline_content(
     u: &UiVars,
     palette: &HighlightPalette,
     editable: bool,
-    focused_row: Option<usize>,
-    cursor: usize,
+    primary: Option<Caret>,
+    sel_anchor: Option<Caret>,
+    extra_carets: &[Caret],
+    scroll_x: f32,
     cx: &mut Context<DiffPane>,
 ) -> impl IntoElement {
     pane_column(
@@ -501,8 +900,10 @@ fn inline_content(
         u,
         palette,
         editable,
-        focused_row,
-        cursor,
+        primary,
+        sel_anchor,
+        extra_carets,
+        scroll_x,
         cx,
     )
 }
@@ -515,14 +916,17 @@ fn pane_column(
     u: &UiVars,
     palette: &HighlightPalette,
     editable: bool,
-    focused_row: Option<usize>,
-    cursor: usize,
+    primary: Option<Caret>,
+    sel_anchor: Option<Caret>,
+    extra_carets: &[Caret],
+    scroll_x: f32,
     cx: &mut Context<DiffPane>,
 ) -> impl IntoElement {
     let u = u.clone();
     let palette = palette.clone();
     let lines = lines.to_vec();
     let line_hls = line_hls.to_vec();
+    let extra_carets = extra_carets.to_vec();
 
     div()
         .id(id)
@@ -533,7 +937,6 @@ fn pane_column(
         .children(lines.into_iter().enumerate().map(|(local_i, line)| {
             let i = index_offset + local_i;
             let bg = hunk_bg_static(&u, line.kind);
-            let is_focus = focused_row == Some(i);
             let can_edit_row =
                 editable && matches!(line.kind, LineKind::Equal | LineKind::Insert);
             let gutter = line
@@ -542,6 +945,10 @@ fn pane_column(
                 .unwrap_or_else(|| "    ".into());
             let text = line.text.clone();
             let highlights = cached_highlights(line_hls.get(local_i), &text, &palette);
+            let is_focus = primary.map(|c| c.row == i).unwrap_or(false);
+            let caret_col = primary.filter(|c| c.row == i).map(|c| c.col);
+            let sel = selection_range_for_row(sel_anchor, primary, i, text.chars().count());
+            let has_extra = extra_carets.iter().any(|c| c.row == i);
 
             div()
                 .id((id, i))
@@ -551,56 +958,181 @@ fn pane_column(
                 .h(px(ROW_HEIGHT))
                 .w_full()
                 .bg(rgb3(bg))
-                .when(is_focus, |el| el.border_l_2().border_color(rgb3(u.accent)))
-                .when(can_edit_row, |el| {
+                .when(is_focus || has_extra, |el| {
+                    el.border_l_2().border_color(rgb3(u.accent))
+                })
+                .when(can_edit_row || editable, |el| {
+                    let line_len = text.chars().count();
                     el.cursor_text().on_mouse_down(
                         MouseButton::Left,
-                        cx.listener(move |this, _e, window, cx| {
-                            this.focused_row = Some(i);
-                            this.cursor = this
-                                .cache
-                                .right_lines
-                                .get(i)
-                                .map(|l| l.text.chars().count())
-                                .unwrap_or(0);
+                        cx.listener(move |this, event: &MouseDownEvent, window, cx| {
+                            let caret = Caret {
+                                row: i,
+                                col: line_len,
+                            };
+                            if event.modifiers.alt {
+                                if let Some(p) = this.primary {
+                                    if p != caret && !this.extra_carets.contains(&caret) {
+                                        this.extra_carets.push(caret);
+                                    }
+                                } else {
+                                    this.primary = Some(caret);
+                                    this.sel_anchor = Some(caret);
+                                }
+                            } else if event.modifiers.shift {
+                                this.primary = Some(caret);
+                                if this.sel_anchor.is_none() {
+                                    this.sel_anchor = Some(caret);
+                                }
+                                this.extra_carets.clear();
+                            } else {
+                                this.primary = Some(caret);
+                                this.sel_anchor = Some(caret);
+                                this.extra_carets.clear();
+                            }
                             window.focus(&this.focus_handle);
                             cx.notify();
                         }),
                     )
                 })
+                // Sticky gutter — does not follow scroll_x.
                 .child(
                     div()
-                        .w(px(44.))
+                        .w(px(GUTTER_W))
+                        .flex_shrink_0()
                         .px_1()
                         .text_color(rgb3(u.text_muted))
                         .font_family("Menlo")
+                        .bg(rgb3(bg))
                         .child(gutter),
                 )
                 .child(
                     div()
                         .flex_1()
                         .min_w_0()
-                        .px_1()
                         .overflow_hidden()
-                        .child({
-                            let display = if is_focus && can_edit_row {
-                                let mut t = text.clone();
-                                let byte = t
-                                    .char_indices()
-                                    .nth(cursor)
-                                    .map(|(b, _)| b)
-                                    .unwrap_or(t.len());
-                                t.insert(byte, '│');
-                                t
-                            } else if text.is_empty() {
-                                " ".into()
-                            } else {
-                                text
-                            };
-                            StyledText::new(display).with_highlights(highlights)
-                        }),
+                        .child(
+                            div()
+                                .ml(px(-scroll_x))
+                                .px_1()
+                                .child(render_editable_text(
+                                    &text,
+                                    highlights,
+                                    caret_col,
+                                    sel,
+                                    can_edit_row && is_focus,
+                                    &u,
+                                )),
+                        ),
                 )
         }))
+}
+
+fn selection_range_for_row(
+    anchor: Option<Caret>,
+    primary: Option<Caret>,
+    row: usize,
+    line_len: usize,
+) -> Option<Range<usize>> {
+    let (Some(a), Some(b)) = (anchor, primary) else {
+        return None;
+    };
+    if a == b {
+        return None;
+    }
+    let (start, end) = if (a.row, a.col) <= (b.row, b.col) {
+        (a, b)
+    } else {
+        (b, a)
+    };
+    if row < start.row || row > end.row {
+        return None;
+    }
+    if start.row == end.row {
+        return Some(start.col..end.col);
+    }
+    if row == start.row {
+        return Some(start.col..line_len);
+    }
+    if row == end.row {
+        return Some(0..end.col);
+    }
+    Some(0..line_len)
+}
+
+fn render_editable_text(
+    text: &str,
+    highlights: Vec<(Range<usize>, HighlightStyle)>,
+    caret_col: Option<usize>,
+    sel: Option<Range<usize>>,
+    show_caret: bool,
+    u: &UiVars,
+) -> AnyElement {
+    if let Some(sel) = sel.filter(|s| s.start != s.end) {
+        let chars: Vec<char> = text.chars().collect();
+        let mut parts: Vec<AnyElement> = Vec::new();
+        let mut i = 0usize;
+        while i < chars.len() {
+            if i >= sel.start && i < sel.end {
+                let mut chunk = String::new();
+                while i < chars.len() && i < sel.end {
+                    chunk.push(chars[i]);
+                    i += 1;
+                }
+                parts.push(
+                    div()
+                        .bg(rgb3(u.accent))
+                        .text_color(rgb3(u.btn_fg))
+                        .child(chunk)
+                        .into_any_element(),
+                );
+            } else {
+                parts.push(div().child(chars[i].to_string()).into_any_element());
+                i += 1;
+            }
+        }
+        return div().flex().flex_row().children(parts).into_any_element();
+    }
+
+    let display = if show_caret {
+        if let Some(col) = caret_col {
+            let mut t = text.to_string();
+            let byte = char_byte(&t, col);
+            // Placeholder; real caret painted via overlay animation next to text is hard with StyledText,
+            // so keep glyph + blink wrapper around whole line tip.
+            t.insert(byte, '│');
+            t
+        } else {
+            text.to_string()
+        }
+    } else if text.is_empty() {
+        " ".into()
+    } else {
+        text.to_string()
+    };
+
+    if show_caret {
+        div()
+            .flex()
+            .flex_row()
+            .child(StyledText::new(display).with_highlights(highlights))
+            .with_animation(
+                "diff-caret-blink",
+                Animation::new(Duration::from_millis(1060)).repeat(),
+                |this, delta| {
+                    if delta < 0.5 {
+                        this.opacity(1.0)
+                    } else {
+                        this.opacity(0.85)
+                    }
+                },
+            )
+            .into_any_element()
+    } else {
+        StyledText::new(display)
+            .with_highlights(highlights)
+            .into_any_element()
+    }
 }
 
 fn hunk_bg_static(u: &UiVars, kind: LineKind) -> [u8; 3] {
