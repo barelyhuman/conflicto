@@ -5,208 +5,23 @@ use conflicto_core::{
     list_commit_files, list_commits, load_preferences, load_recent_repos, remember_repo,
     remove_recent_repo, resolve_repo, save_preferences, stage_paths, unstage_paths,
     write_working_tree_file, AppPreferences, ChangeEntry, ChangeSide, ChangeStatus, ColorScheme,
-    CommitFile, CommitInfo, FileDiff, GraphRow, RecentRepo, RepoInfo, ThemeId, UiVars, ViewMode,
+    CommitFile, CommitInfo, FileDiff, GraphRow, HighlightPalette, RecentRepo, RepoInfo, ThemeId,
+    UiVars, ViewMode,
 };
-use egui::{Color32, FontFamily, FontId, Key, Modifiers, RichText, ScrollArea, Sense, Ui};
-use similar::{ChangeTag, DiffOp, TextDiff};
+use egui::{Color32, Key, Modifiers, RichText, ScrollArea, Sense, Ui};
+
+use crate::diff_widget::{self, DiffScroll, DiffViewCache};
 
 const SIDEBAR_W: f32 = 320.0;
 const TOOLBAR_H: f32 = 42.0;
-const LINE_FONT: f32 = 13.0;
+/// Leading inset so toolbar widgets clear native traffic lights (fullsize content).
+#[cfg(target_os = "macos")]
+const MAC_TRAFFIC_INSET_X: f32 = 76.0;
+#[cfg(not(target_os = "macos"))]
+const MAC_TRAFFIC_INSET_X: f32 = 0.0;
 
 fn rgb(c: [u8; 3]) -> Color32 {
     Color32::from_rgb(c[0], c[1], c[2])
-}
-
-fn tint(bg: [u8; 3], accent: [u8; 3], amount: f32) -> Color32 {
-    let t = amount.clamp(0.0, 1.0);
-    Color32::from_rgb(
-        (bg[0] as f32 + (accent[0] as f32 - bg[0] as f32) * t).round() as u8,
-        (bg[1] as f32 + (accent[1] as f32 - bg[1] as f32) * t).round() as u8,
-        (bg[2] as f32 + (accent[2] as f32 - bg[2] as f32) * t).round() as u8,
-    )
-}
-
-#[derive(Clone, Copy, PartialEq, Eq)]
-enum LineKind {
-    Equal,
-    Delete,
-    Insert,
-    Gap,
-}
-
-#[derive(Clone)]
-struct DiffLine {
-    text: String,
-    kind: LineKind,
-    /// 1-based line number in that side's file; None for gap rows
-    line_no: Option<usize>,
-}
-
-fn aligned_diff_lines(old: &str, new: &str) -> (Vec<DiffLine>, Vec<DiffLine>) {
-    let diff = TextDiff::from_lines(old, new);
-    let mut left = Vec::new();
-    let mut right = Vec::new();
-    let mut old_no = 1usize;
-    let mut new_no = 1usize;
-
-    for op in diff.ops() {
-        match *op {
-            DiffOp::Equal { .. } => {
-                for change in diff.iter_changes(op) {
-                    let text = change.to_string_lossy().trim_end_matches('\n').to_string();
-                    left.push(DiffLine {
-                        text: text.clone(),
-                        kind: LineKind::Equal,
-                        line_no: Some(old_no),
-                    });
-                    right.push(DiffLine {
-                        text,
-                        kind: LineKind::Equal,
-                        line_no: Some(new_no),
-                    });
-                    old_no += 1;
-                    new_no += 1;
-                }
-            }
-            DiffOp::Delete { .. } => {
-                for change in diff.iter_changes(op) {
-                    let text = change.to_string_lossy().trim_end_matches('\n').to_string();
-                    left.push(DiffLine {
-                        text,
-                        kind: LineKind::Delete,
-                        line_no: Some(old_no),
-                    });
-                    right.push(DiffLine {
-                        text: String::new(),
-                        kind: LineKind::Gap,
-                        line_no: None,
-                    });
-                    old_no += 1;
-                }
-            }
-            DiffOp::Insert { .. } => {
-                for change in diff.iter_changes(op) {
-                    let text = change.to_string_lossy().trim_end_matches('\n').to_string();
-                    left.push(DiffLine {
-                        text: String::new(),
-                        kind: LineKind::Gap,
-                        line_no: None,
-                    });
-                    right.push(DiffLine {
-                        text,
-                        kind: LineKind::Insert,
-                        line_no: Some(new_no),
-                    });
-                    new_no += 1;
-                }
-            }
-            DiffOp::Replace {
-                old_index,
-                old_len,
-                new_index,
-                new_len,
-            } => {
-                let old_slice = &diff.old_slices()[old_index..old_index + old_len];
-                let new_slice = &diff.new_slices()[new_index..new_index + new_len];
-                let max = old_len.max(new_len);
-                for i in 0..max {
-                    if i < old_len {
-                        left.push(DiffLine {
-                            text: old_slice[i].trim_end_matches('\n').to_string(),
-                            kind: LineKind::Delete,
-                            line_no: Some(old_no),
-                        });
-                        old_no += 1;
-                    } else {
-                        left.push(DiffLine {
-                            text: String::new(),
-                            kind: LineKind::Gap,
-                            line_no: None,
-                        });
-                    }
-                    if i < new_len {
-                        right.push(DiffLine {
-                            text: new_slice[i].trim_end_matches('\n').to_string(),
-                            kind: LineKind::Insert,
-                            line_no: Some(new_no),
-                        });
-                        new_no += 1;
-                    } else {
-                        right.push(DiffLine {
-                            text: String::new(),
-                            kind: LineKind::Gap,
-                            line_no: None,
-                        });
-                    }
-                }
-            }
-        }
-    }
-
-    (left, right)
-}
-
-fn line_fill(kind: LineKind, u: &UiVars) -> Color32 {
-    match kind {
-        LineKind::Equal => Color32::TRANSPARENT,
-        LineKind::Delete => tint(u.bg, u.status_d, 0.28),
-        LineKind::Insert => tint(u.bg, u.status_a, 0.28),
-        LineKind::Gap => tint(u.bg, u.text_muted, 0.08),
-    }
-}
-
-fn line_text_color(kind: LineKind, u: &UiVars) -> Color32 {
-    match kind {
-        LineKind::Delete => rgb(u.status_d),
-        LineKind::Insert => rgb(u.status_a),
-        LineKind::Gap => rgb(u.text_muted),
-        LineKind::Equal => rgb(u.text),
-    }
-}
-
-fn render_diff_lines(ui: &mut Ui, lines: &[DiffLine], u: &UiVars) {
-    ui.spacing_mut().item_spacing.y = 0.0;
-    for line in lines {
-        let fill = line_fill(line.kind, u);
-        egui::Frame::NONE
-            .fill(fill)
-            .inner_margin(egui::Margin::symmetric(6, 1))
-            .show(ui, |ui| {
-                ui.set_width(ui.available_width());
-                ui.horizontal(|ui| {
-                    ui.spacing_mut().item_spacing.x = 8.0;
-                    let gutter = match line.line_no {
-                        Some(n) => format!("{n:>4}"),
-                        None => "    ".into(),
-                    };
-                    ui.label(
-                        RichText::new(gutter)
-                            .monospace()
-                            .size(LINE_FONT)
-                            .color(rgb(u.text_muted)),
-                    );
-                    let marker = match line.kind {
-                        LineKind::Delete => "−",
-                        LineKind::Insert => "+",
-                        LineKind::Equal => " ",
-                        LineKind::Gap => " ",
-                    };
-                    ui.label(
-                        RichText::new(marker)
-                            .monospace()
-                            .size(LINE_FONT)
-                            .color(line_text_color(line.kind, u)),
-                    );
-                    ui.label(
-                        RichText::new(&line.text)
-                            .monospace()
-                            .size(LINE_FONT)
-                            .color(line_text_color(line.kind, u)),
-                    );
-                });
-            });
-    }
 }
 
 #[derive(Clone)]
@@ -218,6 +33,7 @@ struct Selection {
 pub struct ConflictoApp {
     prefs: AppPreferences,
     ui_vars: UiVars,
+    hl_palette: HighlightPalette,
     repo: Option<RepoInfo>,
     recent: Vec<RecentRepo>,
     changes: Vec<ChangeEntry>,
@@ -235,15 +51,21 @@ pub struct ConflictoApp {
     selected_commit_file: Option<String>,
     error: Option<String>,
     status: Option<String>,
+    /// Linked scroll for side-by-side (and inline) diff panes
+    diff_scroll: DiffScroll,
+    /// Highlight + alignment cache (invalidated on content change)
+    diff_cache: DiffViewCache,
 }
 
 impl ConflictoApp {
     pub fn new(cc: &eframe::CreationContext<'_>) -> Self {
         let prefs = load_preferences();
         let pack = get_theme(prefs.theme_id);
+        let hl_palette = HighlightPalette::from_ui(&pack.ui, pack.scheme);
         let mut app = Self {
             prefs,
             ui_vars: pack.ui,
+            hl_palette,
             repo: None,
             recent: load_recent_repos(),
             changes: Vec::new(),
@@ -260,6 +82,8 @@ impl ConflictoApp {
             selected_commit_file: None,
             error: None,
             status: None,
+            diff_scroll: DiffScroll::default(),
+            diff_cache: DiffViewCache::default(),
         };
         app.apply_theme_visuals(&cc.egui_ctx);
         if let Some(path) = app.prefs.last_repo_path.clone() {
@@ -294,7 +118,9 @@ impl ConflictoApp {
 
     fn set_theme(&mut self, ctx: &egui::Context, id: ThemeId) {
         self.prefs.theme_id = id;
-        self.ui_vars = get_theme(id).ui;
+        let pack = get_theme(id);
+        self.ui_vars = pack.ui.clone();
+        self.hl_palette = HighlightPalette::from_ui(&pack.ui, pack.scheme);
         self.apply_theme_visuals(ctx);
         let _ = save_preferences(&self.prefs);
     }
@@ -381,6 +207,8 @@ impl ConflictoApp {
                 self.edit_buffer = diff.modified.clone();
                 self.dirty = false;
                 self.diff = Some(diff);
+                self.diff_scroll.reset();
+                self.diff_cache.reset();
                 self.error = None;
             }
             Err(e) => self.error = Some(e.to_string()),
@@ -420,6 +248,8 @@ impl ConflictoApp {
                 self.edit_buffer = diff.modified.clone();
                 self.dirty = false;
                 self.diff = Some(diff);
+                self.diff_scroll.reset();
+                self.diff_cache.reset();
                 self.selection = None;
                 self.error = None;
             }
@@ -484,31 +314,52 @@ impl eframe::App for ConflictoApp {
 
         let u = self.ui_vars.clone();
 
-        egui::SidePanel::right("sidebar")
-            .exact_width(SIDEBAR_W)
-            .resizable(false)
-            .frame(egui::Frame::NONE.fill(rgb(u.bg_sidebar)))
-            .show(ctx, |ui| {
-                self.ui_sidebar(ui, &u);
-            });
-
         egui::CentralPanel::default()
             .frame(egui::Frame::NONE.fill(rgb(u.bg)))
             .show(ctx, |ui| {
-                self.ui_main(ui, &u);
+                let full = ui.available_size();
+                let main_w = (full.x - SIDEBAR_W).max(200.0);
+                ui.horizontal(|ui| {
+                    ui.spacing_mut().item_spacing.x = 0.0;
+                    ui.allocate_ui_with_layout(
+                        egui::vec2(main_w, full.y),
+                        egui::Layout::top_down(egui::Align::Min),
+                        |ui| {
+                            egui::Frame::NONE
+                                .fill(rgb(u.bg))
+                                .show(ui, |ui| {
+                                    ui.set_min_size(ui.available_size());
+                                    self.ui_main(ui, &u);
+                                });
+                        },
+                    );
+                    ui.allocate_ui_with_layout(
+                        egui::vec2(SIDEBAR_W, full.y),
+                        egui::Layout::top_down(egui::Align::Min),
+                        |ui| {
+                            egui::Frame::NONE
+                                .fill(rgb(u.bg_sidebar))
+                                .show(ui, |ui| {
+                                    ui.set_min_size(ui.available_size());
+                                    self.ui_sidebar(ui, &u);
+                                });
+                        },
+                    );
+                });
             });
     }
 }
 
 impl ConflictoApp {
     fn ui_sidebar(&mut self, ui: &mut Ui, u: &UiVars) {
-        ui.set_min_height(ui.available_height());
+        ui.set_min_size(ui.available_size());
 
         // Header
         egui::Frame::NONE
             .fill(rgb(u.bg_surface))
             .inner_margin(egui::Margin::symmetric(12, 8))
             .show(ui, |ui| {
+                ui.set_width(ui.available_width());
                 ui.set_height(TOOLBAR_H - 4.0);
                 ui.horizontal(|ui| {
                     let label = self
@@ -665,6 +516,7 @@ impl ConflictoApp {
                 .color(rgb(u.text_muted)),
         );
         if entries.is_empty() {
+            ui.add_space(4.0);
             ui.label(RichText::new("None").small().color(rgb(u.text_muted)));
             return;
         }
@@ -694,6 +546,7 @@ impl ConflictoApp {
                                 .monospace()
                                 .color(status_color),
                         );
+                        ui.add_space(4.0);
                         let name = Path::new(&entry.path)
                             .file_name()
                             .and_then(|n| n.to_str())
@@ -847,16 +700,19 @@ impl ConflictoApp {
     }
 
     fn ui_main(&mut self, ui: &mut Ui, u: &UiVars) {
-        // Toolbar
+        ui.set_min_size(ui.available_size());
+
+        // Toolbar — leading inset clears macOS traffic lights when using fullsize content.
         egui::Frame::NONE
             .fill(rgb(u.bg_surface))
             .inner_margin(egui::Margin {
-                left: 80,
+                left: (12.0 + MAC_TRAFFIC_INSET_X) as i8,
                 right: 12,
                 top: 0,
                 bottom: 0,
             })
             .show(ui, |ui| {
+                ui.set_width(ui.available_width());
                 ui.set_height(TOOLBAR_H);
                 ui.horizontal_centered(|ui| {
                     let path_label = self.diff.as_ref().map(|d| {
@@ -963,130 +819,42 @@ impl ConflictoApp {
     fn ui_diff(&mut self, ui: &mut Ui, u: &UiVars) {
         let Some(diff) = self.diff.clone() else { return };
         let editable = self.can_edit();
-        let original = diff.original.clone();
-        let modified = if editable {
-            self.edit_buffer.clone()
+        let palette = self.hl_palette.clone();
+        let edit = if editable {
+            Some(&mut self.edit_buffer)
         } else {
-            diff.modified.clone()
+            None
         };
-        let (left_lines, right_lines) = aligned_diff_lines(&original, &modified);
 
-        if self.side_by_side {
-            ui.columns(2, |cols| {
-                cols[0].label(
-                    RichText::new("Original")
-                        .small()
-                        .color(rgb(u.text_muted)),
-                );
-                ScrollArea::both()
-                    .id_salt("diff_left")
-                    .auto_shrink([false, false])
-                    .show(&mut cols[0], |ui| {
-                        render_diff_lines(ui, &left_lines, u);
-                    });
-
-                cols[1].horizontal(|ui| {
-                    ui.label(
-                        RichText::new(if editable {
-                            "Working Tree (editable)"
-                        } else {
-                            "Modified"
-                        })
-                        .small()
-                        .color(rgb(u.text_muted)),
-                    );
-                });
-
-                if editable {
-                    // Colored preview + editable buffer under it.
-                    let preview_h = (cols[1].available_height() * 0.45).max(120.0);
-                    ScrollArea::both()
-                        .id_salt("diff_right_preview")
-                        .max_height(preview_h)
-                        .auto_shrink([false, false])
-                        .show(&mut cols[1], |ui| {
-                            render_diff_lines(ui, &right_lines, u);
-                        });
-                    cols[1].label(
-                        RichText::new("Edit")
-                            .small()
-                            .color(rgb(u.text_muted)),
-                    );
-                    ScrollArea::both()
-                        .id_salt("diff_right_edit")
-                        .auto_shrink([false, false])
-                        .show(&mut cols[1], |ui| {
-                            let response = ui.add(
-                                egui::TextEdit::multiline(&mut self.edit_buffer)
-                                    .code_editor()
-                                    .desired_width(f32::INFINITY)
-                                    .font(FontId::new(LINE_FONT, FontFamily::Monospace))
-                                    .text_color(rgb(u.text)),
-                            );
-                            if response.changed() {
-                                self.dirty = self.edit_buffer != diff.modified;
-                                self.status = None;
-                            }
-                        });
-                } else {
-                    ScrollArea::both()
-                        .id_salt("diff_right")
-                        .auto_shrink([false, false])
-                        .show(&mut cols[1], |ui| {
-                            render_diff_lines(ui, &right_lines, u);
-                        });
-                }
-            });
+        let outcome = if self.side_by_side {
+            diff_widget::show_side_by_side(
+                ui,
+                u,
+                &palette,
+                &diff.path,
+                &diff.original,
+                &diff.modified,
+                edit,
+                &mut self.diff_scroll,
+                &mut self.diff_cache,
+            )
         } else {
-            ScrollArea::both()
-                .id_salt("diff_inline")
-                .auto_shrink([false, false])
-                .show(ui, |ui| {
-                    ui.spacing_mut().item_spacing.y = 0.0;
-                    let text_diff = TextDiff::from_lines(&original, &modified);
-                    for change in text_diff.iter_all_changes() {
-                        let (prefix, kind) = match change.tag() {
-                            ChangeTag::Delete => ("− ", LineKind::Delete),
-                            ChangeTag::Insert => ("+ ", LineKind::Insert),
-                            ChangeTag::Equal => ("  ", LineKind::Equal),
-                        };
-                        let fill = line_fill(kind, u);
-                        let color = line_text_color(kind, u);
-                        let text = change.to_string_lossy();
-                        egui::Frame::NONE
-                            .fill(fill)
-                            .inner_margin(egui::Margin::symmetric(6, 1))
-                            .show(ui, |ui| {
-                                ui.set_width(ui.available_width());
-                                ui.label(
-                                    RichText::new(format!("{prefix}{text}"))
-                                        .monospace()
-                                        .size(LINE_FONT)
-                                        .color(color),
-                                );
-                            });
-                    }
+            diff_widget::show_inline(
+                ui,
+                u,
+                &palette,
+                &diff.path,
+                &diff.original,
+                &diff.modified,
+                edit,
+                &mut self.diff_scroll,
+                &mut self.diff_cache,
+            )
+        };
 
-                    if editable {
-                        ui.add_space(8.0);
-                        ui.label(
-                            RichText::new("Edit working tree")
-                                .small()
-                                .color(rgb(u.text_muted)),
-                        );
-                        let response = ui.add(
-                            egui::TextEdit::multiline(&mut self.edit_buffer)
-                                .code_editor()
-                                .desired_width(f32::INFINITY)
-                                .desired_rows(16)
-                                .font(FontId::new(LINE_FONT, FontFamily::Monospace))
-                                .text_color(rgb(u.text)),
-                        );
-                        if response.changed() {
-                            self.dirty = self.edit_buffer != diff.modified;
-                        }
-                    }
-                });
+        if outcome.buffer_changed {
+            self.dirty = self.edit_buffer != diff.modified;
+            self.status = None;
         }
     }
 }

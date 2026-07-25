@@ -18,7 +18,13 @@ cargo build -p conflicto --release
 ls -lh target/release/conflicto
 ```
 
-Observed release binary on macOS arm64: **~4.2 MB** (≪ Electron).
+## Syntax highlighting
+
+Tree-sitter builtins (statically linked): **rust, typescript/tsx, javascript, python, json, css**. Other extensions render as plaintext until a language-extension loader ships.
+
+Unstaged side-by-side: left = read-only hunk chrome; right = editable Equal/Insert rows with the same red/green fills (one `edit_buffer`, not a third editor).
+
+Observed release binary on macOS arm64: **~10 MB** (with builtins; ≪ Electron).
 
 ## Shortcuts
 

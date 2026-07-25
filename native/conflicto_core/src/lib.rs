@@ -3,6 +3,7 @@
 pub mod fs_io;
 pub mod git;
 pub mod graph;
+pub mod highlight;
 pub mod models;
 pub mod prefs;
 pub mod theme;
@@ -13,6 +14,10 @@ pub use git::{
     stage_paths, unstage_paths, GitError,
 };
 pub use graph::{layout_commit_graph, GraphEdge, GraphEdgeKind, GraphRow};
+pub use highlight::{
+    highlight_color, highlight_language, highlight_source, registry, HighlightKind, HighlightPalette,
+    HighlightSpan, LanguageRegistry, HIGHLIGHT_NAMES,
+};
 pub use models::*;
 pub use prefs::{load_preferences, load_recent_repos, remember_repo, remove_recent_repo, save_preferences};
 pub use theme::{get_theme, themes, ColorScheme, ThemeId, ThemePack, UiVars, DEFAULT_THEME_ID};

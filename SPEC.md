@@ -22,7 +22,7 @@ Code lives under [`native/`](native/). Electron remains until the native app is 
 
 | Metric | Target |
 |--------|--------|
-| Release artifact | ≤ 15–25 MB goal; ceiling ≪ 100 MB (**~4.2 MB** observed on macOS arm64) |
+| Release artifact | ≤ 15–25 MB goal; ceiling ≪ 100 MB (**~10 MB** with tree-sitter builtins on macOS arm64) |
 | Idle RSS | Tens of MB, not hundreds |
 | Build | `lto = true`, `codegen-units = 1`, strip in release |
 
@@ -34,20 +34,21 @@ Code lives under [`native/`](native/). Electron remains until the native app is 
 |------|----------|
 | Repo | Open folder / path; recents (max 20); remember last repo |
 | Changes | Staged + working tree; stage/unstage; status letters |
-| Diff | Side-by-side / inline; path toolbar; **unstaged WT side editable + ⌘S** |
+| Diff | Side-by-side / inline; **tree-sitter** syntax highlight; **unstaged WT pane is the file** (edit + ⌘S) |
 | Graph | Sidebar accordion; ~80 commits; lane graph; commit files + blob diff |
-| Themes | Ported packs + UI tokens on chrome and diff |
+| Themes | Ported packs + UI tokens on chrome, diff, and highlight palette |
 | Prefs | `themeId`, `lastRepoPath` in platform config dir |
 | Shortcuts | Open repo (⌘O), refresh (⌘R), save when dirty (⌘S) |
 
-**Not in v1:** separate editor mode, embedded terminal, FS watcher, GitHub, updater.
+**Not in v1:** separate editor mode, embedded terminal, FS watcher, GitHub, updater, language extension loader.
 
 ### Editable unstaged diff
 
-- Editing is **in the diff view**.
-- **Unstaged:** working-tree (modified) side is editable; save writes UTF-8 to disk; dirty indicator; refresh after save.
-- **Staged** and **commit** diffs: read-only.
-- One dirty buffer per current unstaged selection.
+- **Never three editors** — max two panes; WT side is the file when unstaged.
+- **Unstaged:** line-oriented editable diff widget (Equal/Insert rows) with red/green hunk chrome on both panes; ⌘S writes UTF-8; dirty indicator; refresh after save.
+- **Staged** / **commit:** read-only highlighted panes with the same red/green hunk chrome.
+- Built-in highlight langs: rust, typescript/tsx, javascript, python, json, css (else plaintext).
+- Tree-sitter highlighting stays on glyphs; hunk tint is row background.
 
 ## Layout (close enough)
 
@@ -67,8 +68,8 @@ Mirror Electron types: `RepoInfo`, `ChangeEntry`, `FileDiff`, `CommitInfo`, `Com
 ## Architecture
 
 ```
-conflicto (bin)     — egui shell, sidebar, diff, graph UI, shortcuts
-conflicto_core      — git CLI, prefs/recents, themes, graph layout, file IO
+conflicto (bin)     — egui shell, sidebar, diff/edit UI, shortcuts
+conflicto_core      — git CLI, prefs/recents, themes, graph layout, file IO, tree-sitter highlight
 ```
 
 Platform bits stay thin (`rfd`, `dirs`, eframe/winit). No `cfg(target_os)` in feature logic except tiny chrome helpers.
@@ -93,6 +94,7 @@ Platform bits stay thin (`rfd`, `dirs`, eframe/winit). No `cfg(target_os)` in fe
 - App updater
 - GitHub PRs / comments / worktrees
 - Prefs schema validation (Zod-equivalent)
+- **Language extensions** (dynamic grammars via `LanguageRegistry::register` — dylib/sidecar packs)
 
 ## v1 done when
 
