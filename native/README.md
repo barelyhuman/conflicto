@@ -42,6 +42,7 @@ Unstaged side-by-side: left = read-only hunk chrome; right = editable Equal/Inse
 - [ ] Git 
     - [ ] Ability to switch branches 
     - [ ] Make commits 
+    - [ ] Ability to push/pull/fetch 
     - [ ] Visualise the history graph
     - [ ] Connect to Github 
         - [ ] Ability to view a github PR
