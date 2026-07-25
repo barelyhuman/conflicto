@@ -31,6 +31,7 @@ export const loadingCommitFiles = signal(false)
 
 export const themeId = signal<ThemeId>(DEFAULT_THEME_ID)
 export const terminalOpen = signal(false)
+export const terminalHeight = signal(200)
 
 export function toggleTerminal() {
   terminalOpen.value = !terminalOpen.value

@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'preact/hooks'
 import { Terminal } from '@xterm/xterm'
 import { FitAddon } from '@xterm/addon-fit'
 import '@xterm/xterm/css/xterm.css'
-import { repo, terminalOpen, themeId } from '../state'
+import { repo, terminalHeight, terminalOpen, themeId } from '../state'
 import { getTheme } from '../theme/themes'
 
 function readCssVar(name: string, fallback: string): string {
@@ -20,13 +20,21 @@ function terminalTheme() {
   }
 }
 
+const MIN_HEIGHT = 120
+
+function maxHeight(): number {
+  return Math.floor(window.innerHeight * 0.7)
+}
+
 export function TerminalPanel() {
   const hostRef = useRef<HTMLDivElement>(null)
   const termRef = useRef<Terminal | null>(null)
   const fitRef = useRef<FitAddon | null>(null)
   const [ready, setReady] = useState(false)
   const [sessionCwd, setSessionCwd] = useState<string | null>(null)
+  const [dragging, setDragging] = useState(false)
   const initialCwdRef = useRef(repo.value?.root ?? null)
+  const dragRef = useRef<{ startY: number; startHeight: number } | null>(null)
 
   useEffect(() => {
     const host = hostRef.current
@@ -104,8 +112,50 @@ export function TerminalPanel() {
     term.options.theme = terminalTheme()
   }, [ready, themeId.value])
 
+  useEffect(() => {
+    if (!dragging) return
+
+    const onMove = (e: PointerEvent) => {
+      const drag = dragRef.current
+      if (!drag) return
+      const delta = drag.startY - e.clientY
+      const next = Math.min(maxHeight(), Math.max(MIN_HEIGHT, drag.startHeight + delta))
+      terminalHeight.value = next
+    }
+
+    const onUp = () => {
+      dragRef.current = null
+      setDragging(false)
+    }
+
+    window.addEventListener('pointermove', onMove)
+    window.addEventListener('pointerup', onUp)
+    window.addEventListener('pointercancel', onUp)
+    return () => {
+      window.removeEventListener('pointermove', onMove)
+      window.removeEventListener('pointerup', onUp)
+      window.removeEventListener('pointercancel', onUp)
+    }
+  }, [dragging])
+
+  function onResizePointerDown(e: PointerEvent) {
+    e.preventDefault()
+    dragRef.current = { startY: e.clientY, startHeight: terminalHeight.value }
+    setDragging(true)
+  }
+
   return (
-    <div class="terminal-panel">
+    <div
+      class={`terminal-panel ${dragging ? 'resizing' : ''}`}
+      style={{ height: `${terminalHeight.value}px` }}
+    >
+      <div
+        class="terminal-resize-handle"
+        onPointerDown={onResizePointerDown}
+        role="separator"
+        aria-orientation="horizontal"
+        aria-label="Resize terminal"
+      />
       <div class="terminal-panel-header">
         <span>Terminal</span>
         <span class="terminal-cwd" title={sessionCwd ?? undefined}>

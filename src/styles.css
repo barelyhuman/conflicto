@@ -702,12 +702,31 @@ button.file-row {
 .terminal-panel {
   display: flex;
   flex-direction: column;
-  height: 200px;
   flex-shrink: 0;
   border-top: 1px solid var(--border);
   background: var(--bg);
+  position: relative;
   min-height: 120px;
-  max-height: 50vh;
+}
+
+.terminal-panel.resizing {
+  user-select: none;
+}
+
+.terminal-resize-handle {
+  position: absolute;
+  top: -3px;
+  left: 0;
+  right: 0;
+  height: 6px;
+  cursor: ns-resize;
+  z-index: 2;
+}
+
+.terminal-resize-handle:hover,
+.terminal-panel.resizing .terminal-resize-handle {
+  background: var(--accent);
+  opacity: 0.35;
 }
 
 .terminal-panel-header {
