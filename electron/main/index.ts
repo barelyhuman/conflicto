@@ -13,8 +13,9 @@ import {
   unstagePaths,
 } from './git'
 import { listRecentRepos, recordRecentRepo, removeRecentRepo } from './recentRepos'
+import { getPreferences, setPreferences } from './preferences'
 import { disposeTerminal, registerTerminalIpc } from './terminal'
-import type { ChangeSide } from '../../src/types'
+import type { AppPreferences, ChangeSide } from '../../src/types'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
@@ -52,6 +53,17 @@ function registerIpc() {
   ipcMain.handle('conflicto:remove-recent-repo', async (_event, root: string) => {
     return removeRecentRepo(root)
   })
+
+  ipcMain.handle('conflicto:get-preferences', async () => {
+    return getPreferences()
+  })
+
+  ipcMain.handle(
+    'conflicto:set-preferences',
+    async (_event, partial: Partial<AppPreferences>) => {
+      return setPreferences(partial ?? {})
+    },
+  )
 
   ipcMain.handle('conflicto:open-repo', async () => {
     const result = await dialog.showOpenDialog(win!, {
