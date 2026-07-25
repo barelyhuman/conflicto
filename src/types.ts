@@ -1,8 +1,18 @@
+import type { ThemeId } from './theme/tokens'
+
+export type { ThemeId }
+
 export type ChangeSide = 'staged' | 'unstaged'
 
 export type ChangeStatus = 'modified' | 'added' | 'deleted' | 'renamed' | 'untracked' | 'copied'
 
 export type ViewMode = 'changes' | 'graph'
+
+export interface AppPreferences {
+  themeId: ThemeId
+  terminalHeight: number
+  lastRepoPath: string | null
+}
 
 export interface ChangeEntry {
   path: string
@@ -60,6 +70,8 @@ export interface ConflictoApi {
   openRepoPath: (path: string) => Promise<RepoInfo>
   getRecentRepos: () => Promise<RecentRepo[]>
   removeRecentRepo: (root: string) => Promise<RecentRepo[]>
+  getPreferences: () => Promise<AppPreferences>
+  setPreferences: (partial: Partial<AppPreferences>) => Promise<AppPreferences>
   listChanges: (root: string) => Promise<ChangeEntry[]>
   stagePaths: (root: string, paths: string[]) => Promise<void>
   unstagePaths: (root: string, paths: string[]) => Promise<void>

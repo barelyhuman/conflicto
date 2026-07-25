@@ -1,9 +1,16 @@
 import { render } from 'preact'
 import { App } from './App'
 import { applyTheme } from './theme/applyTheme'
-import { themeId } from './state'
+import { hydratePreferences, themeId } from './state'
 import './styles.css'
 
-void applyTheme(themeId.value)
+async function bootstrap() {
+  try {
+    await hydratePreferences()
+  } catch {
+    await applyTheme(themeId.value)
+  }
+  render(<App />, document.getElementById('app')!)
+}
 
-render(<App />, document.getElementById('app')!)
+void bootstrap()

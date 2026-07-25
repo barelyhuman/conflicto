@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'preact/hooks'
 import { Terminal } from '@xterm/xterm'
 import { FitAddon } from '@xterm/addon-fit'
 import '@xterm/xterm/css/xterm.css'
-import { repo, terminalHeight, terminalOpen, themeId } from '../state'
+import { persistTerminalHeight, repo, terminalHeight, terminalOpen, themeId } from '../state'
 import { getTheme } from '../theme/themes'
 
 function readCssVar(name: string, fallback: string): string {
@@ -126,6 +126,7 @@ export function TerminalPanel() {
     const onUp = () => {
       dragRef.current = null
       setDragging(false)
+      persistTerminalHeight()
     }
 
     window.addEventListener('pointermove', onMove)

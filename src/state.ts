@@ -1,5 +1,6 @@
 import { signal, computed } from '@preact/signals'
 import type {
+  AppPreferences,
   ChangeEntry,
   CommitFile,
   CommitInfo,
@@ -11,6 +12,10 @@ import type {
 import { applyTheme } from './theme/applyTheme'
 import { DEFAULT_THEME_ID, THEMES } from './theme/themes'
 import type { ThemeId } from './theme/tokens'
+
+const MIN_TERMINAL_HEIGHT = 120
+const DEFAULT_TERMINAL_HEIGHT = 200
+const HEIGHT_PERSIST_DEBOUNCE_MS = 250
 
 export const repo = signal<RepoInfo | null>(null)
 export const recentRepos = signal<RecentRepo[]>([])
@@ -31,7 +36,67 @@ export const loadingCommitFiles = signal(false)
 
 export const themeId = signal<ThemeId>(DEFAULT_THEME_ID)
 export const terminalOpen = signal(false)
-export const terminalHeight = signal(200)
+export const terminalHeight = signal(DEFAULT_TERMINAL_HEIGHT)
+
+/** Skip preference writes while restoring from disk on boot. */
+let hydrating = false
+let heightPersistTimer: ReturnType<typeof setTimeout> | null = null
+
+function clampTerminalHeight(height: number): number {
+  const max =
+    typeof window !== 'undefined' && window.innerHeight > 0
+      ? Math.floor(window.innerHeight * 0.7)
+      : 560
+  return Math.min(max, Math.max(MIN_TERMINAL_HEIGHT, Math.round(height)))
+}
+
+async function persistPreferences(partial: Partial<AppPreferences>): Promise<void> {
+  if (hydrating) return
+  try {
+    await window.conflicto?.setPreferences?.(partial)
+  } catch {
+    // Main process may be unavailable in browser preview
+  }
+}
+
+export function persistTerminalHeight(height = terminalHeight.value): void {
+  if (hydrating) return
+  const next = clampTerminalHeight(height)
+  if (heightPersistTimer) clearTimeout(heightPersistTimer)
+  heightPersistTimer = setTimeout(() => {
+    heightPersistTimer = null
+    void persistPreferences({ terminalHeight: next })
+  }, HEIGHT_PERSIST_DEBOUNCE_MS)
+}
+
+export async function hydratePreferences(): Promise<void> {
+  hydrating = true
+  let clearLastRepo = false
+  try {
+    const prefs = (await window.conflicto?.getPreferences?.()) ?? null
+    if (!prefs) return
+
+    themeId.value = prefs.themeId
+    terminalHeight.value = clampTerminalHeight(prefs.terminalHeight)
+
+    await applyTheme(themeId.value)
+
+    if (prefs.lastRepoPath) {
+      try {
+        await openRepositoryPath(prefs.lastRepoPath)
+      } catch {
+        clearLastRepo = true
+      }
+    }
+  } catch {
+    // Fall through with in-memory defaults
+  } finally {
+    hydrating = false
+  }
+  if (clearLastRepo) {
+    await persistPreferences({ lastRepoPath: null })
+  }
+}
 
 export function toggleTerminal() {
   terminalOpen.value = !terminalOpen.value
@@ -74,6 +139,7 @@ async function applyRepo(info: RepoInfo) {
   commits.value = []
   changes.value = []
   await Promise.all([refreshChanges(), refreshCommits(), loadRecentRepos()])
+  void persistPreferences({ lastRepoPath: info.root })
 }
 
 export async function openRepository() {
@@ -272,6 +338,7 @@ export async function refreshAll() {
 export async function setAppTheme(id: ThemeId) {
   themeId.value = id
   await applyTheme(id)
+  void persistPreferences({ themeId: id })
 }
 
 export { THEMES }
