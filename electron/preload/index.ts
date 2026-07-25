@@ -16,6 +16,22 @@ const api: ConflictoApi = {
   getCommitFileDiff: (root, hash, path) =>
     ipcRenderer.invoke('conflicto:get-commit-file-diff', root, hash, path),
   setChromeColor: (hex) => ipcRenderer.invoke('conflicto:set-chrome-color', hex),
+  terminal: {
+    start: (opts) => ipcRenderer.invoke('conflicto:terminal-start', opts),
+    write: (data) => ipcRenderer.invoke('conflicto:terminal-write', data),
+    resize: (cols, rows) => ipcRenderer.invoke('conflicto:terminal-resize', { cols, rows }),
+    stop: () => ipcRenderer.invoke('conflicto:terminal-stop'),
+    onData: (listener) => {
+      const handler = (_event: unknown, data: string) => listener(data)
+      ipcRenderer.on('conflicto:terminal-data', handler)
+      return () => ipcRenderer.removeListener('conflicto:terminal-data', handler)
+    },
+    onExit: (listener) => {
+      const handler = () => listener()
+      ipcRenderer.on('conflicto:terminal-exit', handler)
+      return () => ipcRenderer.removeListener('conflicto:terminal-exit', handler)
+    },
+  },
 }
 
 contextBridge.exposeInMainWorld('conflicto', api)

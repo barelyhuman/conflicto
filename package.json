@@ -17,9 +17,13 @@
     "@preact/signals": "^2.3.2",
     "@rose-pine/palette": "^4.0.1",
     "@tabler/icons-preact": "^3.45.0",
+    "@xterm/addon-fit": "^0.11.0",
+    "@xterm/xterm": "^6.0.0",
+    "node-pty": "^1.1.0",
     "preact": "^10.26.9"
   },
   "devDependencies": {
+    "@electron/rebuild": "^4.2.0",
     "@preact/preset-vite": "^2.10.2",
     "electron": "^37.10.3",
     "electron-builder": "^26.0.12",

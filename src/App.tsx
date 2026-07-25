@@ -2,6 +2,7 @@ import { useEffect } from 'preact/hooks'
 import { RepoSidebar } from './components/RepoSidebar'
 import { DiffToolbar } from './components/DiffToolbar'
 import { PierreDiffView } from './components/PierreDiffView'
+import { TerminalPanel } from './components/TerminalPanel'
 import {
   diff,
   error,
@@ -11,6 +12,8 @@ import {
   refreshAll,
   repo,
   selectedKey,
+  terminalOpen,
+  toggleTerminal,
 } from './state'
 
 export function App() {
@@ -25,6 +28,10 @@ export function App() {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'r' && repo.value) {
         e.preventDefault()
         refreshAll()
+      }
+      if ((e.metaKey || e.ctrlKey) && e.key === '`') {
+        e.preventDefault()
+        toggleTerminal()
       }
     }
     window.addEventListener('keydown', onKey)
@@ -71,6 +78,7 @@ export function App() {
           )}
           {hasDiff && <PierreDiffView />}
         </div>
+        {terminalOpen.value && <TerminalPanel />}
       </main>
       <RepoSidebar />
     </div>

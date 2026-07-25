@@ -30,6 +30,11 @@ export const commitFiles = signal<CommitFile[]>([])
 export const loadingCommitFiles = signal(false)
 
 export const themeId = signal<ThemeId>(DEFAULT_THEME_ID)
+export const terminalOpen = signal(false)
+
+export function toggleTerminal() {
+  terminalOpen.value = !terminalOpen.value
+}
 
 export const staged = computed(() => changes.value.filter((c) => c.side === 'staged'))
 export const unstaged = computed(() => changes.value.filter((c) => c.side === 'unstaged'))

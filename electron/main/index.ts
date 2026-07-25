@@ -13,6 +13,7 @@ import {
   unstagePaths,
 } from './git'
 import { listRecentRepos, recordRecentRepo, removeRecentRepo } from './recentRepos'
+import { disposeTerminal, registerTerminalIpc } from './terminal'
 import type { ChangeSide } from '../../src/types'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
@@ -110,6 +111,8 @@ function registerIpc() {
     if (!win || typeof hex !== 'string' || !/^#[0-9a-fA-F]{6}$/.test(hex)) return
     win.setBackgroundColor(hex)
   })
+
+  registerTerminalIpc(() => win)
 }
 
 async function createWindow() {
@@ -150,6 +153,7 @@ app.whenReady().then(() => {
 })
 
 app.on('window-all-closed', () => {
+  disposeTerminal()
   win = null
   if (process.platform !== 'darwin') app.quit()
 })

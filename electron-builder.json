@@ -3,10 +3,11 @@
   "appId": "com.conflicto.app",
   "productName": "Conflicto",
   "asar": true,
+  "asarUnpack": ["node_modules/node-pty/**"],
   "directories": {
     "output": "release/${version}"
   },
-  "files": ["dist-electron", "dist"],
+  "files": ["dist-electron", "dist", "package.json", "node_modules/node-pty/**"],
   "mac": {
     "artifactName": "${productName}_${version}.${ext}",
     "target": ["dmg", "zip"]

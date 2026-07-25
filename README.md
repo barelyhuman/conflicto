@@ -15,7 +15,7 @@ A fast, VS Code-inspired desktop diff viewer. Point it at a git repo and inspect
     - [ ] Ability to approve / merged / open the PR 
     - [ ] Open the PR in a worktree locally if needed
 - [ ] Add options to see diff with whitespace disabled 
-- [ ] A very simple terminal integration
+- [x] A very simple terminal integration
 - [x] Better theme arch
     - [x] Create an adaptive theme that uses the monaco themes to create the rest of the UI
 - [ ] Updater
@@ -57,4 +57,5 @@ If Electron boots but `import 'electron'` fails (API is a path string), check th
 
 - `⌘O` / `Ctrl+O` — open repository
 - `⌘R` / `Ctrl+R` — refresh changes
+- `` ⌘` `` / `` Ctrl+` `` — toggle terminal
 

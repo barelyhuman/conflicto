@@ -46,6 +46,15 @@ export interface CommitFile {
   status: ChangeStatus
 }
 
+export interface TerminalApi {
+  start: (opts?: { cwd?: string | null; cols?: number; rows?: number }) => Promise<{ cwd: string | null }>
+  write: (data: string) => Promise<void>
+  resize: (cols: number, rows: number) => Promise<void>
+  stop: () => Promise<void>
+  onData: (listener: (data: string) => void) => () => void
+  onExit: (listener: () => void) => () => void
+}
+
 export interface ConflictoApi {
   openRepo: () => Promise<RepoInfo | null>
   openRepoPath: (path: string) => Promise<RepoInfo>
@@ -59,6 +68,7 @@ export interface ConflictoApi {
   listCommitFiles: (root: string, hash: string) => Promise<CommitFile[]>
   getCommitFileDiff: (root: string, hash: string, path: string) => Promise<FileDiff>
   setChromeColor: (hex: string) => Promise<void>
+  terminal: TerminalApi
 }
 
 declare global {

@@ -1,4 +1,15 @@
-import { diff, findSelected, selectedCommit, setAppTheme, sideBySide, THEMES, themeId, viewMode } from '../state'
+import {
+  diff,
+  findSelected,
+  selectedCommit,
+  setAppTheme,
+  sideBySide,
+  THEMES,
+  themeId,
+  terminalOpen,
+  toggleTerminal,
+  viewMode,
+} from '../state'
 import type { ThemeId } from '../theme/tokens'
 
 export function DiffToolbar() {
@@ -49,6 +60,14 @@ export function DiffToolbar() {
             ))}
           </select>
         </label>
+        <button
+          type="button"
+          class={`btn toggle ${terminalOpen.value ? 'active' : ''}`}
+          onClick={() => toggleTerminal()}
+          title="Toggle Terminal (⌘`)"
+        >
+          Terminal
+        </button>
         <button
           type="button"
           class={`btn toggle ${sideBySide.value ? 'active' : ''}`}
