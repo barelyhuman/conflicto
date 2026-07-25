@@ -1,6 +1,7 @@
 mod actions;
 mod app;
 mod color;
+mod commit_input;
 mod diff;
 
 use gpui::*;

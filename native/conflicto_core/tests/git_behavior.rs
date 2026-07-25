@@ -2,8 +2,8 @@ mod common;
 use common::TempRepo;
 
 use conflicto_core::{
-    get_file_diff, layout_commit_graph, list_changes, list_commits, resolve_repo, stage_paths,
-    unstage_paths, write_working_tree_file, ChangeSide, ChangeStatus,
+    commit, get_file_diff, layout_commit_graph, list_changes, list_commits, resolve_repo,
+    stage_paths, unstage_paths, write_working_tree_file, ChangeSide, ChangeStatus,
 };
 
 #[test]
@@ -118,4 +118,40 @@ fn commit_file_diff() {
     let diff = get_commit_file_diff(repo.path(), hash, "a.txt", None).unwrap();
     assert_eq!(diff.original, "1\n");
     assert_eq!(diff.modified, "2\n");
+}
+
+#[test]
+fn commit_after_staging() {
+    let repo = TempRepo::new();
+    repo.write("a.txt", "one\n");
+    repo.add_all();
+    repo.commit("init");
+    repo.write("a.txt", "two\n");
+
+    stage_paths(repo.path(), &["a.txt".into()]).unwrap();
+    assert!(list_changes(repo.path())
+        .unwrap()
+        .iter()
+        .any(|c| c.path == "a.txt" && c.side == ChangeSide::Staged));
+
+    commit(repo.path(), "update a").unwrap();
+
+    let changes = list_changes(repo.path()).unwrap();
+    assert!(!changes.iter().any(|c| c.path == "a.txt"));
+
+    let commits = list_commits(repo.path(), None).unwrap();
+    assert_eq!(commits[0].subject, "update a");
+}
+
+#[test]
+fn commit_rejects_empty_message() {
+    let repo = TempRepo::new();
+    repo.write("a.txt", "one\n");
+    repo.add_all();
+    repo.commit("init");
+    repo.write("a.txt", "two\n");
+    stage_paths(repo.path(), &["a.txt".into()]).unwrap();
+
+    let err = commit(repo.path(), "   ").unwrap_err();
+    assert!(err.to_string().contains("empty"));
 }

@@ -1,3 +1,3 @@
 use gpui::actions;
 
-actions!(conflicto, [OpenRepo, Refresh, Save, ToggleSideBySide]);
+actions!(conflicto, [OpenRepo, Refresh, Save, ToggleSideBySide, Commit]);

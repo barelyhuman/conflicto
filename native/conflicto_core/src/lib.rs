@@ -18,8 +18,8 @@ pub use diff::{
 };
 pub use diff_cache::{DiffViewCache, LineHighlights};
 pub use git::{
-    get_commit_file_diff, get_file_diff, list_changes, list_commit_files, list_commits, resolve_repo,
-    stage_paths, unstage_paths, write_working_tree_file, GitError,
+    commit, get_commit_file_diff, get_file_diff, list_changes, list_commit_files, list_commits,
+    resolve_repo, stage_paths, unstage_paths, write_working_tree_file, GitError,
 };
 pub use graph::{layout_commit_graph, GraphEdge, GraphEdgeKind, GraphRow};
 pub use highlight::{

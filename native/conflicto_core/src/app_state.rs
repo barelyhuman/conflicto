@@ -3,8 +3,8 @@
 use std::path::{Path, PathBuf};
 
 use crate::git::{
-    get_commit_file_diff, get_file_diff, list_changes, list_commit_files, list_commits, resolve_repo,
-    stage_paths, unstage_paths, write_working_tree_file,
+    commit, get_commit_file_diff, get_file_diff, list_changes, list_commit_files, list_commits,
+    resolve_repo, stage_paths, unstage_paths, write_working_tree_file,
 };
 use crate::graph::layout_commit_graph;
 use crate::highlight::HighlightPalette;
@@ -33,6 +33,8 @@ pub struct AppState {
     pub commit_files: Vec<CommitFile>,
     pub error: Option<String>,
     pub status: Option<String>,
+    /// Draft commit message for the Changes sidebar.
+    pub commit_message: String,
 }
 
 impl AppState {
@@ -57,6 +59,7 @@ impl AppState {
             commit_files: Vec::new(),
             error: None,
             status: None,
+            commit_message: String::new(),
         };
         if let Some(path) = app.prefs.last_repo_path.clone() {
             if Path::new(&path).is_dir() {
@@ -286,6 +289,36 @@ impl AppState {
             return;
         }
         self.with_repo_path_list(&paths, unstage_paths);
+    }
+
+    pub fn has_staged_changes(&self) -> bool {
+        self.changes.iter().any(|c| c.side == ChangeSide::Staged)
+    }
+
+    /// Commit staged changes with the draft message. Clears the draft on success.
+    pub fn commit_staged(&mut self) {
+        let message = self.commit_message.clone();
+        if message.trim().is_empty() {
+            self.status = Some("Enter a commit message".into());
+            return;
+        }
+        if !self.has_staged_changes() {
+            self.status = Some("Nothing staged to commit".into());
+            return;
+        }
+        let Some(repo) = self.repo.clone() else {
+            self.error = Some("No repository open".into());
+            return;
+        };
+        match commit(Path::new(&repo.root), &message) {
+            Ok(()) => {
+                self.commit_message.clear();
+                self.error = None;
+                self.status = Some("Created commit".into());
+                self.refresh_all();
+            }
+            Err(e) => self.error = Some(e.to_string()),
+        }
     }
 
     fn with_repo_paths(

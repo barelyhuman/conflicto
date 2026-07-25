@@ -163,6 +163,34 @@ pub fn unstage_paths(root: &Path, paths: &[String]) -> Result<(), GitError> {
     Ok(())
 }
 
+/// Create a commit from the current index. `message` may be multi-line.
+pub fn commit(root: &Path, message: &str) -> Result<(), GitError> {
+    let message = message.trim();
+    if message.is_empty() {
+        return Err(GitError::Message("Commit message is empty".into()));
+    }
+    // `-F` preserves newlines; `-m` alone is awkward for multi-line subjects/bodies.
+    let path = std::env::temp_dir().join(format!(
+        "conflicto-commit-msg-{}-{}.txt",
+        std::process::id(),
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_nanos())
+            .unwrap_or(0)
+    ));
+    fs::write(&path, format!("{message}\n"))?;
+    let result = git_ok(
+        root,
+        &[
+            "commit",
+            "-F",
+            path.to_str().ok_or_else(|| GitError::Message("Invalid commit message path".into()))?,
+        ],
+    );
+    let _ = fs::remove_file(&path);
+    result.map(|_| ())
+}
+
 fn read_working_tree(root: &Path, file_path: &str) -> String {
     std::fs::read_to_string(root.join(file_path)).unwrap_or_default()
 }

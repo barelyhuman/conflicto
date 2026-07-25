@@ -6,13 +6,15 @@ use conflicto_core::{themes, AppState, ChangeEntry, ChangeSide, CommitFile, View
 use gpui::prelude::*;
 use gpui::*;
 
-use crate::actions::{OpenRepo, Refresh, Save, ToggleSideBySide};
+use crate::actions::{Commit, OpenRepo, Refresh, Save, ToggleSideBySide};
 use crate::color::rgb3;
+use crate::commit_input::{CommitMessageEvent, CommitMessageField};
 use crate::diff::{DiffPane, DiffPaneEvent};
 
 pub struct ConflictoApp {
     state: AppState,
     diff: Entity<DiffPane>,
+    commit_input: Entity<CommitMessageField>,
     repo_menu_open: bool,
     theme_menu_open: bool,
     settings_menu_open: bool,
@@ -22,16 +24,21 @@ pub struct ConflictoApp {
 impl ConflictoApp {
     pub fn new(window: &mut Window, cx: &mut Context<Self>) -> Self {
         let state = AppState::new();
+        let ui = state.ui_vars.clone();
         let diff = cx.new(DiffPane::new);
+        let commit_input = cx.new(|cx| CommitMessageField::new(&ui, cx));
         let mut app = Self {
             state,
             diff: diff.clone(),
+            commit_input: commit_input.clone(),
             repo_menu_open: false,
             theme_menu_open: false,
             settings_menu_open: false,
             focus_handle: cx.focus_handle(),
         };
         cx.subscribe(&diff, Self::on_diff_event).detach();
+        cx.subscribe(&commit_input, Self::on_commit_input_event)
+            .detach();
         app.sync_diff(cx);
         window.focus(&app.focus_handle);
         app
@@ -107,6 +114,21 @@ impl ConflictoApp {
         cx.notify();
     }
 
+    fn commit(&mut self, _: &Commit, _window: &mut Window, cx: &mut Context<Self>) {
+        self.commit_staged(cx);
+    }
+
+    fn commit_staged(&mut self, cx: &mut Context<Self>) {
+        let msg = self.commit_input.read(cx).content().to_string();
+        self.state.commit_message = msg;
+        self.state.commit_staged();
+        if self.state.commit_message.is_empty() {
+            self.commit_input.update(cx, |field, cx| field.clear(cx));
+        }
+        self.sync_diff(cx);
+        cx.notify();
+    }
+
     fn on_diff_event(
         &mut self,
         _diff: Entity<DiffPane>,
@@ -117,6 +139,20 @@ impl ConflictoApp {
             DiffPaneEvent::BufferChanged(buf) => {
                 self.state.session.edit_buffer = buf.clone();
                 self.state.session.mark_buffer_changed();
+                cx.notify();
+            }
+        }
+    }
+
+    fn on_commit_input_event(
+        &mut self,
+        _input: Entity<CommitMessageField>,
+        event: &CommitMessageEvent,
+        cx: &mut Context<Self>,
+    ) {
+        match event {
+            CommitMessageEvent::Changed(msg) => {
+                self.state.commit_message = msg.clone();
                 cx.notify();
             }
         }
@@ -146,6 +182,7 @@ impl Render for ConflictoApp {
             .on_action(cx.listener(Self::refresh))
             .on_action(cx.listener(Self::save))
             .on_action(cx.listener(Self::toggle_sxs))
+            .on_action(cx.listener(Self::commit))
             .child(
                 div()
                     .flex()
@@ -281,6 +318,8 @@ fn theme_dropdown_button(
                                 .on_click(cx.listener(move |this, _, _, cx| {
                                     this.state.set_theme(id);
                                     this.theme_menu_open = false;
+                                    let ui = this.state.ui_vars.clone();
+                                    this.commit_input.update(cx, |field, _| field.set_ui(&ui));
                                     this.sync_diff(cx);
                                     cx.notify();
                                 }))
@@ -664,6 +703,7 @@ fn changes_list(app: &mut ConflictoApp, cx: &mut Context<ConflictoApp>) -> impl 
         .collect();
     let has_staged = !staged.is_empty();
     let has_unstaged = !unstaged.is_empty();
+    let can_commit = has_staged && !app.state.commit_message.trim().is_empty();
     div()
         .id("changes")
         .flex()
@@ -673,6 +713,7 @@ fn changes_list(app: &mut ConflictoApp, cx: &mut Context<ConflictoApp>) -> impl 
         .overflow_scroll()
         .p_2()
         .gap_2()
+        .child(commit_box(app, can_commit, &u, cx))
         .child(section_header(
             "Staged",
             has_staged.then_some(("Discard all", "discard-all-staged")),
@@ -704,6 +745,54 @@ fn changes_list(app: &mut ConflictoApp, cx: &mut Context<ConflictoApp>) -> impl 
             unstaged
                 .into_iter()
                 .map(|e| change_row(e, &u, &app.state.session, false, cx)),
+        )
+}
+
+fn commit_box(
+    app: &mut ConflictoApp,
+    can_commit: bool,
+    u: &conflicto_core::UiVars,
+    cx: &mut Context<ConflictoApp>,
+) -> impl IntoElement {
+    let u = u.clone();
+    div()
+        .flex()
+        .flex_col()
+        .gap_2()
+        .pb_2()
+        .child(app.commit_input.clone())
+        .child(
+            div()
+                .id("commit-btn")
+                .flex()
+                .items_center()
+                .justify_center()
+                .h(px(28.))
+                .px_2()
+                .rounded_sm()
+                .border_1()
+                .border_color(rgb3(if can_commit { u.accent } else { u.border }))
+                .bg(rgb3(if can_commit { u.btn_bg } else { u.bg_surface }))
+                .when(can_commit, |el| {
+                    el.cursor_pointer()
+                        .hover(|s| {
+                            s.bg(rgb3(u.bg_hover))
+                                .border_color(rgb3(u.accent))
+                                .text_color(rgb3(u.accent))
+                        })
+                        .active(|s| s.bg(rgb3(u.bg_active)).opacity(0.85))
+                        .on_click(cx.listener(|this, _, _, cx| {
+                            this.commit_staged(cx);
+                        }))
+                })
+                .when(!can_commit, |el| el.opacity(0.55))
+                .child(
+                    div()
+                        .text_xs()
+                        .font_weight(FontWeight::SEMIBOLD)
+                        .text_color(rgb3(if can_commit { u.accent } else { u.text_muted }))
+                        .child("Commit"),
+                ),
         )
 }
 
@@ -986,5 +1075,7 @@ pub fn bind_keys(cx: &mut App) {
         KeyBinding::new("ctrl-s", Save, None),
         KeyBinding::new("cmd-\\", ToggleSideBySide, None),
         KeyBinding::new("ctrl-\\", ToggleSideBySide, None),
+        KeyBinding::new("cmd-enter", Commit, None),
+        KeyBinding::new("ctrl-enter", Commit, None),
     ]);
 }
