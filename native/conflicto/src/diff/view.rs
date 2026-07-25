@@ -319,6 +319,7 @@ impl Render for DiffPane {
                                 let vh_cell = viewport_h.clone();
                                 canvas(
                                     move |bounds, _, _| {
+                                        // Only the editor viewport owns scroll metrics.
                                         vh_cell.set(f32::from(bounds.size.height));
                                     },
                                     |_bounds, _, _, _| {},
@@ -382,9 +383,7 @@ impl Render for DiffPane {
                                 canvas(
                                     {
                                         let mb = mb.clone();
-                                        let vh_cell = viewport_h.clone();
                                         move |bounds, _, _| {
-                                            vh_cell.set(f32::from(bounds.size.height));
                                             mb.set(bounds);
                                             bounds
                                         }
@@ -398,7 +397,6 @@ impl Render for DiffPane {
                                                 &ui_for_map,
                                                 &markers,
                                                 scroll_y,
-                                                max_y,
                                                 vh,
                                             );
                                         }
@@ -411,15 +409,12 @@ impl Render for DiffPane {
                                 cx.listener(move |this, event: &MouseDownEvent, _window, cx| {
                                     let bounds = this.minimap_bounds.get();
                                     let n = this.row_count();
-                                    let content_h = (n as f32 * ROW_HEIGHT).max(1.0);
                                     let vh = this.viewport_h.get().max(1.0);
-                                    let max_y = (content_h - vh).max(0.0);
                                     this.scroll_y = minimap::scroll_y_from_minimap_click(
                                         bounds,
                                         event.position.y,
                                         n,
                                         vh,
-                                        max_y,
                                     );
                                     cx.notify();
                                 }),

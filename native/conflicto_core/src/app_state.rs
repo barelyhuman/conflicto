@@ -261,13 +261,48 @@ impl AppState {
         self.with_repo_paths(path, unstage_paths);
     }
 
+    pub fn stage_all_unstaged(&mut self) {
+        let paths: Vec<String> = self
+            .changes
+            .iter()
+            .filter(|c| c.side == ChangeSide::Unstaged)
+            .map(|c| c.path.clone())
+            .collect();
+        if paths.is_empty() {
+            return;
+        }
+        self.with_repo_path_list(&paths, stage_paths);
+    }
+
+    /// Remove all paths from the index (unstage). Labelled "Discard all" in the Staged header.
+    pub fn unstage_all_staged(&mut self) {
+        let paths: Vec<String> = self
+            .changes
+            .iter()
+            .filter(|c| c.side == ChangeSide::Staged)
+            .map(|c| c.path.clone())
+            .collect();
+        if paths.is_empty() {
+            return;
+        }
+        self.with_repo_path_list(&paths, unstage_paths);
+    }
+
     fn with_repo_paths(
         &mut self,
         path: &str,
         action: impl FnOnce(&Path, &[String]) -> Result<(), crate::git::GitError>,
     ) {
+        self.with_repo_path_list(&[path.to_string()], action);
+    }
+
+    fn with_repo_path_list(
+        &mut self,
+        paths: &[String],
+        action: impl FnOnce(&Path, &[String]) -> Result<(), crate::git::GitError>,
+    ) {
         let Some(repo) = self.repo.clone() else { return };
-        if let Err(e) = action(Path::new(&repo.root), &[path.to_string()]) {
+        if let Err(e) = action(Path::new(&repo.root), paths) {
             self.error = Some(e.to_string());
         } else {
             self.refresh_all();

@@ -186,182 +186,222 @@ fn toolbar(app: &mut ConflictoApp, cx: &mut Context<ConflictoApp>) -> impl IntoE
     let current = app.state.prefs.theme_id;
     let sxs = app.state.side_by_side;
 
-    let theme_menu = theme_open.then(|| {
-        let u = u.clone();
-        div()
-            .id("theme-menu")
-            .flex()
-            .flex_col()
-            .w_full()
-            .border_t_1()
-            .border_color(rgb3(u.border))
-            .bg(rgb3(u.bg))
-            .py_1()
-            .children(themes().iter().map(|pack| {
-                let id = pack.id;
-                let selected = id == current;
-                div()
-                    .id(SharedString::from(format!("theme-opt-{}", id.label())))
-                    .flex()
-                    .items_center()
-                    .justify_end()
-                    .h(px(28.))
-                    .px_3()
-                    .cursor_pointer()
-                    .when(selected, |el| el.bg(rgb3(u.bg_active)))
-                    .hover(|s| s.bg(rgb3(u.bg_hover)))
-                    .on_click(cx.listener(move |this, _, _, cx| {
-                        this.state.set_theme(id);
-                        this.theme_menu_open = false;
-                        this.sync_diff(cx);
-                        cx.notify();
-                    }))
-                    .child(
-                        div()
-                            .text_xs()
-                            .text_color(rgb3(if selected { u.accent } else { u.text }))
-                            .child(id.label()),
-                    )
-            }))
-            .into_any_element()
-    });
-
-    let settings_menu = settings_open.then(|| {
-        let u = u.clone();
-        div()
-            .id("settings-menu")
-            .flex()
-            .flex_col()
-            .w_full()
-            .border_t_1()
-            .border_color(rgb3(u.border))
-            .bg(rgb3(u.bg))
-            .p_2()
-            .child(
-                div()
-                    .id("sxs-toggle")
-                    .flex()
-                    .flex_row()
-                    .items_center()
-                    .justify_end()
-                    .gap_2()
-                    .h(px(28.))
-                    .px_1()
-                    .rounded_sm()
-                    .cursor_pointer()
-                    .hover(|s| s.bg(rgb3(u.bg_hover)))
-                    .on_click(cx.listener(|this, _, _, cx| {
-                        this.state.side_by_side = !this.state.side_by_side;
-                        this.sync_diff(cx);
-                        cx.notify();
-                    }))
-                    .child(
-                        div()
-                            .flex()
-                            .items_center()
-                            .justify_center()
-                            .size(px(16.))
-                            .rounded_sm()
-                            .border_1()
-                            .border_color(rgb3(if sxs { u.accent } else { u.border }))
-                            .bg(rgb3(if sxs { u.accent } else { u.bg }))
-                            .child(
-                                div()
-                                    .text_xs()
-                                    .text_color(rgb3(if sxs { u.btn_fg } else { u.bg }))
-                                    .child(if sxs { "✓" } else { " " }),
-                            ),
-                    )
-                    .child(
-                        div()
-                            .text_xs()
-                            .text_color(rgb3(u.text))
-                            .child("Side by side"),
-                    ),
-            )
-            .into_any_element()
-    });
-
     div()
         .flex()
-        .flex_col()
+        .flex_row()
+        .h(px(42.))
         .w_full()
+        .items_center()
+        .gap_2()
+        .px_3()
         .bg(rgb3(u.bg_surface))
         .child(
             div()
+                .flex_1()
+                .text_xs()
+                .text_color(rgb3(u.text_muted))
+                .child(if dirty { "• Unsaved edits" } else { "" }),
+        )
+        .child(theme_dropdown_button(current, theme_open, &u, cx))
+        .child(settings_cog_button(sxs, settings_open, &u, cx))
+}
+
+/// Overlay popover — absolute + deferred so it does not grow the toolbar.
+fn theme_dropdown_button(
+    current: conflicto_core::ThemeId,
+    open: bool,
+    u: &conflicto_core::UiVars,
+    cx: &mut Context<ConflictoApp>,
+) -> impl IntoElement {
+    let u = u.clone();
+    div()
+        .relative()
+        .child(
+            div()
+                .id("theme-dropdown")
                 .flex()
-                .flex_row()
-                .min_h(px(42.))
                 .items_center()
-                .gap_2()
-                .px_3()
+                .gap_1()
+                .h(px(28.))
+                .px_2()
+                .rounded_sm()
+                .border_1()
+                .border_color(rgb3(u.border))
+                .bg(rgb3(u.bg))
+                .cursor_pointer()
+                .hover(|s| s.bg(rgb3(u.bg_hover)))
+                .on_click(cx.listener(|this, _, _, cx| {
+                    this.theme_menu_open = !this.theme_menu_open;
+                    this.settings_menu_open = false;
+                    cx.notify();
+                }))
                 .child(
                     div()
-                        .flex_1()
+                        .text_xs()
+                        .text_color(rgb3(u.text))
+                        .child(current.label()),
+                )
+                .child(
+                    div()
                         .text_xs()
                         .text_color(rgb3(u.text_muted))
-                        .child(if dirty { "• Unsaved edits" } else { "" }),
-                )
-                .child(
-                    div()
-                        .id("theme-dropdown")
-                        .flex()
-                        .items_center()
-                        .gap_1()
-                        .h(px(28.))
-                        .px_2()
-                        .rounded_sm()
-                        .border_1()
-                        .border_color(rgb3(u.border))
-                        .bg(rgb3(u.bg))
-                        .cursor_pointer()
-                        .hover(|s| s.bg(rgb3(u.bg_hover)))
-                        .on_click(cx.listener(|this, _, _, cx| {
-                            this.theme_menu_open = !this.theme_menu_open;
-                            this.settings_menu_open = false;
-                            cx.notify();
-                        }))
-                        .child(
-                            div()
-                                .text_xs()
-                                .text_color(rgb3(u.text))
-                                .child(current.label()),
-                        )
-                        .child(
-                            div()
-                                .text_xs()
-                                .text_color(rgb3(u.text_muted))
-                                .child(if theme_open { "▴" } else { "▾" }),
-                        ),
-                )
-                .child(
-                    div()
-                        .id("settings-cog")
-                        .flex()
-                        .items_center()
-                        .justify_center()
-                        .size(px(28.))
-                        .rounded_sm()
-                        .border_1()
-                        .border_color(rgb3(u.border))
-                        .bg(rgb3(if settings_open { u.bg_active } else { u.bg }))
-                        .cursor_pointer()
-                        .hover(|s| s.bg(rgb3(u.bg_hover)))
-                        .on_click(cx.listener(|this, _, _, cx| {
-                            this.settings_menu_open = !this.settings_menu_open;
-                            this.theme_menu_open = false;
-                            cx.notify();
-                        }))
-                        .child(
-                            div()
-                                .text_sm()
-                                .text_color(rgb3(u.text))
-                                .child("⚙"),
-                        ),
+                        .child(if open { "▴" } else { "▾" }),
                 ),
         )
-        .children(theme_menu)
-        .children(settings_menu)
+        .when(open, |el| {
+            let u = u.clone();
+            el.child(
+                deferred(
+                    div()
+                        .id("theme-menu")
+                        .absolute()
+                        .top(px(32.))
+                        .right_0()
+                        .w(px(220.))
+                        .rounded_sm()
+                        .border_1()
+                        .border_color(rgb3(u.border))
+                        .bg(rgb3(u.bg_surface))
+                        .shadow_md()
+                        .py_1()
+                        .occlude()
+                        .children(themes().iter().map(|pack| {
+                            let id = pack.id;
+                            let selected = id == current;
+                            div()
+                                .id(SharedString::from(format!("theme-opt-{}", id.label())))
+                                .flex()
+                                .items_center()
+                                .w_full()
+                                .h(px(28.))
+                                .px_3()
+                                .cursor_pointer()
+                                .when(selected, |el| el.bg(rgb3(u.bg_active)))
+                                .hover(|s| s.bg(rgb3(u.bg_hover)))
+                                .on_click(cx.listener(move |this, _, _, cx| {
+                                    this.state.set_theme(id);
+                                    this.theme_menu_open = false;
+                                    this.sync_diff(cx);
+                                    cx.notify();
+                                }))
+                                .child(
+                                    div()
+                                        .text_xs()
+                                        .text_color(rgb3(if selected {
+                                            u.accent
+                                        } else {
+                                            u.text
+                                        }))
+                                        .child(id.label()),
+                                )
+                        })),
+                )
+                .with_priority(100),
+            )
+        })
+}
+
+fn settings_cog_button(
+    sxs: bool,
+    open: bool,
+    u: &conflicto_core::UiVars,
+    cx: &mut Context<ConflictoApp>,
+) -> impl IntoElement {
+    let u = u.clone();
+    div()
+        .relative()
+        .child(
+            div()
+                .id("settings-cog")
+                .flex()
+                .items_center()
+                .justify_center()
+                .size(px(28.))
+                .rounded_sm()
+                .border_1()
+                .border_color(rgb3(u.border))
+                .bg(rgb3(if open { u.bg_active } else { u.bg }))
+                .cursor_pointer()
+                .hover(|s| s.bg(rgb3(u.bg_hover)))
+                .on_click(cx.listener(|this, _, _, cx| {
+                    this.settings_menu_open = !this.settings_menu_open;
+                    this.theme_menu_open = false;
+                    cx.notify();
+                }))
+                .child(
+                    div()
+                        .text_sm()
+                        .text_color(rgb3(u.text))
+                        .child("⚙"),
+                ),
+        )
+        .when(open, |el| {
+            let u = u.clone();
+            el.child(
+                deferred(
+                    div()
+                        .id("settings-menu")
+                        .absolute()
+                        .top(px(32.))
+                        .right_0()
+                        .w(px(220.))
+                        .rounded_sm()
+                        .border_1()
+                        .border_color(rgb3(u.border))
+                        .bg(rgb3(u.bg_surface))
+                        .shadow_md()
+                        .p_2()
+                        .occlude()
+                        .child(
+                            div()
+                                .id("sxs-toggle")
+                                .flex()
+                                .flex_row()
+                                .items_center()
+                                .gap_2()
+                                .w_full()
+                                .h(px(28.))
+                                .px_1()
+                                .rounded_sm()
+                                .cursor_pointer()
+                                .hover(|s| s.bg(rgb3(u.bg_hover)))
+                                .on_click(cx.listener(|this, _, _, cx| {
+                                    this.state.side_by_side = !this.state.side_by_side;
+                                    this.sync_diff(cx);
+                                    cx.notify();
+                                }))
+                                .child(
+                                    div()
+                                        .flex()
+                                        .items_center()
+                                        .justify_center()
+                                        .size(px(16.))
+                                        .rounded_sm()
+                                        .border_1()
+                                        .border_color(rgb3(if sxs { u.accent } else { u.border }))
+                                        .bg(rgb3(if sxs { u.accent } else { u.bg }))
+                                        .child(
+                                            div()
+                                                .text_xs()
+                                                .text_color(rgb3(if sxs {
+                                                    u.btn_fg
+                                                } else {
+                                                    u.bg
+                                                }))
+                                                .child(if sxs { "✓" } else { " " }),
+                                        ),
+                                )
+                                .child(
+                                    div()
+                                        .text_xs()
+                                        .text_color(rgb3(u.text))
+                                        .child("Side by side"),
+                                ),
+                        ),
+                )
+                .with_priority(100),
+            )
+        })
 }
 
 fn sidebar(app: &mut ConflictoApp, cx: &mut Context<ConflictoApp>) -> impl IntoElement {
@@ -622,6 +662,8 @@ fn changes_list(app: &mut ConflictoApp, cx: &mut Context<ConflictoApp>) -> impl 
         .filter(|c| c.side == ChangeSide::Unstaged)
         .cloned()
         .collect();
+    let has_staged = !staged.is_empty();
+    let has_unstaged = !unstaged.is_empty();
     div()
         .id("changes")
         .flex()
@@ -631,13 +673,33 @@ fn changes_list(app: &mut ConflictoApp, cx: &mut Context<ConflictoApp>) -> impl 
         .overflow_scroll()
         .p_2()
         .gap_2()
-        .child(section_label("Staged", &u))
+        .child(section_header(
+            "Staged",
+            has_staged.then_some(("Discard all", "discard-all-staged")),
+            &u,
+            cx,
+            |this, _, _, cx| {
+                this.state.unstage_all_staged();
+                this.sync_diff(cx);
+                cx.notify();
+            },
+        ))
         .children(
             staged
                 .into_iter()
                 .map(|e| change_row(e, &u, &app.state.session, true, cx)),
         )
-        .child(section_label("Changes", &u))
+        .child(section_header(
+            "Changes",
+            has_unstaged.then_some(("Add all", "add-all-changes")),
+            &u,
+            cx,
+            |this, _, _, cx| {
+                this.state.stage_all_unstaged();
+                this.sync_diff(cx);
+                cx.notify();
+            },
+        ))
         .children(
             unstaged
                 .into_iter()
@@ -645,12 +707,51 @@ fn changes_list(app: &mut ConflictoApp, cx: &mut Context<ConflictoApp>) -> impl 
         )
 }
 
-fn section_label(text: &str, u: &conflicto_core::UiVars) -> impl IntoElement {
+fn section_header(
+    title: &'static str,
+    action: Option<(&'static str, &'static str)>,
+    u: &conflicto_core::UiVars,
+    cx: &mut Context<ConflictoApp>,
+    on_action: impl Fn(&mut ConflictoApp, &ClickEvent, &mut Window, &mut Context<ConflictoApp>)
+        + 'static,
+) -> impl IntoElement {
+    let u = u.clone();
     div()
-        .text_xs()
-        .font_weight(FontWeight::SEMIBOLD)
-        .text_color(rgb3(u.text_muted))
-        .child(text.to_string())
+        .flex()
+        .flex_row()
+        .items_center()
+        .gap_2()
+        .child(
+            div()
+                .flex_1()
+                .text_xs()
+                .font_weight(FontWeight::SEMIBOLD)
+                .text_color(rgb3(u.text_muted))
+                .child(title),
+        )
+        .children(action.map(|(label, id)| {
+            div()
+                .id(id)
+                .px_1()
+                .rounded_sm()
+                .border_1()
+                .border_color(rgb3(u.border))
+                .bg(rgb3(u.bg_surface))
+                .cursor_pointer()
+                .hover(|s| {
+                    s.bg(rgb3(u.btn_bg))
+                        .border_color(rgb3(u.accent))
+                        .text_color(rgb3(u.accent))
+                })
+                .active(|s| s.bg(rgb3(u.bg_active)).opacity(0.85))
+                .on_click(cx.listener(on_action))
+                .child(
+                    div()
+                        .text_xs()
+                        .text_color(rgb3(u.text_muted))
+                        .child(label),
+                )
+        }))
 }
 
 fn change_row(

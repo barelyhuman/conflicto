@@ -39,14 +39,24 @@ pub fn sxs_marker_lines(left: &[DiffLine], right: &[DiffLine]) -> Vec<DiffLine> 
     kinds
 }
 
+/// Map document Y (pixels at ROW_HEIGHT) → minimap Y within `bounds`.
+fn doc_y_to_minimap(doc_y: f32, content_h: f32, map_h: f32) -> f32 {
+    if content_h <= 0.0 {
+        return 0.0;
+    }
+    (doc_y / content_h * map_h).clamp(0.0, map_h)
+}
+
 /// Paint minimap into `bounds`.
+///
+/// Markers and the viewport thumb share one scale: document pixels → minimap
+/// height, so they stay aligned with the editor scroll position.
 pub fn paint_minimap(
     window: &mut Window,
     bounds: Bounds<Pixels>,
     u: &UiVars,
     lines: &[DiffLine],
     scroll_y: f32,
-    max_y: f32,
     viewport_h: f32,
 ) {
     window.paint_quad(fill(bounds, rgb3(u.bg_surface)));
@@ -56,10 +66,11 @@ pub fn paint_minimap(
         return;
     }
     let content_h = (n as f32 * ROW_HEIGHT).max(1.0);
-    let height: f32 = bounds.size.height.into();
+    let map_h: f32 = bounds.size.height.into();
     let origin_y: f32 = bounds.origin.y.into();
-    let row_h = (height / n as f32).max(1.0);
 
+    // Sub-pixel row height is required when n > map_h; never floor to 1px or
+    // markers drift toward the bottom of the strip.
     let mut i = 0usize;
     while i < n {
         let kind = match lines[i].kind {
@@ -74,25 +85,20 @@ pub fn paint_minimap(
         while i < n && lines[i].kind == kind {
             i += 1;
         }
-        let y0 = origin_y + start as f32 * row_h;
-        let y1 = origin_y + i as f32 * row_h;
+        let y0 = origin_y + doc_y_to_minimap(start as f32 * ROW_HEIGHT, content_h, map_h);
+        let y1 = origin_y + doc_y_to_minimap(i as f32 * ROW_HEIGHT, content_h, map_h);
         let marker = Bounds {
             origin: point(bounds.origin.x + px(2.), px(y0)),
-            size: size(bounds.size.width - px(4.), px((y1 - y0).max(1.0))),
+            size: size(
+                bounds.size.width - px(4.),
+                px((y1 - y0).max(1.0)),
+            ),
         };
         window.paint_quad(fill(marker, rgb3(marker_rgb(kind, u))));
     }
 
-    let thumb_h = if content_h > 0.0 {
-        (viewport_h / content_h * height).clamp(8.0, height)
-    } else {
-        height
-    };
-    let thumb_t = if max_y > 0.0 {
-        scroll_y / max_y * (height - thumb_h).max(0.0)
-    } else {
-        0.0
-    };
+    let thumb_h = doc_y_to_minimap(viewport_h, content_h, map_h).clamp(8.0, map_h);
+    let thumb_t = doc_y_to_minimap(scroll_y, content_h, map_h).min(map_h - thumb_h);
     let thumb = Bounds {
         origin: point(bounds.origin.x, bounds.origin.y + px(thumb_t)),
         size: size(bounds.size.width, px(thumb_h)),
@@ -109,13 +115,12 @@ pub fn scroll_y_from_minimap_click(
     click_y: Pixels,
     line_count: usize,
     viewport_h: f32,
-    max_y: f32,
 ) -> f32 {
     let content_h = (line_count as f32 * ROW_HEIGHT).max(1.0);
-    let height: f32 = bounds.size.height.into();
+    let map_h: f32 = bounds.size.height.into();
     let origin_y: f32 = bounds.origin.y.into();
     let click: f32 = click_y.into();
-    let frac = ((click - origin_y) / height).clamp(0.0, 1.0);
-    let target = frac * content_h - viewport_h * 0.5;
-    target.clamp(0.0, max_y.max(0.0))
+    let frac = ((click - origin_y) / map_h).clamp(0.0, 1.0);
+    let max_y = (content_h - viewport_h).max(0.0);
+    (frac * content_h - viewport_h * 0.5).clamp(0.0, max_y)
 }
