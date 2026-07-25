@@ -3,6 +3,7 @@ name = "conflicto"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
+description = "Conflicto — native git diff viewer (GPUI)"
 
 [[bin]]
 name = "conflicto"
@@ -10,6 +11,5 @@ path = "src/main.rs"
 
 [dependencies]
 conflicto_core = { workspace = true }
-eframe = { workspace = true }
-egui = { workspace = true }
+gpui = "0.2.2"
 rfd = { workspace = true }

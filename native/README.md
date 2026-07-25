@@ -1,6 +1,6 @@
 # Conflicto (native)
 
-Rust + egui rewrite of Conflicto. See [`../SPEC.md`](../SPEC.md).
+Rust + **GPUI** rewrite of Conflicto. See [`../SPEC.md`](../SPEC.md).
 
 ## Develop
 
@@ -10,6 +10,12 @@ cargo run -p conflicto
 ```
 
 Requires `git` on PATH.
+
+On macOS, GPUI needs the Xcode Metal toolchain once:
+
+```bash
+xcodebuild -downloadComponent MetalToolchain
+```
 
 Release (size-optimized via workspace `profile.release`):
 
@@ -24,19 +30,9 @@ Tree-sitter builtins (statically linked): **rust, typescript/tsx, javascript, py
 
 Unstaged side-by-side: left = read-only hunk chrome; right = editable Equal/Insert rows with the same red/green fills (one `edit_buffer`, not a third editor).
 
-Observed release binary on macOS arm64: **~10 MB** (with builtins; ≪ Electron).
-
 ## Shortcuts
 
 - ⌘/Ctrl+O — open repository
 - ⌘/Ctrl+R — refresh
 - ⌘/Ctrl+S — save unstaged edits
-
-
-## TODO 
-
-- [ ] Migrate the sidebar to `ui_kit`
-     - [ ] Sidebar container
-     - [ ] File Entries 
-     - [ ] File Actions 
-     - [ ] Dropdown Container and Entries
+- ⌘/Ctrl+\ — toggle side-by-side / inline

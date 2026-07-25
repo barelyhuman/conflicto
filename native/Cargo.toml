@@ -15,8 +15,6 @@ thiserror = "2"
 dirs = "6"
 rfd = "0.15"
 similar = "2"
-eframe = { version = "0.31", default-features = true }
-egui = "0.31"
 tree-sitter = "0.25"
 tree-sitter-highlight = "0.25"
 tree-sitter-rust = "0.24"

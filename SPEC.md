@@ -9,9 +9,9 @@ A simple local git differ should not ship Chromium (~300MB). Conflicto’s nativ
 | Choice | Decision |
 |--------|----------|
 | Language | Rust |
-| UI | egui + eframe (no webview) |
+| UI | **GPUI** (Zed’s GPU UI; no webview, no egui) |
 | Git | System `git` on PATH |
-| Platforms | **macOS first**; portable crates (`rfd`, `dirs`, `eframe`) for Linux/Windows later |
+| Platforms | **macOS first**; portable crates (`rfd`, `dirs`, `gpui`) for Linux/Windows later |
 | Aesthetics | Close enough to Electron (layout + tokens), not pixel-perfect |
 | V1 | Diffs (editable when unstaged), graph, themes |
 | Later | Terminal/PTY, watcher, branch switcher, GitHub PRs, updater |
@@ -22,11 +22,13 @@ Code lives under [`native/`](native/). Electron remains until the native app is 
 
 | Metric | Target |
 |--------|--------|
-| Release artifact | ≤ 15–25 MB goal; ceiling ≪ 100 MB (**~10 MB** with tree-sitter builtins on macOS arm64) |
+| Release artifact | ≪ Electron; GPUI GPU stack may exceed the old ~10 MB egui build — still aim well under 100 MB |
 | Idle RSS | Tens of MB, not hundreds |
 | Build | `lto = true`, `codegen-units = 1`, strip in release |
 
 **Do not pull in:** browsers/WebViews, full unused syntax packs, debug symbols in release packages, libgit2 (use system git).
+
+On macOS, GPUI requires the Xcode Metal toolchain (`xcodebuild -downloadComponent MetalToolchain`).
 
 ## V1 features
 
@@ -34,13 +36,13 @@ Code lives under [`native/`](native/). Electron remains until the native app is 
 |------|----------|
 | Repo | Open folder / path; recents (max 20); remember last repo |
 | Changes | Staged + working tree; stage/unstage; status letters |
-| Diff | Side-by-side / inline; **tree-sitter** syntax highlight; **unstaged WT pane is the file** (edit + ⌘S) |
+| Diff | Side-by-side / inline; **tree-sitter** syntax highlight; **unstaged WT pane is the file** (edit + ⌘S); minimap |
 | Graph | Sidebar accordion; ~80 commits; lane graph; commit files + blob diff |
 | Themes | Ported packs + UI tokens on chrome, diff, and highlight palette |
 | Prefs | `themeId`, `lastRepoPath` in platform config dir |
 | Shortcuts | Open repo (⌘O), refresh (⌘R), save when dirty (⌘S) |
 
-**Not in v1:** separate editor mode, embedded terminal, FS watcher, GitHub, updater, language extension loader.
+**Not in v1:** separate editor mode, embedded terminal, FS watcher, GitHub, updater, language extension loader, discard-edits UI.
 
 ### Editable unstaged diff
 
@@ -63,16 +65,17 @@ Window ~1280×800, min ~800×500. Flat surfaces (`bg` / `bg_sidebar` / `bg_surfa
 
 ## Data model
 
-Mirror Electron types: `RepoInfo`, `ChangeEntry`, `FileDiff`, `CommitInfo`, `CommitFile`, `AppPreferences`, `ViewMode`, `RecentRepo`, `ThemeId`, `UiVars`.
+Mirror Electron types: `RepoInfo`, `ChangeEntry`, `FileDiff`, `CommitInfo`, `CommitFile`, `AppPreferences`, `ViewMode`, `RecentRepo`, `ThemeId`, `UiVars`, plus `DiffSession` / `DiffSource` in core.
 
 ## Architecture
 
 ```
-conflicto (bin)     — egui shell, sidebar, diff/edit UI, shortcuts
-conflicto_core      — git CLI, prefs/recents, themes, graph layout, file IO, tree-sitter highlight
+conflicto (bin)     — GPUI shell, sidebar, diff/edit UI, shortcuts
+conflicto_core      — git CLI, prefs/recents, themes, graph layout, file IO,
+                      tree-sitter highlight, DiffSession / app domain helpers
 ```
 
-Platform bits stay thin (`rfd`, `dirs`, eframe/winit). No `cfg(target_os)` in feature logic except tiny chrome helpers.
+Platform bits stay thin (`rfd`, `dirs`, gpui). No `cfg(target_os)` in feature logic except tiny chrome helpers (e.g. traffic-light inset).
 
 ### Platform checklist (later Linux/Windows)
 

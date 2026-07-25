@@ -1,31 +1,32 @@
+mod actions;
 mod app;
-mod diff_widget;
-mod ui_kit;
+mod color;
+mod diff;
 
-use app::ConflictoApp;
+use gpui::*;
 
-fn main() -> eframe::Result<()> {
-    let mut viewport = egui::ViewportBuilder::default()
-        .with_inner_size([1280.0, 800.0])
-        .with_min_inner_size([800.0, 500.0])
-        .with_title("Conflicto");
+use crate::app::{bind_keys, ConflictoApp};
 
-    #[cfg(target_os = "macos")]
-    {
-        viewport = viewport
-            .with_fullsize_content_view(true)
-            .with_titlebar_shown(false)
-            .with_title_shown(false)
-            .with_titlebar_buttons_shown(true);
-    }
-
-    let options = eframe::NativeOptions {
-        viewport,
-        ..Default::default()
-    };
-    eframe::run_native(
-        "Conflicto",
-        options,
-        Box::new(|cc| Ok(Box::new(ConflictoApp::new(cc)))),
-    )
+fn main() {
+    Application::new().run(|cx: &mut App| {
+        bind_keys(cx);
+        cx.activate(true);
+        cx.open_window(
+            WindowOptions {
+                window_bounds: Some(WindowBounds::Windowed(Bounds::centered(
+                    None,
+                    size(px(1280.), px(800.)),
+                    cx,
+                ))),
+                window_min_size: Some(size(px(800.), px(500.))),
+                titlebar: Some(TitlebarOptions {
+                    title: Some("Conflicto".into()),
+                    ..Default::default()
+                }),
+                ..Default::default()
+            },
+            |window, cx| cx.new(|cx| ConflictoApp::new(window, cx)),
+        )
+        .expect("open window");
+    });
 }
