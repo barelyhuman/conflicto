@@ -13,4 +13,3 @@ conflicto_core = { workspace = true }
 eframe = { workspace = true }
 egui = { workspace = true }
 rfd = { workspace = true }
-similar = { workspace = true }

@@ -1,3 +1,4 @@
+use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
@@ -53,20 +54,6 @@ impl IfEmpty for String {
         } else {
             self
         }
-    }
-}
-
-fn status_from_xy(ch: char, untracked: bool) -> ChangeStatus {
-    if untracked || ch == '?' {
-        return ChangeStatus::Untracked;
-    }
-    match ch {
-        'M' => ChangeStatus::Modified,
-        'A' => ChangeStatus::Added,
-        'D' => ChangeStatus::Deleted,
-        'R' => ChangeStatus::Renamed,
-        'C' => ChangeStatus::Copied,
-        _ => ChangeStatus::Modified,
     }
 }
 
@@ -135,7 +122,7 @@ pub fn list_changes(root: &Path) -> Result<Vec<ChangeEntry>, GitError> {
             entries.push(ChangeEntry {
                 path: file_path.clone(),
                 old_path: old_path.clone(),
-                status: status_from_xy(x, false),
+                status: ChangeStatus::from_git_code(x),
                 side: ChangeSide::Staged,
             });
         }
@@ -143,7 +130,7 @@ pub fn list_changes(root: &Path) -> Result<Vec<ChangeEntry>, GitError> {
             entries.push(ChangeEntry {
                 path: file_path,
                 old_path,
-                status: status_from_xy(y, false),
+                status: ChangeStatus::from_git_code(y),
                 side: ChangeSide::Unstaged,
             });
         }
@@ -176,43 +163,16 @@ pub fn unstage_paths(root: &Path, paths: &[String]) -> Result<(), GitError> {
     Ok(())
 }
 
-fn language_from_path(file_path: &str) -> String {
-    let ext = Path::new(file_path)
-        .extension()
-        .and_then(|e| e.to_str())
-        .unwrap_or("")
-        .to_lowercase();
-    match ext.as_str() {
-        "ts" | "tsx" => "typescript",
-        "js" | "jsx" | "mjs" | "cjs" => "javascript",
-        "json" => "json",
-        "md" => "markdown",
-        "css" => "css",
-        "scss" => "scss",
-        "html" | "htm" | "vue" | "svelte" => "html",
-        "rs" => "rust",
-        "py" => "python",
-        "go" => "go",
-        "java" => "java",
-        "kt" => "kotlin",
-        "swift" => "swift",
-        "c" | "h" => "c",
-        "cpp" | "cc" | "hpp" => "cpp",
-        "cs" => "csharp",
-        "rb" => "ruby",
-        "php" => "php",
-        "sh" | "bash" | "zsh" => "shell",
-        "yml" | "yaml" => "yaml",
-        "toml" => "ini",
-        "xml" => "xml",
-        "sql" => "sql",
-        _ => "plaintext",
-    }
-    .to_string()
-}
-
 fn read_working_tree(root: &Path, file_path: &str) -> String {
     std::fs::read_to_string(root.join(file_path)).unwrap_or_default()
+}
+
+pub fn write_working_tree_file(root: &Path, rel_path: &str, contents: &str) -> std::io::Result<()> {
+    let path = root.join(rel_path);
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent)?;
+    }
+    fs::write(path, contents)
 }
 
 fn read_blob(root: &Path, spec: &str) -> Result<String, GitError> {
@@ -223,30 +183,37 @@ fn read_blob(root: &Path, spec: &str) -> Result<String, GitError> {
     Ok(stdout)
 }
 
-pub fn get_file_diff(root: &Path, file_path: &str, side: ChangeSide) -> Result<FileDiff, GitError> {
-    let language = language_from_path(file_path);
+fn blob_path<'a>(path: &'a str, old_path: Option<&'a str>) -> &'a str {
+    old_path.unwrap_or(path)
+}
+
+pub fn get_file_diff(
+    root: &Path,
+    file_path: &str,
+    old_path: Option<&str>,
+    side: ChangeSide,
+) -> Result<FileDiff, GitError> {
+    let orig_path = blob_path(file_path, old_path);
     match side {
         ChangeSide::Staged => {
-            let original = read_blob(root, &format!("HEAD:{file_path}"))?;
+            let original = read_blob(root, &format!("HEAD:{orig_path}"))?;
             let modified = read_blob(root, &format!(":{file_path}"))?;
             Ok(FileDiff {
                 path: file_path.to_string(),
                 original,
                 modified,
-                language,
             })
         }
         ChangeSide::Unstaged => {
-            let mut original = read_blob(root, &format!(":{file_path}"))?;
+            let mut original = read_blob(root, &format!(":{orig_path}"))?;
             if original.is_empty() {
-                original = read_blob(root, &format!("HEAD:{file_path}"))?;
+                original = read_blob(root, &format!("HEAD:{orig_path}"))?;
             }
             let modified = read_working_tree(root, file_path);
             Ok(FileDiff {
                 path: file_path.to_string(),
                 original,
                 modified,
-                language,
             })
         }
     }
@@ -306,16 +273,6 @@ pub fn list_commits(root: &Path, limit: Option<usize>) -> Result<Vec<CommitInfo>
     Ok(commits)
 }
 
-fn status_from_name_status(code: &str) -> ChangeStatus {
-    match code.chars().next().unwrap_or('M') {
-        'A' => ChangeStatus::Added,
-        'D' => ChangeStatus::Deleted,
-        'R' => ChangeStatus::Renamed,
-        'C' => ChangeStatus::Copied,
-        _ => ChangeStatus::Modified,
-    }
-}
-
 pub fn list_commit_files(root: &Path, hash: &str) -> Result<Vec<CommitFile>, GitError> {
     let stdout = git_ok(
         root,
@@ -338,7 +295,7 @@ pub fn list_commit_files(root: &Path, hash: &str) -> Result<Vec<CommitFile>, Git
             files.push(CommitFile {
                 path: new_path,
                 old_path,
-                status: status_from_name_status(status_code),
+                status: ChangeStatus::from_git_code(first),
             });
         } else {
             let file_path = parts.get(i + 1).unwrap_or(&"").to_string();
@@ -346,21 +303,25 @@ pub fn list_commit_files(root: &Path, hash: &str) -> Result<Vec<CommitFile>, Git
             files.push(CommitFile {
                 path: file_path,
                 old_path: None,
-                status: status_from_name_status(status_code),
+                status: ChangeStatus::from_git_code(first),
             });
         }
     }
     Ok(files)
 }
 
-pub fn get_commit_file_diff(root: &Path, hash: &str, file_path: &str) -> Result<FileDiff, GitError> {
-    let language = language_from_path(file_path);
-    let original = read_blob(root, &format!("{hash}^:{file_path}"))?;
+pub fn get_commit_file_diff(
+    root: &Path,
+    hash: &str,
+    file_path: &str,
+    old_path: Option<&str>,
+) -> Result<FileDiff, GitError> {
+    let orig_path = blob_path(file_path, old_path);
+    let original = read_blob(root, &format!("{hash}^:{orig_path}"))?;
     let modified = read_blob(root, &format!("{hash}:{file_path}"))?;
     Ok(FileDiff {
         path: file_path.to_string(),
         original,
         modified,
-        language,
     })
 }

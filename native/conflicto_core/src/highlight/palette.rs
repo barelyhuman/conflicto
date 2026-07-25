@@ -1,3 +1,4 @@
+use crate::theme::color::{darken, lighten};
 use crate::theme::{ColorScheme, UiVars};
 
 use super::HighlightKind;
@@ -24,7 +25,6 @@ pub struct HighlightPalette {
 impl HighlightPalette {
     pub fn from_ui(ui: &UiVars, scheme: ColorScheme) -> Self {
         let is_light = matches!(scheme, ColorScheme::Light);
-        // Derive from UI tokens where possible; fill gaps with scheme-aware accents.
         if is_light {
             Self {
                 comment: ui.text_muted,
@@ -61,23 +61,6 @@ impl HighlightPalette {
             }
         }
     }
-}
-
-fn mix(a: [u8; 3], b: [u8; 3], t: f32) -> [u8; 3] {
-    let t = t.clamp(0.0, 1.0);
-    [
-        (a[0] as f32 + (b[0] as f32 - a[0] as f32) * t).round() as u8,
-        (a[1] as f32 + (b[1] as f32 - a[1] as f32) * t).round() as u8,
-        (a[2] as f32 + (b[2] as f32 - a[2] as f32) * t).round() as u8,
-    ]
-}
-
-fn lighten(c: [u8; 3], t: f32) -> [u8; 3] {
-    mix(c, [255, 255, 255], t)
-}
-
-fn darken(c: [u8; 3], t: f32) -> [u8; 3] {
-    mix(c, [0, 0, 0], t)
 }
 
 pub fn highlight_color(kind: HighlightKind, palette: &HighlightPalette) -> [u8; 3] {

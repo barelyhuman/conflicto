@@ -1,3 +1,4 @@
+pub mod color;
 mod derive;
 mod packs;
 

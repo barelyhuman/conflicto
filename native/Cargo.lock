@@ -701,7 +701,6 @@ dependencies = [
  "eframe",
  "egui",
  "rfd",
- "similar",
 ]
 
 [[package]]

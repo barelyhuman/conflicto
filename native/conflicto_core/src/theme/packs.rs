@@ -1,25 +1,32 @@
+use std::sync::OnceLock;
+
 use super::derive::derive_ui_vars;
 use super::{ColorScheme, ThemeId, UiVars};
 
+#[derive(Clone)]
 pub struct ThemePack {
     pub id: ThemeId,
-    pub label: &'static str,
     pub scheme: ColorScheme,
     pub ui: UiVars,
 }
 
+impl ThemePack {
+    pub fn label(&self) -> &'static str {
+        self.id.label()
+    }
+}
+
 pub const DEFAULT_THEME_ID: ThemeId = ThemeId::PierreDark;
 
-fn pack(id: ThemeId, label: &'static str, scheme: ColorScheme, colors: &[(&str, &str)]) -> ThemePack {
+fn pack(id: ThemeId, scheme: ColorScheme, colors: &[(&str, &str)]) -> ThemePack {
     ThemePack {
         id,
-        label,
         scheme,
         ui: derive_ui_vars(colors, scheme),
     }
 }
 
-fn rose(id: ThemeId, label: &'static str, scheme: ColorScheme, c: Rose) -> ThemePack {
+fn rose(id: ThemeId, scheme: ColorScheme, c: Rose) -> ThemePack {
     let colors: [(&str, &str); 18] = [
         ("editor.background", c.base),
         ("editor.foreground", c.text),
@@ -40,11 +47,10 @@ fn rose(id: ThemeId, label: &'static str, scheme: ColorScheme, c: Rose) -> Theme
         ("gitDecoration.deletedResourceForeground", c.love),
         ("gitDecoration.renamedResourceForeground", c.pine),
     ];
-    // error colors — append via second derive by including in a vec
     let mut all = Vec::from(colors);
     all.push(("errorForeground", c.love));
     all.push(("inputValidation.errorBorder", c.love));
-    pack(id, label, scheme, &all)
+    pack(id, scheme, &all)
 }
 
 struct Rose {
@@ -63,11 +69,10 @@ struct Rose {
     highlight_high: &'static str,
 }
 
-pub fn themes() -> Vec<ThemePack> {
+fn build_themes() -> Vec<ThemePack> {
     vec![
         pack(
             ThemeId::PierreDark,
-            "Pierre Dark",
             ColorScheme::Dark,
             &[
                 ("editor.background", "#1a1a1a"),
@@ -94,7 +99,6 @@ pub fn themes() -> Vec<ThemePack> {
         ),
         pack(
             ThemeId::PierreLight,
-            "Pierre Light",
             ColorScheme::Light,
             &[
                 ("editor.background", "#fafafa"),
@@ -121,7 +125,6 @@ pub fn themes() -> Vec<ThemePack> {
         ),
         pack(
             ThemeId::DarkPlus,
-            "Dark+",
             ColorScheme::Dark,
             &[
                 ("editor.background", "#1e1e1e"),
@@ -148,7 +151,6 @@ pub fn themes() -> Vec<ThemePack> {
         ),
         pack(
             ThemeId::LightPlus,
-            "Light+",
             ColorScheme::Light,
             &[
                 ("editor.background", "#ffffff"),
@@ -175,7 +177,6 @@ pub fn themes() -> Vec<ThemePack> {
         ),
         rose(
             ThemeId::RosePine,
-            "Rosé Pine",
             ColorScheme::Dark,
             Rose {
                 base: "#191724",
@@ -195,7 +196,6 @@ pub fn themes() -> Vec<ThemePack> {
         ),
         rose(
             ThemeId::RosePineMoon,
-            "Rosé Pine Moon",
             ColorScheme::Dark,
             Rose {
                 base: "#232136",
@@ -215,7 +215,6 @@ pub fn themes() -> Vec<ThemePack> {
         ),
         rose(
             ThemeId::RosePineDawn,
-            "Rosé Pine Dawn",
             ColorScheme::Light,
             Rose {
                 base: "#faf4ed",
@@ -236,9 +235,15 @@ pub fn themes() -> Vec<ThemePack> {
     ]
 }
 
+pub fn themes() -> &'static [ThemePack] {
+    static THEMES: OnceLock<Vec<ThemePack>> = OnceLock::new();
+    THEMES.get_or_init(build_themes).as_slice()
+}
+
 pub fn get_theme(id: ThemeId) -> ThemePack {
     themes()
-        .into_iter()
+        .iter()
         .find(|t| t.id == id)
-        .unwrap_or_else(|| themes().into_iter().next().unwrap())
+        .cloned()
+        .unwrap_or_else(|| themes()[0].clone())
 }

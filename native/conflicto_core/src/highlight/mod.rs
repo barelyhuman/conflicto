@@ -4,9 +4,9 @@
 //! loader can call [`LanguageRegistry::register`] without changing callers.
 
 mod builtin;
-mod theme;
+mod palette;
 
-pub use theme::{highlight_color, HighlightPalette};
+pub use palette::{highlight_color, HighlightPalette};
 
 use std::collections::HashMap;
 use std::ops::Range;

@@ -5,7 +5,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use serde::{Deserialize, Serialize};
 
 use crate::models::{AppPreferences, RecentRepo};
-use crate::theme::ThemeId;
+use crate::theme::{ThemeId, DEFAULT_THEME_ID};
 
 const MAX_RECENT: usize = 20;
 const PREFS_FILE: &str = "preferences.json";
@@ -35,7 +35,7 @@ struct PrefsFile {
 }
 
 fn default_theme() -> ThemeId {
-    ThemeId::PierreDark
+    DEFAULT_THEME_ID
 }
 
 impl From<PrefsFile> for AppPreferences {

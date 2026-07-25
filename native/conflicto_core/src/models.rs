@@ -1,5 +1,7 @@
 use serde::{Deserialize, Serialize};
 
+use crate::theme::UiVars;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum ChangeSide {
@@ -29,13 +31,28 @@ impl ChangeStatus {
             Self::Copied => "C",
         }
     }
-}
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-pub enum ViewMode {
-    #[default]
-    Changes,
-    Graph,
+    /// Map a git porcelain / name-status status letter to [`ChangeStatus`].
+    pub fn from_git_code(ch: char) -> Self {
+        match ch {
+            'M' => Self::Modified,
+            'A' => Self::Added,
+            'D' => Self::Deleted,
+            'R' => Self::Renamed,
+            'C' => Self::Copied,
+            '?' => Self::Untracked,
+            _ => Self::Modified,
+        }
+    }
+
+    pub fn ui_color(self, u: &UiVars) -> [u8; 3] {
+        match self {
+            Self::Modified => u.status_m,
+            Self::Added | Self::Untracked => u.status_a,
+            Self::Deleted => u.status_d,
+            Self::Renamed | Self::Copied => u.status_r,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -64,7 +81,6 @@ pub struct FileDiff {
     pub path: String,
     pub original: String,
     pub modified: String,
-    pub language: String,
 }
 
 #[derive(Debug, Clone)]
