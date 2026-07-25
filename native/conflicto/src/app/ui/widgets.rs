@@ -1,8 +1,10 @@
 use conflicto_core::UiVars;
 use egui::{Color32, RichText, Sense, Ui};
 
-pub const SIDEBAR_W: f32 = 320.0;
-pub const TOOLBAR_H: f32 = 42.0;
+use crate::ui_kit::{ControlSize, LayoutSize, Space};
+
+pub const SIDEBAR_W: f32 = LayoutSize::SIDEBAR;
+pub const TOOLBAR_H: f32 = ControlSize::TOOLBAR;
 /// Leading inset so toolbar widgets clear native traffic lights (fullsize content).
 #[cfg(target_os = "macos")]
 pub const MAC_TRAFFIC_INSET_X: f32 = 76.0;
@@ -26,7 +28,7 @@ pub fn selectable_row(
     };
     egui::Frame::NONE
         .fill(fill)
-        .inner_margin(egui::Margin::symmetric(8, 4))
+        .inner_margin(egui::Margin::symmetric(Space::Sm.px() as i8 + 2, Space::Xs.px() as i8))
         .show(ui, add_contents)
         .response
         .interact(Sense::click())
@@ -36,7 +38,7 @@ pub fn accordion_header(ui: &mut Ui, u: &UiVars, title: impl Into<String>) -> bo
     let mut clicked = false;
     egui::Frame::NONE
         .fill(rgb(u.bg_surface))
-        .inner_margin(egui::Margin::symmetric(12, 6))
+        .inner_margin(egui::Margin::symmetric(Space::Md.px() as i8, Space::Sm.px() as i8))
         .show(ui, |ui| {
             if ui
                 .add(

@@ -31,3 +31,12 @@ Observed release binary on macOS arm64: **~10 MB** (with builtins; ≪ Electron)
 - ⌘/Ctrl+O — open repository
 - ⌘/Ctrl+R — refresh
 - ⌘/Ctrl+S — save unstaged edits
+
+
+## TODO 
+
+- [ ] Migrate the sidebar to `ui_kit`
+     - [ ] Sidebar container
+     - [ ] File Entries 
+     - [ ] File Actions 
+     - [ ] Dropdown Container and Entries

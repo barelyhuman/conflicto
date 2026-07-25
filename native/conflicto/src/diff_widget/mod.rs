@@ -2,6 +2,7 @@
 
 mod cache;
 mod edit;
+mod minimap;
 mod paint;
 mod scroll;
 mod view;

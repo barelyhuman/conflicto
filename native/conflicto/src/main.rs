@@ -1,5 +1,6 @@
 mod app;
 mod diff_widget;
+mod ui_kit;
 
 use app::ConflictoApp;
 

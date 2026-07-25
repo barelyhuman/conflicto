@@ -5,6 +5,7 @@ use egui::{RichText, ScrollArea, Ui};
 
 use super::cache::DiffViewCache;
 use super::edit::{rgb, write_back_edit, RowEditPass};
+use super::minimap::{self, MINIMAP_W};
 use super::paint::{paint_editable_cell, paint_readonly_cell};
 use super::scroll::{
     content_width_from_chars, finish_scroll_maxes, row_spacer, row_window, sync_linked_scroll,
@@ -118,7 +119,8 @@ pub fn show_side_by_side(
     debug_assert_eq!(left_lines.len(), cache.right_lines.len());
 
     let total = ui.available_size();
-    let half_w = (total.x * 0.5).max(80.0);
+    let editor_w = (total.x - MINIMAP_W).max(160.0);
+    let half_w = (editor_w * 0.5).max(80.0);
     let label_h = 20.0;
     let viewport_h = (total.y - label_h).max(1.0);
     let content_h = left_lines.len() as f32 * super::scroll::ROW_HEIGHT;
@@ -126,7 +128,7 @@ pub fn show_side_by_side(
     let ceiling_y = scroll.max_y.max(est_max_y);
     let ceiling_x = scroll.max_x;
 
-    let panes_rect = egui::Rect::from_min_size(ui.cursor().min, total);
+    let panes_rect = egui::Rect::from_min_size(ui.cursor().min, egui::vec2(editor_w, total.y));
     if ui.rect_contains_pointer(panes_rect) {
         let delta = ui.input_mut(|i| {
             let d = i.smooth_scroll_delta;
@@ -279,6 +281,15 @@ pub fn show_side_by_side(
                 });
             },
         );
+
+        minimap::show_sxs(
+            ui,
+            u,
+            left_lines,
+            &cache.right_lines,
+            scroll,
+            viewport_h,
+        );
     });
 
     finish_scroll_maxes(scroll, measured_max_x, measured_max_y);
@@ -308,63 +319,84 @@ pub fn show_inline(
     cache.ensure(path, original, &modified_snapshot);
     let trailing = cache.trailing;
 
-    if editable {
-        ui.label(
-            RichText::new("Working Tree (editable)")
-                .small()
-                .color(rgb(u.text_muted)),
-        );
-    }
+    let total = ui.available_size();
+    let editor_w = (total.x - MINIMAP_W).max(80.0);
+    let label_h = if editable { 20.0 } else { 0.0 };
+    let viewport_h = (total.y - label_h).max(1.0);
 
-    let content_w = content_width_from_chars(ui, cache.max_line_chars, ui.available_width());
     let mut new_buffer: Option<String> = None;
-    let out = ScrollArea::both()
-        .id_salt("diff_inline")
-        .scroll_offset(egui::vec2(scroll.x, scroll.y))
-        .auto_shrink([false, false])
-        .show(ui, |ui| {
-            ui.set_clip_rect(ui.clip_rect());
-            ui.set_max_width(ui.available_width());
-            ui.spacing_mut().item_spacing.y = 0.0;
-            if editable {
-                let mut lines = cache.unified_lines.clone();
-                if let Some(buf) = show_mixed_rows(
-                    ui,
-                    &mut lines,
-                    u,
-                    &cache.left_spans,
-                    &cache.left_starts,
-                    &cache.right_spans,
-                    &cache.right_starts,
-                    palette,
-                    trailing,
-                    "inline_edit",
-                    scroll.y,
-                    content_w,
-                ) {
-                    new_buffer = Some(buf);
+
+    ui.horizontal(|ui| {
+        ui.spacing_mut().item_spacing.x = 0.0;
+
+        ui.allocate_ui_with_layout(
+            egui::vec2(editor_w, total.y),
+            egui::Layout::top_down(egui::Align::Min),
+            |ui| {
+                if editable {
+                    ui.label(
+                        RichText::new("Working Tree (editable)")
+                            .small()
+                            .color(rgb(u.text_muted)),
+                    );
                 }
-            } else {
-                let n = cache.unified_lines.len();
-                let (first, end) = row_window(scroll.y, ui.clip_rect().height(), n);
-                row_spacer(ui, content_w, first);
-                for line in &cache.unified_lines[first..end] {
-                    let (spans, starts) = match line.kind {
-                        LineKind::Delete => (&cache.left_spans as &[_], &cache.left_starts as &[_]),
-                        _ => (&cache.right_spans as &[_], &cache.right_starts as &[_]),
-                    };
-                    paint_readonly_cell(ui, content_w, line, u, spans, starts, palette);
-                }
-                row_spacer(ui, content_w, n.saturating_sub(end));
-            }
-        });
-    scroll.x = out.state.offset.x;
-    scroll.y = out.state.offset.y;
-    finish_scroll_maxes(
-        scroll,
-        super::scroll::max_scroll_axis(out.content_size.x, out.inner_rect.width()),
-        super::scroll::max_scroll_axis(out.content_size.y, out.inner_rect.height()),
-    );
+
+                let content_w =
+                    content_width_from_chars(ui, cache.max_line_chars, ui.available_width());
+                let out = ScrollArea::both()
+                    .id_salt("diff_inline")
+                    .scroll_offset(egui::vec2(scroll.x, scroll.y))
+                    .auto_shrink([false, false])
+                    .show(ui, |ui| {
+                        ui.set_clip_rect(ui.clip_rect());
+                        ui.set_max_width(ui.available_width());
+                        ui.spacing_mut().item_spacing.y = 0.0;
+                        if editable {
+                            let mut lines = cache.unified_lines.clone();
+                            if let Some(buf) = show_mixed_rows(
+                                ui,
+                                &mut lines,
+                                u,
+                                &cache.left_spans,
+                                &cache.left_starts,
+                                &cache.right_spans,
+                                &cache.right_starts,
+                                palette,
+                                trailing,
+                                "inline_edit",
+                                scroll.y,
+                                content_w,
+                            ) {
+                                new_buffer = Some(buf);
+                            }
+                        } else {
+                            let n = cache.unified_lines.len();
+                            let (first, end) = row_window(scroll.y, ui.clip_rect().height(), n);
+                            row_spacer(ui, content_w, first);
+                            for line in &cache.unified_lines[first..end] {
+                                let (spans, starts) = match line.kind {
+                                    LineKind::Delete => {
+                                        (&cache.left_spans as &[_], &cache.left_starts as &[_])
+                                    }
+                                    _ => (&cache.right_spans as &[_], &cache.right_starts as &[_]),
+                                };
+                                paint_readonly_cell(ui, content_w, line, u, spans, starts, palette);
+                            }
+                            row_spacer(ui, content_w, n.saturating_sub(end));
+                        }
+                    });
+                scroll.x = out.state.offset.x;
+                scroll.y = out.state.offset.y;
+                finish_scroll_maxes(
+                    scroll,
+                    super::scroll::max_scroll_axis(out.content_size.x, out.inner_rect.width()),
+                    super::scroll::max_scroll_axis(out.content_size.y, out.inner_rect.height()),
+                );
+            },
+        );
+
+        minimap::show(ui, u, &cache.unified_lines, scroll, viewport_h);
+    });
 
     DiffWidgetOutcome {
         buffer_changed: write_back_edit(edit_buffer, new_buffer),
