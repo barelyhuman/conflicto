@@ -36,3 +36,21 @@ Unstaged side-by-side: left = read-only hunk chrome; right = editable Equal/Inse
 - ⌘/Ctrl+R — refresh
 - ⌘/Ctrl+S — save unstaged edits
 - ⌘/Ctrl+\ — toggle side-by-side / inline
+
+## TODO 
+
+- [ ] Git 
+    - [ ] Ability to switch branches 
+    - [ ] Make commits 
+    - [ ] Visualise the history graph
+    - [ ] Connect to Github 
+        - [ ] Ability to view a github PR
+- [ ] File/Diff Viewer 
+    - [ ] Ability to veritical scroll while keeping the line number sticky 
+    - [ ] Multi-cursor selection for edits 
+    - [ ] Blinking cursor
+    - [ ] LSP
+- [ ] Keyboard
+    - [ ] Basic Ctrl/CMD+C,Ctrl/CMD+V,Ctrl/CMD+A doesn't work in editors today
+    - [ ] Ability to quit the app with CMD+Q (Alt+f4)
+    - [ ] A ctrl/cmd+P for showing all possible options 

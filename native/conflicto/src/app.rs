@@ -11,6 +11,12 @@ use crate::color::rgb3;
 use crate::commit_input::{CommitMessageEvent, CommitMessageField};
 use crate::diff::{DiffPane, DiffPaneEvent};
 
+/// Left inset so toolbar content clears macOS traffic lights (transparent titlebar).
+#[cfg(target_os = "macos")]
+const TITLEBAR_LEFT_INSET: f32 = 78.0;
+#[cfg(not(target_os = "macos"))]
+const TITLEBAR_LEFT_INSET: f32 = 12.0;
+
 pub struct ConflictoApp {
     state: AppState,
     diff: Entity<DiffPane>,
@@ -230,8 +236,11 @@ fn toolbar(app: &mut ConflictoApp, cx: &mut Context<ConflictoApp>) -> impl IntoE
         .w_full()
         .items_center()
         .gap_2()
-        .px_3()
+        .pl(px(TITLEBAR_LEFT_INSET))
+        .pr_3()
         .bg(rgb3(u.bg_surface))
+        // Allow dragging the window from the empty titlebar strip.
+        .window_control_area(WindowControlArea::Drag)
         .child(
             div()
                 .flex_1()

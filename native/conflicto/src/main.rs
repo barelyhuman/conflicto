@@ -22,7 +22,9 @@ fn main() {
                 window_min_size: Some(size(px(800.), px(500.))),
                 titlebar: Some(TitlebarOptions {
                     title: Some("Conflicto".into()),
-                    ..Default::default()
+                    // Hide the system titlebar chrome; keep macOS traffic lights.
+                    appears_transparent: true,
+                    traffic_light_position: Some(point(px(14.), px(14.))),
                 }),
                 ..Default::default()
             },
