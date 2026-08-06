@@ -1,0 +1,24 @@
+{
+  "$schema": "https://wails.io/schemas/config.v2.json",
+  "name": "conflicto",
+  "outputfilename": "conflicto",
+  "frontend": {
+    "dir": "./frontend",
+    "install": "pnpm install",
+    "build": "pnpm build",
+    "dev": "pnpm dev",
+    "package": "pnpm"
+  },
+  "author": {
+    "name": "conflicto",
+    "email": ""
+  },
+  "info": {
+    "productVersion": "0.1.0",
+    "copyright": ""
+  },
+  "wailsjsdir": "./client/src",
+  "debounceMS": 100,
+  "devServer": "localhost:34115",
+  "appargs": ""
+}

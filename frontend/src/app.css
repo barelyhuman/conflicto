@@ -1,0 +1,106 @@
+.app-shell {
+  display: grid;
+  grid-template-rows: 38px 1fr 32px;
+  grid-template-columns: 260px 1fr;
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
+}
+
+/* Header */
+.app-header {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 16px;
+  background: var(--surface);
+  flex-shrink: 0;
+  z-index: 10;
+  -webkit-app-region: drag;
+}
+
+.app-header-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.app-logo {
+  font-size: 14px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  color: var(--text-h);
+}
+
+.app-breadcrumb-sep {
+  color: var(--text-muted);
+  font-size: 13px;
+  user-select: none;
+}
+
+/* macOS: provide padding for traffic lights with hidden titlebar */
+.app-shell.macos .app-header {
+  padding-left: 80px;
+}
+
+/* macOS fullscreen: traffic lights hidden, revert padding */
+.app-shell.macos.macos-fullscreen .app-header {
+  padding-left: 16px;
+}
+
+.app-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  -webkit-app-region: no-drag;
+}
+
+.create-pr-trigger {
+  padding: 4px 10px;
+  border-radius: 6px;
+  border: none;
+  background: var(--accent-bg);
+  color: var(--text-h);
+  font-family: var(--font-sans);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.create-pr-trigger:hover {
+  background: var(--accent-hover);
+}
+
+/* Sidebar */
+.app-sidebar {
+  grid-row: 2;
+  grid-column: 1;
+  background: var(--surface);
+  overflow-y: auto;
+  overflow-x: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Main / Diff */
+.app-main {
+  grid-row: 2;
+  grid-column: 2;
+  background: var(--surface);
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+}
+
+
+
+/* Empty state */
+.diff-empty {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted);
+  font-size: 13px;
+}
