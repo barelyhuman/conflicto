@@ -35,6 +35,40 @@ export namespace main {
 		    return a;
 		}
 	}
+	export class TerminalStartOpts {
+	    cwd: string;
+	    cols: number;
+	    rows: number;
+	    cmd: string;
+	    args: string[];
+	
+	    static createFrom(source: any = {}) {
+	        return new TerminalStartOpts(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.cwd = source["cwd"];
+	        this.cols = source["cols"];
+	        this.rows = source["rows"];
+	        this.cmd = source["cmd"];
+	        this.args = source["args"];
+	    }
+	}
+	export class TerminalStartResult {
+	    id: string;
+	    cwd: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new TerminalStartResult(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.cwd = source["cwd"];
+	    }
+	}
 
 }
 

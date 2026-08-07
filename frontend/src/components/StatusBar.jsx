@@ -65,7 +65,7 @@ export function StatusBar({ onPull, onPush, behind, ahead, onSelectBranch, curre
       <style>{`
         .status-bar {
           grid-column: 1 / -1;
-          grid-row: 3;
+          grid-row: 4;
           display: flex;
           align-items: center;
           justify-content: space-between;

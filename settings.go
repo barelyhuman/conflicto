@@ -9,8 +9,10 @@ import (
 
 // Settings represents the application settings
 type Settings struct {
-	GitHubToken string `json:"githubToken,omitempty"`
-	Theme       string `json:"theme,omitempty"`
+	GitHubToken    string `json:"githubToken,omitempty"`
+	Theme          string `json:"theme,omitempty"`
+	TerminalOpen   bool   `json:"terminalOpen,omitempty"`
+	TerminalHeight int    `json:"terminalHeight,omitempty"`
 }
 
 // settingsFilePath returns the path to the settings file

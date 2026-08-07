@@ -28,6 +28,8 @@ export function GetPRList():Promise<void>;
 
 export function GetRecentProjects():Promise<Array<main.RecentProject>>;
 
+export function GetTerminalPrefs():Promise<Record<string, any>>;
+
 export function InvalidatePRCache():Promise<void>;
 
 export function OpenProject():Promise<string>;
@@ -42,10 +44,22 @@ export function Refresh():Promise<void>;
 
 export function SearchPRList(arg1:number,arg2:string):Promise<Array<Record<string, any>>>;
 
+export function SetTerminalPrefs(arg1:boolean,arg2:number):Promise<void>;
+
 export function StageFile(arg1:string):Promise<void>;
 
 export function SwitchBranch(arg1:string):Promise<void>;
 
 export function SwitchProject(arg1:string):Promise<void>;
+
+export function TerminalResize(arg1:string,arg2:number,arg3:number):Promise<void>;
+
+export function TerminalStart(arg1:main.TerminalStartOpts):Promise<main.TerminalStartResult>;
+
+export function TerminalStop(arg1:string):Promise<void>;
+
+export function TerminalStopAll():Promise<void>;
+
+export function TerminalWrite(arg1:string,arg2:string):Promise<void>;
 
 export function UnstageFile(arg1:string):Promise<void>;

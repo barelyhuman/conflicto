@@ -40,6 +40,7 @@ type App struct {
 	git      *GitService
 	recents  *RecentsManager
 	prCache  map[int]PRCache
+	terms    *terminalManager
 }
 
 // NewApp creates a new App application struct
@@ -61,6 +62,9 @@ func (a *App) startup(ctx context.Context) {
 
 	// Initialize git service
 	a.git = NewGitService()
+
+	// Terminal PTY sessions
+	a.terms = newTerminalManager(a.EmitEvent)
 
 	// Add current repo to recents if we have one
 	if a.git != nil && a.git.IsRepo() {
@@ -97,10 +101,87 @@ func (a *App) domReady(ctx context.Context) {
 
 // shutdown is called at application termination
 func (a *App) shutdown(ctx context.Context) {
+	if a.terms != nil {
+		a.terms.stopAll()
+	}
 	// Save settings
 	if a.settings != nil {
 		a.settings.Save()
 	}
+}
+
+// TerminalStart spawns a new PTY session.
+func (a *App) TerminalStart(opts TerminalStartOpts) (*TerminalStartResult, error) {
+	if a.terms == nil {
+		return nil, fmt.Errorf("terminal manager not initialized")
+	}
+	projectPath := ""
+	if a.git != nil && a.git.IsRepo() {
+		projectPath = a.git.path
+	}
+	return a.terms.start(opts, projectPath)
+}
+
+// TerminalWrite writes data to a PTY session.
+func (a *App) TerminalWrite(id string, data string) error {
+	if a.terms == nil {
+		return fmt.Errorf("terminal manager not initialized")
+	}
+	return a.terms.write(id, data)
+}
+
+// TerminalResize resizes a PTY session.
+func (a *App) TerminalResize(id string, cols int, rows int) error {
+	if a.terms == nil {
+		return fmt.Errorf("terminal manager not initialized")
+	}
+	return a.terms.resize(id, cols, rows)
+}
+
+// TerminalStop kills a PTY session (explicit pane close only).
+func (a *App) TerminalStop(id string) error {
+	if a.terms == nil {
+		return nil
+	}
+	return a.terms.stop(id)
+}
+
+// TerminalStopAll kills all PTY sessions (app shutdown).
+func (a *App) TerminalStopAll() {
+	if a.terms != nil {
+		a.terms.stopAll()
+	}
+}
+
+// GetTerminalPrefs returns persisted terminal UI prefs.
+func (a *App) GetTerminalPrefs() map[string]interface{} {
+	if a.settings == nil {
+		return map[string]interface{}{
+			"terminalOpen":   false,
+			"terminalHeight": 220,
+		}
+	}
+	height := a.settings.TerminalHeight
+	if height <= 0 {
+		height = 220
+	}
+	return map[string]interface{}{
+		"terminalOpen":   a.settings.TerminalOpen,
+		"terminalHeight": height,
+	}
+}
+
+// SetTerminalPrefs persists terminal UI prefs.
+func (a *App) SetTerminalPrefs(open bool, height int) error {
+	if a.settings == nil {
+		a.settings = &Settings{}
+	}
+	if height < 120 {
+		height = 120
+	}
+	a.settings.TerminalOpen = open
+	a.settings.TerminalHeight = height
+	return a.settings.Save()
 }
 
 // beforeClose is called when the application is about to close

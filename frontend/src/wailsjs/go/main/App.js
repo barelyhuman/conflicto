@@ -34,6 +34,10 @@ export function GetRecentProjects() {
   return window['go']['main']['App']['GetRecentProjects']();
 }
 
+export function GetTerminalPrefs() {
+  return window['go']['main']['App']['GetTerminalPrefs']();
+}
+
 export function OpenProject() {
   return window['go']['main']['App']['OpenProject']();
 }
@@ -64,4 +68,28 @@ export function UnstageFile(arg1) {
 
 export function Refresh() {
   return window['go']['main']['App']['Refresh']();
+}
+
+export function SetTerminalPrefs(arg1, arg2) {
+  return window['go']['main']['App']['SetTerminalPrefs'](arg1, arg2);
+}
+
+export function TerminalStart(arg1) {
+  return window['go']['main']['App']['TerminalStart'](arg1);
+}
+
+export function TerminalWrite(arg1, arg2) {
+  return window['go']['main']['App']['TerminalWrite'](arg1, arg2);
+}
+
+export function TerminalResize(arg1, arg2, arg3) {
+  return window['go']['main']['App']['TerminalResize'](arg1, arg2, arg3);
+}
+
+export function TerminalStop(arg1) {
+  return window['go']['main']['App']['TerminalStop'](arg1);
+}
+
+export function TerminalStopAll() {
+  return window['go']['main']['App']['TerminalStopAll']();
 }

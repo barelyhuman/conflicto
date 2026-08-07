@@ -54,6 +54,10 @@ export function GetRecentProjects() {
   return window['go']['main']['App']['GetRecentProjects']();
 }
 
+export function GetTerminalPrefs() {
+  return window['go']['main']['App']['GetTerminalPrefs']();
+}
+
 export function InvalidatePRCache() {
   return window['go']['main']['App']['InvalidatePRCache']();
 }
@@ -82,6 +86,10 @@ export function SearchPRList(arg1, arg2) {
   return window['go']['main']['App']['SearchPRList'](arg1, arg2);
 }
 
+export function SetTerminalPrefs(arg1, arg2) {
+  return window['go']['main']['App']['SetTerminalPrefs'](arg1, arg2);
+}
+
 export function StageFile(arg1) {
   return window['go']['main']['App']['StageFile'](arg1);
 }
@@ -92,6 +100,26 @@ export function SwitchBranch(arg1) {
 
 export function SwitchProject(arg1) {
   return window['go']['main']['App']['SwitchProject'](arg1);
+}
+
+export function TerminalResize(arg1, arg2, arg3) {
+  return window['go']['main']['App']['TerminalResize'](arg1, arg2, arg3);
+}
+
+export function TerminalStart(arg1) {
+  return window['go']['main']['App']['TerminalStart'](arg1);
+}
+
+export function TerminalStop(arg1) {
+  return window['go']['main']['App']['TerminalStop'](arg1);
+}
+
+export function TerminalStopAll() {
+  return window['go']['main']['App']['TerminalStopAll']();
+}
+
+export function TerminalWrite(arg1, arg2) {
+  return window['go']['main']['App']['TerminalWrite'](arg1, arg2);
 }
 
 export function UnstageFile(arg1) {

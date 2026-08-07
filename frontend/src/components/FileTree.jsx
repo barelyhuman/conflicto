@@ -26,21 +26,34 @@ export function FileTree({
 }) {
   const containerRef = useRef(null);
   const treeRef = useRef(null);
+  const activeFileRef = useRef(activeFile);
+  activeFileRef.current = activeFile;
+  const onSelectRef = useRef(onSelect);
+  onSelectRef.current = onSelect;
+  const conflictsRef = useRef(conflicts);
+  conflictsRef.current = conflicts;
+
+  // Content key so new array identities with the same files do not remount the tree
+  // (e.g. App re-renders from activeFile / activeDiff, or stable EMPTY_FILES swaps).
+  const fileListKey = useMemo(() => {
+    const files = isPRMode ? prFiles : [...conflicts, ...staged, ...unstaged];
+    return `${isPRMode ? 'pr' : 'local'}\0${files.map((f) => `${f.path}:${f.status}`).join('\0')}`;
+  }, [conflicts, staged, unstaged, prFiles, isPRMode]);
 
   const model = useMemo(() => {
     const files = isPRMode ? prFiles : [...conflicts, ...staged, ...unstaged];
     const paths = files.map((f) => f.path);
+    const filePathSet = new Set(paths);
     const prepared = prepareFileTreeInput(paths);
     const gitStatus = files.map((f) => ({
       path: f.path,
       status: mapStatus(f.status),
     }));
 
-    return new PierreTree({
+    const tree = new PierreTree({
       preparedInput: prepared,
       gitStatus,
       initialExpansion: 'open',
-      initialSelectedPaths: activeFile ? [activeFile] : [],
       unsafeCSS: `
         :host {
           --trees-bg-override: #111111;
@@ -57,17 +70,24 @@ export function FileTree({
           --trees-bg-muted-override: #171717;
         }
       `,
+      initialSelectedPaths: activeFileRef.current ? [activeFileRef.current] : [],
       onSelectionChange: (selected) => {
-        console.log('[PierreTree] onSelectionChange:', selected);
-        if (selected.length > 0) {
-          const path = selected[0];
-          const isConflict = conflicts.some((c) => c.path === path);
-          console.log('[PierreTree] selecting path:', path, 'isConflict:', isConflict);
-          onSelect?.(path, isConflict);
+        if (selected.length === 0) return;
+        const path = selected[0];
+        // Directories are synthetic path prefixes — only real files trigger onSelect.
+        if (!filePathSet.has(path)) {
+          const current = activeFileRef.current;
+          if (current) {
+            tree.focusPath(current);
+          }
+          return;
         }
+        const isConflict = conflictsRef.current.some((c) => c.path === path);
+        onSelectRef.current?.(path, isConflict);
       },
     });
-  }, [conflicts, staged, unstaged, prFiles, isPRMode]); // eslint-disable-line react-hooks/exhaustive-deps
+    return tree;
+  }, [fileListKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (containerRef.current && !treeRef.current) {
@@ -103,21 +123,23 @@ export function FileTree({
       );
       if (!row) return;
 
+      // Folders only expand/collapse — never select for diff viewing.
+      if (row.getAttribute('data-item-type') === 'folder') return;
+
       const clickedPath = row.getAttribute('data-item-path');
       if (!clickedPath) return;
 
       // Ignore clicks on already-selected item to avoid double-firing
       // when the tree's own selection *does* work.
-      if (clickedPath === activeFile) return;
+      if (clickedPath === activeFileRef.current) return;
 
-      const isConflict = conflicts.some((c) => c.path === clickedPath);
-      console.log('[FileTree fallback click] path:', clickedPath, 'isConflict:', isConflict);
-      onSelect?.(clickedPath, isConflict);
+      const isConflict = conflictsRef.current.some((c) => c.path === clickedPath);
+      onSelectRef.current?.(clickedPath, isConflict);
     };
 
     container.addEventListener('click', handleClick);
     return () => container.removeEventListener('click', handleClick);
-  }, [onSelect, conflicts, activeFile]);
+  }, [model]);
 
   return (
     <div

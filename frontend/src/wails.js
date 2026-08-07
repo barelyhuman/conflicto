@@ -1,11 +1,34 @@
 // Wails runtime wrapper with fallback to mock data for development
 
+import { stagedFiles, unstagedFiles, conflictFiles, pullRequests, localBranches, remoteBranches } from './mockData.js';
+import { mockErrors } from './mockErrors.js';
+
 // Check if we're running in Wails
 const isWails = typeof window !== 'undefined' && window.go && window.go.main && window.go.main.App;
 
-// Mock data for development (when not in Wails)
-import { stagedFiles, unstagedFiles, conflictFiles, pullRequests, localBranches, remoteBranches } from './mockData.js';
-import { mockErrors } from './mockErrors.js';
+// Terminal event fan-out (panes subscribe via api.onTerminalData/Exit)
+const terminalDataListeners = new Set();
+const terminalExitListeners = new Set();
+
+function emitTerminalData(data) {
+  terminalDataListeners.forEach((fn) => {
+    try {
+      fn(data);
+    } catch {
+      // ignore listener errors
+    }
+  });
+}
+
+function emitTerminalExit(data) {
+  terminalExitListeners.forEach((fn) => {
+    try {
+      fn(data);
+    } catch {
+      // ignore listener errors
+    }
+  });
+}
 
 export function setupWailsEvents(callbacks) {
   if (isWails && window.runtime) {
@@ -60,6 +83,14 @@ export function setupWailsEvents(callbacks) {
     });
     window.runtime.EventsOn('refreshCompleted', () => {
       callbacks.onRefreshCompleted?.();
+    });
+    window.runtime.EventsOn('terminal:data', (data) => {
+      emitTerminalData(data);
+      callbacks.onTerminalData?.(data);
+    });
+    window.runtime.EventsOn('terminal:exit', (data) => {
+      emitTerminalExit(data);
+      callbacks.onTerminalExit?.(data);
     });
 
     // Request initial data via the public Refresh method
@@ -331,6 +362,87 @@ index 1234567..abcdefg 100644
     }
     return Promise.resolve({ name: 'conflicto', path: '/Users/sid/dev/conflicto' });
   },
+
+  terminalStart: (opts = {}) => {
+    if (isWails) {
+      return window.go.main.App.TerminalStart(opts);
+    }
+    // Dev mock: fake session id, no real PTY
+    const id = `mock-${Date.now()}`;
+    setTimeout(() => {
+      emitTerminalData({ id, data: `\r\n[dev] mock terminal ${id}\r\n$ ` });
+    }, 50);
+    return Promise.resolve({ id, cwd: opts.cwd || '/Users/sid/dev/conflicto' });
+  },
+
+  terminalWrite: (id, data) => {
+    if (isWails) {
+      return window.go.main.App.TerminalWrite(id, data);
+    }
+    if (data === '\r' || data === '\n') {
+      emitTerminalData({ id, data: '\r\n$ ' });
+    } else if (data === '\x1b\r') {
+      emitTerminalData({ id, data: '\r\n' });
+    } else {
+      emitTerminalData({ id, data });
+    }
+    return Promise.resolve();
+  },
+
+  terminalResize: (id, cols, rows) => {
+    if (isWails) {
+      return window.go.main.App.TerminalResize(id, cols, rows);
+    }
+    return Promise.resolve();
+  },
+
+  terminalStop: (id) => {
+    if (isWails) {
+      return window.go.main.App.TerminalStop(id);
+    }
+    setTimeout(() => {
+      emitTerminalExit({ id, code: 0 });
+    }, 0);
+    return Promise.resolve();
+  },
+
+  getTerminalPrefs: () => {
+    if (isWails) {
+      return window.go.main.App.GetTerminalPrefs();
+    }
+    try {
+      const raw = localStorage.getItem('conflicto.terminalPrefs');
+      if (raw) return Promise.resolve(JSON.parse(raw));
+    } catch {
+      // ignore
+    }
+    return Promise.resolve({ terminalOpen: false, terminalHeight: 220 });
+  },
+
+  setTerminalPrefs: (open, height) => {
+    if (isWails) {
+      return window.go.main.App.SetTerminalPrefs(open, height);
+    }
+    try {
+      localStorage.setItem(
+        'conflicto.terminalPrefs',
+        JSON.stringify({ terminalOpen: open, terminalHeight: height })
+      );
+    } catch {
+      // ignore
+    }
+    return Promise.resolve();
+  },
+
+  onTerminalData: (fn) => {
+    terminalDataListeners.add(fn);
+    return () => terminalDataListeners.delete(fn);
+  },
+
+  onTerminalExit: (fn) => {
+    terminalExitListeners.add(fn);
+    return () => terminalExitListeners.delete(fn);
+  },
 };
 
 // Window / Environment helpers
@@ -363,4 +475,4 @@ export function watchFullscreen(callback, intervalMs = 500) {
   return () => clearInterval(id);
 }
 
-export { isWails };
+export { isWails, emitTerminalData, emitTerminalExit };

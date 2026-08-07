@@ -17,6 +17,8 @@ export function GetCurrentProject():Promise<{name: string, path: string}>;
 
 export function GetRecentProjects():Promise<Array<{name: string, path: string, openedAt: string}>>;
 
+export function GetTerminalPrefs():Promise<{terminalOpen: boolean, terminalHeight: number}>;
+
 export function OpenProject():Promise<string>;
 
 export function SwitchProject(arg1:string):Promise<void>;
@@ -32,3 +34,15 @@ export function SwitchBranch(arg1:string):Promise<void>;
 export function UnstageFile(arg1:string):Promise<void>;
 
 export function Refresh():Promise<void>;
+
+export function SetTerminalPrefs(arg1:boolean,arg2:number):Promise<void>;
+
+export function TerminalStart(arg1:any):Promise<{id: string, cwd: string}>;
+
+export function TerminalWrite(arg1:string,arg2:string):Promise<void>;
+
+export function TerminalResize(arg1:string,arg2:number,arg3:number):Promise<void>;
+
+export function TerminalStop(arg1:string):Promise<void>;
+
+export function TerminalStopAll():Promise<void>;

@@ -15,6 +15,10 @@ import { PreferencesPage } from './components/PreferencesPage.jsx';
 import { ProjectPicker } from './components/ProjectPicker.jsx';
 import { PRCheckoutPrompt } from './components/PRCheckoutPrompt.jsx';
 import { CreatePRModal } from './components/CreatePRModal.jsx';
+import { TerminalDock, isTerminalFocusTarget } from './components/terminal/TerminalDock.jsx';
+
+/** Stable empty list so FileTree does not remount on unrelated App re-renders. */
+const EMPTY_FILES = [];
 
 export function App() {
   const [activeFile, setActiveFile] = useState(null);
@@ -55,7 +59,17 @@ export function App() {
   const [prList, setPrList] = useState([]);
   const [prComments, setPrComments] = useState([]);
   const [prPrompt, setPrPrompt] = useState(null);
+  // Create PR modal
   const [createPROpen, setCreatePROpen] = useState(false);
+
+  // Terminal dock
+  const [terminalOpen, setTerminalOpen] = useState(false);
+  const [terminalHeight, setTerminalHeight] = useState(220);
+  const terminalPrefsReady = useRef(false);
+  const terminalOpenRef = useRef(terminalOpen);
+  const terminalHeightRef = useRef(terminalHeight);
+  useEffect(() => { terminalOpenRef.current = terminalOpen; }, [terminalOpen]);
+  useEffect(() => { terminalHeightRef.current = terminalHeight; }, [terminalHeight]);
 
   // Refs for stable access in event callbacks
   const activeFileRef = useRef(activeFile);
@@ -177,6 +191,7 @@ export function App() {
   // Keyboard shortcut: Cmd/Ctrl + ,
   useEffect(() => {
     function onKey(e) {
+      if (isTerminalFocusTarget(e.target)) return;
       if ((e.metaKey || e.ctrlKey) && e.key === ',') {
         e.preventDefault();
         setPreferencesOpen((open) => !open);
@@ -184,6 +199,45 @@ export function App() {
     }
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);
+  }, []);
+
+  // Toggle terminal with Ctrl+` (works even when terminal is focused)
+  useEffect(() => {
+    function onKey(e) {
+      if (e.key !== '`' || !e.ctrlKey || e.shiftKey || e.metaKey || e.altKey) return;
+      e.preventDefault();
+      e.stopPropagation();
+      setTerminalOpen((open) => {
+        if (open && document.activeElement && isTerminalFocusTarget(document.activeElement)) {
+          document.activeElement.blur();
+        }
+        return !open;
+      });
+    }
+    // Capture so xterm does not eat Ctrl+` before we toggle
+    document.addEventListener('keydown', onKey, true);
+    return () => document.removeEventListener('keydown', onKey, true);
+  }, []);
+
+  // Load + persist terminal prefs
+  useEffect(() => {
+    api.getTerminalPrefs().then((prefs) => {
+      if (prefs?.terminalHeight) setTerminalHeight(prefs.terminalHeight);
+      if (typeof prefs?.terminalOpen === 'boolean') setTerminalOpen(prefs.terminalOpen);
+      terminalPrefsReady.current = true;
+    });
+  }, []);
+
+  useEffect(() => {
+    if (!terminalPrefsReady.current) return;
+    const t = setTimeout(() => {
+      api.setTerminalPrefs(terminalOpenRef.current, terminalHeightRef.current);
+    }, 200);
+    return () => clearTimeout(t);
+  }, [terminalOpen, terminalHeight]);
+
+  const handleTerminalHeight = useCallback((h) => {
+    setTerminalHeight(h);
   }, []);
 
   // Seed initial project state
@@ -390,10 +444,10 @@ export function App() {
 
           <aside class="app-sidebar">
             <FileTree
-              conflicts={isPRMode ? [] : conflicts}
-              staged={isPRMode ? [] : staged}
-              unstaged={isPRMode ? [] : unstaged}
-              prFiles={isPRMode ? (currentPR?.files ?? []) : []}
+              conflicts={isPRMode ? EMPTY_FILES : conflicts}
+              staged={isPRMode ? EMPTY_FILES : staged}
+              unstaged={isPRMode ? EMPTY_FILES : unstaged}
+              prFiles={isPRMode ? (currentPR?.files ?? EMPTY_FILES) : EMPTY_FILES}
               isPRMode={isPRMode}
               activeFile={activeFile}
               onSelect={handleSelectFile}
@@ -423,6 +477,14 @@ export function App() {
               <div class="diff-empty">Select a file to view changes</div>
             )}
           </main>
+
+          <TerminalDock
+            open={terminalOpen}
+            height={terminalHeight}
+            onHeightChange={handleTerminalHeight}
+            projectPath={projectPath}
+            onRequestOpen={() => setTerminalOpen(true)}
+          />
 
           <ConfirmDialog
             open={confirmOpen}
