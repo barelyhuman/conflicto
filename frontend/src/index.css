@@ -18,24 +18,24 @@
   --accent-bg: #1a1a1a;
   --accent-hover: #262626;
 
-  /* Diff only — functional colors */
-  --added: #4ade80;
-  --added-bg: #052e16;
-  --added-border: #166534;
-  --removed: #f87171;
-  --removed-bg: #450a0a;
-  --removed-border: #991b1b;
+  /* Diff only — functional colors (monochrome + muted red) */
+  --added: #0a0a0a;
+  --added-bg: #ffffff;
+  --added-border: #a3a3a3;
+  --removed: #e5e5e5;
+  --removed-bg: #2a1515;
+  --removed-border: #3f1515;
 
-  /* Conflicts */
-  --conflict-amber: #facc15;
-  --conflict-amber-bg: #3f3a05;
-  --conflict-amber-border: #a16207;
-  --conflict-ours-bg: #0c1a2b;
-  --conflict-theirs-bg: #0b2e16;
-  --conflict-current: #60a5fa;
-  --conflict-current-bg: rgba(96, 165, 250, 0.12);
-  --conflict-incoming: #4ade80;
-  --conflict-incoming-bg: rgba(74, 222, 128, 0.12);
+  /* Conflicts — neutral monochrome */
+  --conflict-amber: #a3a3a3;
+  --conflict-amber-bg: #1a1a1a;
+  --conflict-amber-border: #262626;
+  --conflict-ours-bg: #171717;
+  --conflict-theirs-bg: #141414;
+  --conflict-current: #d4d4d4;
+  --conflict-current-bg: rgba(212, 212, 212, 0.12);
+  --conflict-incoming: #a3a3a3;
+  --conflict-incoming-bg: rgba(163, 163, 163, 0.12);
 
   color-scheme: dark;
   font-family: var(--font-sans);

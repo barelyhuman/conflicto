@@ -151,6 +151,12 @@ export function PRPicker({ selectedPR, currentPR, onSelect, onError }) {
               value={query}
               placeholder="Search PRs..."
               onInput={(e) => setQuery(e.target.value)}
+              onKeyDown={(e) => {
+                if ((e.metaKey || e.ctrlKey) && e.key === 'a') {
+                  e.preventDefault();
+                  e.target.select();
+                }
+              }}
             />
           </div>
 

@@ -399,7 +399,6 @@ export function App() {
               onSelect={handleSelectFile}
               onStage={handleStage}
               onUnstage={handleUnstage}
-              prTitle={currentPR?.title ?? null}
             />
           </aside>
 
@@ -415,7 +414,7 @@ export function App() {
                   patch={currentDiff.patch}
                   filename={currentDiff.path}
                   isPRMode={isPRMode}
-                  isUnstaged={isUnstaged}
+                  isUnstaged={false}
                   comments={isPRMode ? prComments : []}
                   onPostComment={handlePostComment}
                 />

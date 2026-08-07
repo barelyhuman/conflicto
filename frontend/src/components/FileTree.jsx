@@ -39,7 +39,24 @@ export function FileTree({
     return new PierreTree({
       preparedInput: prepared,
       gitStatus,
+      initialExpansion: 'open',
       initialSelectedPaths: activeFile ? [activeFile] : [],
+      unsafeCSS: `
+        :host {
+          --trees-bg-override: #111111;
+          --trees-accent-override: #f5f5f5;
+          --trees-status-added-override: #737373;
+          --trees-status-modified-override: #737373;
+          --trees-status-deleted-override: #737373;
+          --trees-status-renamed-override: #737373;
+          --trees-status-untracked-override: #737373;
+          --trees-file-icon-color: #737373;
+          --trees-selected-bg-override: #1a1a1a;
+          --trees-selected-fg-override: #f5f5f5;
+          --trees-focus-ring-color-override: #737373;
+          --trees-bg-muted-override: #171717;
+        }
+      `,
       onSelectionChange: (selected) => {
         console.log('[PierreTree] onSelectionChange:', selected);
         if (selected.length > 0) {
