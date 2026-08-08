@@ -47,4 +47,4 @@ Useful targets:
 | `make test` | Go tests |
 | `make clean` | Remove build artifacts |
 
-Frontend-only: `make frontend-dev` / `make frontend-build` (runs `pnpm` in `frontend/`).
+Frontend-only: `make frontend-dev` / `make frontend-build` (runs `pnpm` in `frontend/`). Vite alone has no Go backend — use `make dev` for a working UI.

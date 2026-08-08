@@ -10,12 +10,12 @@
     "package": "pnpm"
   },
   "author": {
-    "name": "conflicto",
-    "email": ""
+    "name": "Siddharth Gelera",
+    "email": "ahoy@barelyhuman.dev"
   },
   "info": {
     "productVersion": "0.1.0",
-    "copyright": ""
+    "copyright": "Copyright (c) 2026 Siddharth Gelera"
   },
   "wailsjsdir": "./client/src",
   "debounceMS": 100,

@@ -1,4 +1,23 @@
 /build
 /dist
-
 .DS_Store
+
+# Secrets & credentials
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+id_rsa
+id_rsa.*
+credentials.json
+service-account*.json
+secrets.yaml
+secrets.yml
+.npmrc
+
+# Tooling / local
+.pnpm-store/
+.cursor/
+*.local
