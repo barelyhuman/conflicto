@@ -12,7 +12,7 @@
   grid-template-rows: 30px 1fr minmax(0, auto) 30px;
 }
 
-/* Header */
+/* Header — Wails drag region (not Electron -webkit-app-region) */
 .app-header {
   grid-column: 1 / -1;
   display: flex;
@@ -22,7 +22,7 @@
   background: var(--surface);
   flex-shrink: 0;
   z-index: 10;
-  -webkit-app-region: drag;
+  --wails-draggable: drag;
 }
 
 .app-header-left {
@@ -30,6 +30,10 @@
   align-items: center;
   gap: 8px;
   min-height: 0;
+}
+
+.app-header-left .project-picker {
+  --wails-draggable: no-drag;
 }
 
 .app-logo {
@@ -60,7 +64,7 @@
   align-items: center;
   gap: 6px;
   min-height: 0;
-  -webkit-app-region: no-drag;
+  --wails-draggable: no-drag;
 }
 
 .create-pr-trigger {

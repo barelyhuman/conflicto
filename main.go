@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"embed"
+	goruntime "runtime"
 
 	"github.com/wailsapp/wails/v2"
 	"github.com/wailsapp/wails/v2/pkg/menu"
@@ -22,17 +23,12 @@ func main() {
 	app := NewApp()
 
 	AppMenu := menu.NewMenu()
-
-	// Edit Menu
-	EditMenu := AppMenu.AddSubmenu("Edit")
-	EditMenu.AddSeparator()
-	EditMenu.AddText("Undo", keys.CmdOrCtrl("z"), nil)
-	EditMenu.AddText("Redo", keys.CmdOrCtrl("shift+z"), nil)
-	EditMenu.AddSeparator()
-	EditMenu.AddText("Cut", keys.CmdOrCtrl("x"), nil)
-	EditMenu.AddText("Copy", keys.CmdOrCtrl("c"), nil)
-	EditMenu.AddText("Paste", keys.CmdOrCtrl("v"), nil)
-	EditMenu.AddText("Select All", keys.CmdOrCtrl("a"), nil)
+	if goruntime.GOOS == "darwin" {
+		// AppMenu + EditMenu roles are required on macOS so Quit and
+		// text-editing shortcuts (Cmd+A/C/V/X/Z) work in webview inputs.
+		AppMenu.Append(menu.AppMenu())
+		AppMenu.Append(menu.EditMenu())
+	}
 
 	// View Menu
 	ViewMenu := AppMenu.AddSubmenu("View")
@@ -52,7 +48,7 @@ func main() {
 
 	// Help Menu
 	HelpMenu := AppMenu.AddSubmenu("Help")
-		HelpMenu.AddText("Preferences...", keys.CmdOrCtrl("comma"), func(cd *menu.CallbackData) {
+	HelpMenu.AddText("Preferences...", keys.CmdOrCtrl("comma"), func(cd *menu.CallbackData) {
 		app.EmitEvent("openPreferences", nil)
 	})
 	HelpMenu.AddSeparator()
@@ -88,8 +84,8 @@ func main() {
 			setDockIcon(appIcon)
 			app.startup(ctx)
 		},
-		OnDomReady: app.domReady,
-		OnShutdown: app.shutdown,
+		OnDomReady:    app.domReady,
+		OnShutdown:    app.shutdown,
 		OnBeforeClose: app.beforeClose,
 		Bind: []interface{}{
 			app,
