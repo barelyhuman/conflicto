@@ -10,6 +10,10 @@ export function CheckoutPRToWorktree(arg1) {
   return window['go']['main']['App']['CheckoutPRToWorktree'](arg1);
 }
 
+export function Commit(arg1) {
+  return window['go']['main']['App']['Commit'](arg1);
+}
+
 export function CreatePR(arg1, arg2, arg3, arg4) {
   return window['go']['main']['App']['CreatePR'](arg1, arg2, arg3, arg4);
 }

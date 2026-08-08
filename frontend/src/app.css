@@ -95,7 +95,15 @@
 .file-tree-sidebar {
   display: flex;
   flex-direction: column;
+  flex: 1;
   min-height: 0;
+}
+
+.file-tree-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
   padding-bottom: 8px;
 }
 
@@ -198,6 +206,71 @@
   padding: 4px 12px 8px 28px;
   color: var(--text-muted);
   font-size: 12px;
+}
+
+.commit-panel {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 4px 10px 10px;
+  background: var(--surface);
+}
+
+.change-section-staged .commit-panel {
+  border-bottom: 1px solid color-mix(in srgb, var(--text-muted) 18%, transparent);
+  margin-bottom: 2px;
+}
+
+.commit-message-input {
+  width: 100%;
+  box-sizing: border-box;
+  resize: vertical;
+  min-height: 56px;
+  max-height: 140px;
+  padding: 8px 10px;
+  border: 1px solid color-mix(in srgb, var(--text-muted) 30%, transparent);
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--accent-bg) 55%, transparent);
+  color: var(--text-h);
+  font-family: var(--font-sans);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.commit-message-input::placeholder {
+  color: var(--text-muted);
+}
+
+.commit-message-input:focus {
+  outline: none;
+  border-color: color-mix(in srgb, var(--text-h) 35%, transparent);
+}
+
+.commit-message-input:disabled {
+  opacity: 0.6;
+}
+
+.commit-button {
+  align-self: stretch;
+  border: none;
+  border-radius: 6px;
+  padding: 7px 10px;
+  font-family: var(--font-sans);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  background: var(--accent-hover);
+  color: var(--text-h);
+}
+
+.commit-button:hover:not(:disabled) {
+  filter: brightness(1.08);
+}
+
+.commit-button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
 }
 
 /* Custom sidebar change tree */

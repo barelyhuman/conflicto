@@ -309,6 +309,22 @@ func (a *App) DiscardFile(path string) error {
 	return nil
 }
 
+// Commit creates a commit from staged changes with the given message.
+func (a *App) Commit(message string) error {
+	if a.git == nil {
+		return fmt.Errorf("no git repository")
+	}
+
+	err := a.git.Commit(message)
+	if err != nil {
+		return err
+	}
+
+	a.emitFileStatus()
+	a.emitAheadBehind()
+	return nil
+}
+
 // SwitchBranch switches to a branch
 func (a *App) SwitchBranch(name string) error {
 	if a.git == nil {

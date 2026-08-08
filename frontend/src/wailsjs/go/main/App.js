@@ -10,6 +10,10 @@ export function DiscardFile(arg1) {
   return window['go']['main']['App']['DiscardFile'](arg1);
 }
 
+export function Commit(arg1) {
+  return window['go']['main']['App']['Commit'](arg1);
+}
+
 export function EmitEvent(arg1, arg2) {
   return window['go']['main']['App']['EmitEvent'](arg1, arg2);
 }

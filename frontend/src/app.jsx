@@ -29,6 +29,8 @@ export function App() {
   const [unstaged, setUnstaged] = useState([]);
   const [conflicts, setConflicts] = useState([]);
   const [branches, setBranches] = useState({ current: 'main', local: [], remote: [] });
+  const [commitMessage, setCommitMessage] = useState('');
+  const [committing, setCommitting] = useState(false);
 
   // Confirmation dialog state
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -422,6 +424,20 @@ export function App() {
     });
   }, []);
 
+  const handleCommit = useCallback(async () => {
+    const message = commitMessage.trim();
+    if (!message || staged.length === 0 || committing) return;
+    setCommitting(true);
+    try {
+      await api.commit(message);
+      setCommitMessage('');
+    } catch (err) {
+      pushToast('Commit Error', err.message);
+    } finally {
+      setCommitting(false);
+    }
+  }, [commitMessage, staged.length, committing]);
+
   const handleStageAll = useCallback(async () => {
     const paths = unstaged.map((f) => f.path);
     for (const path of paths) {
@@ -531,6 +547,10 @@ export function App() {
               onDiscard={handleDiscard}
               onStageAll={handleStageAll}
               onUnstageAll={handleUnstageAll}
+              commitMessage={commitMessage}
+              onCommitMessageChange={setCommitMessage}
+              onCommit={handleCommit}
+              committing={committing}
             />
           </aside>
 
@@ -567,16 +587,35 @@ export function App() {
           <ConfirmDialog
             open={confirmOpen}
             filename={pendingConfirmFile ?? ''}
-            title={confirmKind === 'discard' ? 'Discard changes?' : 'Stage conflicted file?'}
+            title={
+              confirmKind === 'discard'
+                ? (unstaged.find((f) => f.path === pendingConfirmFile)?.status === 'U'
+                    ? 'Delete untracked file?'
+                    : 'Discard changes?')
+                : 'Stage conflicted file?'
+            }
             message={
               confirmKind === 'discard' ? (
-                <>
-                  Discard unstaged changes in <code>{pendingConfirmFile ?? ''}</code>?
-                  This cannot be undone.
-                </>
+                unstaged.find((f) => f.path === pendingConfirmFile)?.status === 'U' ? (
+                  <>
+                    Permanently delete <code>{pendingConfirmFile ?? ''}</code>?
+                    This cannot be undone.
+                  </>
+                ) : (
+                  <>
+                    Discard unstaged changes in <code>{pendingConfirmFile ?? ''}</code>?
+                    This cannot be undone.
+                  </>
+                )
               ) : undefined
             }
-            confirmLabel={confirmKind === 'discard' ? 'Discard' : 'Stage with markers'}
+            confirmLabel={
+              confirmKind === 'discard'
+                ? (unstaged.find((f) => f.path === pendingConfirmFile)?.status === 'U'
+                    ? 'Delete'
+                    : 'Discard')
+                : 'Stage with markers'
+            }
             onConfirm={handleConfirmDialog}
             onCancel={handleCancelConfirm}
           />

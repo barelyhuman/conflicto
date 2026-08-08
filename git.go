@@ -35,9 +35,9 @@ type GitService struct {
 
 // FileStatus represents a file's git status
 type FileStatus struct {
-	Path     string `json:"path"`
-	Status   string `json:"status"`   // M, A, D, R, C
-	OldPath  string `json:"oldPath"`
+	Path    string `json:"path"`
+	Status  string `json:"status"` // M, A, D, R, C, U (untracked)
+	OldPath string `json:"oldPath"`
 }
 
 // NewGitService creates a new GitService and attempts to open the current repo
@@ -135,7 +135,8 @@ func (gs *GitService) GetFileStatus() ([]FileStatus, []FileStatus, []FileStatus,
 		return nil, nil, nil, fmt.Errorf("no repository open")
 	}
 
-	out, err := gs.runGit("status", "--porcelain")
+	// -uall lists every untracked file (not just the top-level directory name).
+	out, err := gs.runGit("status", "--porcelain", "-uall")
 	if err != nil {
 		return nil, nil, nil, err
 	}
@@ -164,10 +165,12 @@ func (gs *GitService) GetFileStatus() ([]FileStatus, []FileStatus, []FileStatus,
 
 		// Untracked
 		if x == '?' && y == '?' {
-			fs := FileStatus{Path: path, Status: "?", OldPath: path}
-			if isConflict(path) {
+			fs := FileStatus{Path: path, Status: "U", OldPath: path}
+			if isConflict(filepath.Join(gs.path, path)) {
 				fs.Status = "C"
 				conflicts = append(conflicts, fs)
+			} else {
+				unstaged = append(unstaged, fs)
 			}
 			continue
 		}
@@ -245,12 +248,46 @@ func (gs *GitService) UnstageFile(path string) error {
 }
 
 // DiscardFile discards unstaged worktree changes for a path (restore from index).
+// Untracked paths are removed from the working tree.
 func (gs *GitService) DiscardFile(path string) error {
 	if gs.path == "" {
 		return fmt.Errorf("no repository open")
 	}
+	if gs.isUntracked(path) {
+		return gs.removeRepoPath(path)
+	}
 	_, err := gs.runGit("restore", "--worktree", "--", path)
 	return err
+}
+
+// Commit creates a commit from the current index with the given message.
+func (gs *GitService) Commit(message string) error {
+	if gs.path == "" {
+		return fmt.Errorf("no repository open")
+	}
+	message = strings.TrimSpace(message)
+	if message == "" {
+		return fmt.Errorf("commit message is empty")
+	}
+	_, err := gs.runGit("commit", "-m", message)
+	return err
+}
+
+// isUntracked reports whether path is not in the index.
+func (gs *GitService) isUntracked(path string) bool {
+	_, err := gs.runGit("ls-files", "--error-unmatch", "--", path)
+	return err != nil
+}
+
+// removeRepoPath deletes an untracked file or directory under the repo root.
+func (gs *GitService) removeRepoPath(path string) error {
+	full := filepath.Clean(filepath.Join(gs.path, path))
+	root := filepath.Clean(gs.path)
+	sep := string(os.PathSeparator)
+	if full != root && !strings.HasPrefix(full, root+sep) {
+		return fmt.Errorf("path outside repository")
+	}
+	return os.RemoveAll(full)
 }
 
 // GetCurrentBranch returns the current branch name
@@ -302,31 +339,39 @@ func (gs *GitService) SwitchBranch(name string) error {
 // GetDiff returns the diff for a file.
 // When staged is true, returns the index (cached) diff vs HEAD.
 // When staged is false, returns the worktree diff vs the index.
+// Untracked files are shown as a full addition via --no-index.
 func (gs *GitService) GetDiff(path string, staged bool) (*FileDiff, error) {
 	if gs.path == "" {
 		return nil, fmt.Errorf("no repository open")
 	}
 
-	var cmd *exec.Cmd
+	var out []byte
+	untracked := !staged && gs.isUntracked(path)
 	if staged {
-		cmd = exec.Command("git", "diff", "--unified", "--cached", "--", path)
-	} else {
-		cmd = exec.Command("git", "diff", "--unified", "--", path)
-	}
-	cmd.Dir = gs.path
-	out, err := cmd.Output()
-	if err != nil {
-		// If the command fails, the file might be unchanged or deleted
-		// Try to detect if it's a deleted file by checking if it exists
-		if _, statErr := os.Stat(filepath.Join(gs.path, path)); os.IsNotExist(statErr) {
-			// File was deleted — get diff showing full deletion
-			if staged {
+		cmd := exec.Command("git", "diff", "--unified", "--cached", "--", path)
+		cmd.Dir = gs.path
+		var err error
+		out, err = cmd.Output()
+		if err != nil {
+			if _, statErr := os.Stat(filepath.Join(gs.path, path)); os.IsNotExist(statErr) {
 				cmd = exec.Command("git", "diff", "--unified", "--cached", "--", path)
-			} else {
-				cmd = exec.Command("git", "diff", "--unified", "--", path)
+				cmd.Dir = gs.path
+				out, _ = cmd.CombinedOutput()
 			}
-			cmd.Dir = gs.path
-			out, _ = cmd.CombinedOutput()
+		}
+	} else if untracked {
+		out = gs.diffUntracked(path)
+	} else {
+		cmd := exec.Command("git", "diff", "--unified", "--", path)
+		cmd.Dir = gs.path
+		var err error
+		out, err = cmd.Output()
+		if err != nil {
+			if _, statErr := os.Stat(filepath.Join(gs.path, path)); os.IsNotExist(statErr) {
+				cmd = exec.Command("git", "diff", "--unified", "--", path)
+				cmd.Dir = gs.path
+				out, _ = cmd.CombinedOutput()
+			}
 		}
 	}
 
@@ -337,10 +382,11 @@ func (gs *GitService) GetDiff(path string, staged bool) (*FileDiff, error) {
 
 	// Determine status
 	status := "M"
-	if len(parsed.Lines) > 0 && parsed.Lines[0].Type == "add" && parsed.Hunks != nil && len(parsed.Hunks) > 0 && parsed.Hunks[0].OldStart == 0 && parsed.Hunks[0].OldCount == 0 {
+	if untracked {
+		status = "U"
+	} else if len(parsed.Lines) > 0 && parsed.Lines[0].Type == "add" && parsed.Hunks != nil && len(parsed.Hunks) > 0 && parsed.Hunks[0].OldStart == 0 && parsed.Hunks[0].OldCount == 0 {
 		status = "A"
-	}
-	if len(parsed.Lines) > 0 && parsed.Lines[0].Type == "remove" && parsed.Hunks != nil && len(parsed.Hunks) > 0 && parsed.Hunks[0].NewStart == 0 && parsed.Hunks[0].NewCount == 0 {
+	} else if len(parsed.Lines) > 0 && parsed.Lines[0].Type == "remove" && parsed.Hunks != nil && len(parsed.Hunks) > 0 && parsed.Hunks[0].NewStart == 0 && parsed.Hunks[0].NewCount == 0 {
 		status = "D"
 	}
 
@@ -353,6 +399,20 @@ func (gs *GitService) GetDiff(path string, staged bool) (*FileDiff, error) {
 		Hunks:     parsed.Hunks,
 		Patch:     string(out),
 	}, nil
+}
+
+// diffUntracked returns a unified diff treating path as a new file.
+// git diff --no-index exits 1 when files differ; that is expected.
+func (gs *GitService) diffUntracked(path string) []byte {
+	cmd := exec.Command("git", "diff", "--unified", "--no-index", "--", "/dev/null", path)
+	cmd.Dir = gs.path
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		if ee, ok := err.(*exec.ExitError); ok && ee.ExitCode() == 1 {
+			return out
+		}
+	}
+	return out
 }
 
 // GetAheadBehind returns ahead/behind counts

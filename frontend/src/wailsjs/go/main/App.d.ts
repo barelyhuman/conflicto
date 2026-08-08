@@ -5,6 +5,8 @@ export function DetectGH():Promise<void>;
 
 export function DiscardFile(arg1:string):Promise<void>;
 
+export function Commit(arg1:string):Promise<void>;
+
 export function EmitEvent(arg1:string,arg2:any):Promise<void>;
 
 export function Fetch():Promise<void>;

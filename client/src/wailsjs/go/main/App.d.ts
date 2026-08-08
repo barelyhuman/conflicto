@@ -6,6 +6,8 @@ export function CheckoutPR(arg1:number):Promise<void>;
 
 export function CheckoutPRToWorktree(arg1:number):Promise<void>;
 
+export function Commit(arg1:string):Promise<void>;
+
 export function CreatePR(arg1:string,arg2:string,arg3:string,arg4:boolean):Promise<void>;
 
 export function DetectGH():Promise<void>;

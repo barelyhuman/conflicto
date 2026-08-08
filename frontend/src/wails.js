@@ -167,6 +167,13 @@ export const api = {
     return Promise.resolve();
   },
 
+  commit: (message) => {
+    if (isWails) {
+      return window.go.main.App.Commit(message);
+    }
+    return Promise.resolve();
+  },
+
   switchBranch: (name) => {
     if (isWails) {
       return window.go.main.App.SwitchBranch(name);
