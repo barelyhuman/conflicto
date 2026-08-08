@@ -81,7 +81,6 @@ func main() {
 			},
 		},
 		OnStartup: func(ctx context.Context) {
-			setDockIcon(appIcon)
 			app.startup(ctx)
 		},
 		OnDomReady:    app.domReady,

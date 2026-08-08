@@ -31,7 +31,7 @@ function useTerminalStore() {
  * Contained bottom terminal dock. When closed, collapses via CSS but keeps
  * pane hosts mounted so PTY + scrollback survive.
  */
-export function TerminalDock({ open, height, onHeightChange, projectPath, onRequestOpen }) {
+export function TerminalDock({ open, height, onHeightChange, projectPath, onRequestOpen, onTabClosed }) {
   const { tabs, activeLocalId, splitLocalIds, splitRatio } = useTerminalStore();
   const [dragging, setDragging] = useState(false);
   const dragRef = useRef(null);
@@ -135,6 +135,7 @@ export function TerminalDock({ open, height, onHeightChange, projectPath, onRequ
     if (sessionId) {
       try {
         await api.terminalStop(sessionId);
+        onTabClosed?.([...tabs.filter((t) => t.localId !== localId)]);
       } catch {
         // ignore
       }
@@ -143,6 +144,7 @@ export function TerminalDock({ open, height, onHeightChange, projectPath, onRequ
 
   function handleExit(sessionId) {
     removeTabBySessionId(sessionId);
+    onTabClosed?.([...tabs.filter((t) => t.sessionId !== sessionId)]);
   }
 
   function handleNewTab() {

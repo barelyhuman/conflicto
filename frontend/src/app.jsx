@@ -582,6 +582,11 @@ export function App() {
             onHeightChange={handleTerminalHeight}
             projectPath={projectPath}
             onRequestOpen={() => setTerminalOpen(true)}
+            onTabClosed={(tabs)=>{
+              if(tabs.length === 0) {
+                setTerminalOpen(false);
+              }
+            }}
           />
 
           <ConfirmDialog
