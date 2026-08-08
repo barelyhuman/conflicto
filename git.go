@@ -244,6 +244,15 @@ func (gs *GitService) UnstageFile(path string) error {
 	return cmd.Run()
 }
 
+// DiscardFile discards unstaged worktree changes for a path (restore from index).
+func (gs *GitService) DiscardFile(path string) error {
+	if gs.path == "" {
+		return fmt.Errorf("no repository open")
+	}
+	_, err := gs.runGit("restore", "--worktree", "--", path)
+	return err
+}
+
 // GetCurrentBranch returns the current branch name
 func (gs *GitService) GetCurrentBranch() (string, error) {
 	out, err := gs.runGit("branch", "--show-current")
@@ -290,14 +299,20 @@ func (gs *GitService) SwitchBranch(name string) error {
 	return err
 }
 
-// GetDiff returns the diff for a file
-func (gs *GitService) GetDiff(path string) (*FileDiff, error) {
+// GetDiff returns the diff for a file.
+// When staged is true, returns the index (cached) diff vs HEAD.
+// When staged is false, returns the worktree diff vs the index.
+func (gs *GitService) GetDiff(path string, staged bool) (*FileDiff, error) {
 	if gs.path == "" {
 		return nil, fmt.Errorf("no repository open")
 	}
 
-	// Get diff between HEAD and working tree
-	cmd := exec.Command("git", "diff", "--unified", "HEAD", "--", path)
+	var cmd *exec.Cmd
+	if staged {
+		cmd = exec.Command("git", "diff", "--unified", "--cached", "--", path)
+	} else {
+		cmd = exec.Command("git", "diff", "--unified", "--", path)
+	}
 	cmd.Dir = gs.path
 	out, err := cmd.Output()
 	if err != nil {
@@ -305,7 +320,11 @@ func (gs *GitService) GetDiff(path string) (*FileDiff, error) {
 		// Try to detect if it's a deleted file by checking if it exists
 		if _, statErr := os.Stat(filepath.Join(gs.path, path)); os.IsNotExist(statErr) {
 			// File was deleted — get diff showing full deletion
-			cmd = exec.Command("git", "diff", "--unified", "HEAD", "--", path)
+			if staged {
+				cmd = exec.Command("git", "diff", "--unified", "--cached", "--", path)
+			} else {
+				cmd = exec.Command("git", "diff", "--unified", "--", path)
+			}
 			cmd.Dir = gs.path
 			out, _ = cmd.CombinedOutput()
 		}

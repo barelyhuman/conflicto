@@ -245,13 +245,14 @@ func (a *App) emitAheadBehind() {
 	})
 }
 
-// emitDiff emits diff data for a file
-func (a *App) emitDiff(path string) {
+// emitDiff emits diff data for a file.
+// staged selects index-vs-HEAD (true) or worktree-vs-index (false).
+func (a *App) emitDiff(path string, staged bool) {
 	if a.git == nil || !a.git.IsRepo() {
 		return
 	}
 
-	diff, err := a.git.GetDiff(path)
+	diff, err := a.git.GetDiff(path, staged)
 	if err != nil {
 		a.EmitEvent("error", map[string]string{
 			"title":   "Diff Error",
@@ -293,6 +294,21 @@ func (a *App) UnstageFile(path string) error {
 	return nil
 }
 
+// DiscardFile discards unstaged worktree changes for a path.
+func (a *App) DiscardFile(path string) error {
+	if a.git == nil {
+		return fmt.Errorf("no git repository")
+	}
+
+	err := a.git.DiscardFile(path)
+	if err != nil {
+		return err
+	}
+
+	a.emitFileStatus()
+	return nil
+}
+
 // SwitchBranch switches to a branch
 func (a *App) SwitchBranch(name string) error {
 	if a.git == nil {
@@ -310,9 +326,10 @@ func (a *App) SwitchBranch(name string) error {
 	return nil
 }
 
-// GetDiff gets diff for a file
-func (a *App) GetDiff(path string) error {
-	a.emitDiff(path)
+// GetDiff gets diff for a file.
+// staged=true → staged (index) diff; staged=false → unstaged (worktree) diff.
+func (a *App) GetDiff(path string, staged bool) error {
+	a.emitDiff(path, staged)
 	return nil
 }
 

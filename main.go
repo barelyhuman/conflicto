@@ -1,17 +1,22 @@
 package main
 
 import (
+	"context"
 	"embed"
+
 	"github.com/wailsapp/wails/v2"
+	"github.com/wailsapp/wails/v2/pkg/menu"
+	"github.com/wailsapp/wails/v2/pkg/menu/keys"
 	"github.com/wailsapp/wails/v2/pkg/options"
 	"github.com/wailsapp/wails/v2/pkg/options/assetserver"
 	"github.com/wailsapp/wails/v2/pkg/options/mac"
-	"github.com/wailsapp/wails/v2/pkg/menu"
-	"github.com/wailsapp/wails/v2/pkg/menu/keys"
 )
 
 //go:embed all:frontend/dist
 var assets embed.FS
+
+//go:embed resources/app-icon/conflicto.png
+var appIcon []byte
 
 func main() {
 	app := NewApp()
@@ -73,8 +78,16 @@ func main() {
 			TitleBar:             mac.TitleBarHidden(),
 			Appearance:           mac.NSAppearanceNameDarkAqua,
 			WebviewIsTransparent: false,
+			About: &mac.AboutInfo{
+				Title:   "conflicto",
+				Message: "© 2026 conflicto",
+				Icon:    appIcon,
+			},
 		},
-		OnStartup: app.startup,
+		OnStartup: func(ctx context.Context) {
+			setDockIcon(appIcon)
+			app.startup(ctx)
+		},
 		OnDomReady: app.domReady,
 		OnShutdown: app.shutdown,
 		OnBeforeClose: app.beforeClose,

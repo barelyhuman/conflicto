@@ -1,17 +1,28 @@
-import { useEffect, useRef, useMemo } from 'preact/hooks';
-import { FileTree as PierreTree, prepareFileTreeInput } from '@pierre/trees';
+import { useState, useCallback } from 'preact/hooks';
+import { IconChevronRight } from '@tabler/icons-preact';
+import { ChangeTree } from './ChangeTree.jsx';
 
 /**
+ * @typedef {'conflict' | 'staged' | 'unstaged' | 'pr'} FileSection
+ */
+
+/**
+ * Sidebar file list: PR mode is a single tree; otherwise Conflicts / Staged / Unstaged sections.
+ *
  * @param {Object} props
- * @param {{ path: string, status: 'M'|'A'|'D'|'R'|'C' }[]} props.conflicts
- * @param {{ path: string, status: 'M'|'A'|'D'|'R' }[]} props.staged
- * @param {{ path: string, status: 'M'|'A'|'D'|'R' }[]} props.unstaged
- * @param {{ path: string, status: 'M'|'A'|'D'|'R' }[]} props.prFiles
+ * @param {{ path: string, status: string }[]} props.conflicts
+ * @param {{ path: string, status: string }[]} props.staged
+ * @param {{ path: string, status: string }[]} props.unstaged
+ * @param {{ path: string, status: string }[]} props.prFiles
  * @param {boolean} props.isPRMode
  * @param {string|null} props.activeFile
- * @param {(path: string, isConflict: boolean) => void} props.onSelect
- * @param {(path: string) => void} props.onStage
- * @param {(path: string) => void} props.onUnstage
+ * @param {FileSection|null} props.activeSection
+ * @param {(path: string, section: FileSection) => void} props.onSelect
+ * @param {(path: string) => void} [props.onStage]
+ * @param {(path: string) => void} [props.onUnstage]
+ * @param {(path: string) => void} [props.onDiscard]
+ * @param {() => void} [props.onStageAll]
+ * @param {() => void} [props.onUnstageAll]
  */
 export function FileTree({
   conflicts,
@@ -20,143 +31,144 @@ export function FileTree({
   prFiles,
   isPRMode,
   activeFile,
+  activeSection,
   onSelect,
-  _onStage,
-  _onUnstage,
+  onStage,
+  onUnstage,
+  onDiscard,
+  onStageAll,
+  onUnstageAll,
 }) {
-  const containerRef = useRef(null);
-  const treeRef = useRef(null);
-  const activeFileRef = useRef(activeFile);
-  activeFileRef.current = activeFile;
-  const onSelectRef = useRef(onSelect);
-  onSelectRef.current = onSelect;
-  const conflictsRef = useRef(conflicts);
-  conflictsRef.current = conflicts;
+  const [conflictsOpen, setConflictsOpen] = useState(true);
+  const [stagedOpen, setStagedOpen] = useState(true);
+  const [unstagedOpen, setUnstagedOpen] = useState(true);
 
-  // Content key so new array identities with the same files do not remount the tree
-  // (e.g. App re-renders from activeFile / activeDiff, or stable EMPTY_FILES swaps).
-  const fileListKey = useMemo(() => {
-    const files = isPRMode ? prFiles : [...conflicts, ...staged, ...unstaged];
-    return `${isPRMode ? 'pr' : 'local'}\0${files.map((f) => `${f.path}:${f.status}`).join('\0')}`;
-  }, [conflicts, staged, unstaged, prFiles, isPRMode]);
+  const selectConflict = useCallback((path) => onSelect?.(path, 'conflict'), [onSelect]);
+  const selectStaged = useCallback((path) => onSelect?.(path, 'staged'), [onSelect]);
+  const selectUnstaged = useCallback((path) => onSelect?.(path, 'unstaged'), [onSelect]);
+  const selectPR = useCallback((path) => onSelect?.(path, 'pr'), [onSelect]);
 
-  const model = useMemo(() => {
-    const files = isPRMode ? prFiles : [...conflicts, ...staged, ...unstaged];
-    const paths = files.map((f) => f.path);
-    const filePathSet = new Set(paths);
-    const prepared = prepareFileTreeInput(paths);
-    const gitStatus = files.map((f) => ({
-      path: f.path,
-      status: mapStatus(f.status),
-    }));
-
-    const tree = new PierreTree({
-      preparedInput: prepared,
-      gitStatus,
-      initialExpansion: 'open',
-      unsafeCSS: `
-        :host {
-          --trees-bg-override: #111111;
-          --trees-accent-override: #f5f5f5;
-          --trees-status-added-override: #737373;
-          --trees-status-modified-override: #737373;
-          --trees-status-deleted-override: #737373;
-          --trees-status-renamed-override: #737373;
-          --trees-status-untracked-override: #737373;
-          --trees-file-icon-color: #737373;
-          --trees-selected-bg-override: #1a1a1a;
-          --trees-selected-fg-override: #f5f5f5;
-          --trees-focus-ring-color-override: #737373;
-          --trees-bg-muted-override: #171717;
-        }
-      `,
-      initialSelectedPaths: activeFileRef.current ? [activeFileRef.current] : [],
-      onSelectionChange: (selected) => {
-        if (selected.length === 0) return;
-        const path = selected[0];
-        // Directories are synthetic path prefixes — only real files trigger onSelect.
-        if (!filePathSet.has(path)) {
-          const current = activeFileRef.current;
-          if (current) {
-            tree.focusPath(current);
-          }
-          return;
-        }
-        const isConflict = conflictsRef.current.some((c) => c.path === path);
-        onSelectRef.current?.(path, isConflict);
-      },
-    });
-    return tree;
-  }, [fileListKey]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  useEffect(() => {
-    if (containerRef.current && !treeRef.current) {
-      model.render({ containerWrapper: containerRef.current });
-      treeRef.current = model;
-    }
-    return () => {
-      treeRef.current?.unmount();
-      treeRef.current = null;
-    };
-  }, [model]);
-
-  useEffect(() => {
-    if (activeFile) {
-      model.focusPath(activeFile);
-    }
-  }, [activeFile, model]);
-
-  // Fallback click interceptor: Pierre Tree internal click-to-select
-  // sometimes fails across the Preact 10/11 shadow-DOM boundary.
-  // Because the tree renders inside a shadow root, `event.target` is
-  // retargeted to the host element. We use `composedPath()` to walk
-  // through shadow-DOM elements and find the actual row that was clicked.
-  useEffect(() => {
-    const container = containerRef.current;
-    if (!container) return;
-
-    const handleClick = (event) => {
-      // composedPath includes the full event path through shadow boundaries
-      const path = event.composedPath?.() ?? [];
-      const row = path.find(
-        (el) => el instanceof HTMLElement && el.hasAttribute('data-item-path')
-      );
-      if (!row) return;
-
-      // Folders only expand/collapse — never select for diff viewing.
-      if (row.getAttribute('data-item-type') === 'folder') return;
-
-      const clickedPath = row.getAttribute('data-item-path');
-      if (!clickedPath) return;
-
-      // Ignore clicks on already-selected item to avoid double-firing
-      // when the tree's own selection *does* work.
-      if (clickedPath === activeFileRef.current) return;
-
-      const isConflict = conflictsRef.current.some((c) => c.path === clickedPath);
-      onSelectRef.current?.(clickedPath, isConflict);
-    };
-
-    container.addEventListener('click', handleClick);
-    return () => container.removeEventListener('click', handleClick);
-  }, [model]);
+  if (isPRMode) {
+    return (
+      <div class="file-tree-sidebar">
+        <ChangeTree
+          files={prFiles}
+          activeFile={activeSection === 'pr' ? activeFile : null}
+          onSelect={selectPR}
+        />
+      </div>
+    );
+  }
 
   return (
-    <div
-      ref={containerRef}
-      class="file-tree"
-      style="height: 100%; overflow: hidden;"
-    />
+    <div class="file-tree-sidebar">
+      {conflicts.length > 0 && (
+        <ChangeSection
+          title="Conflicts"
+          count={conflicts.length}
+          open={conflictsOpen}
+          onToggle={() => setConflictsOpen((v) => !v)}
+        >
+          <ChangeTree
+            files={conflicts}
+            activeFile={activeSection === 'conflict' ? activeFile : null}
+            onSelect={selectConflict}
+            flat
+            showStage
+            onStage={onStage}
+          />
+        </ChangeSection>
+      )}
+
+      <ChangeSection
+        title="Staged Changes"
+        count={staged.length}
+        open={stagedOpen}
+        onToggle={() => setStagedOpen((v) => !v)}
+        actionLabel={staged.length > 0 ? 'Unstage All' : null}
+        onAction={onUnstageAll}
+      >
+        {staged.length > 0 ? (
+          <ChangeTree
+            files={staged}
+            activeFile={activeSection === 'staged' ? activeFile : null}
+            onSelect={selectStaged}
+            flat
+            showUnstage
+            onUnstage={onUnstage}
+          />
+        ) : (
+          <div class="change-section-empty">No staged changes</div>
+        )}
+      </ChangeSection>
+
+      <ChangeSection
+        title="Changes"
+        count={unstaged.length}
+        open={unstagedOpen}
+        onToggle={() => setUnstagedOpen((v) => !v)}
+        actionLabel={unstaged.length > 0 ? 'Stage All' : null}
+        onAction={onStageAll}
+      >
+        {unstaged.length > 0 ? (
+          <ChangeTree
+            files={unstaged}
+            activeFile={activeSection === 'unstaged' ? activeFile : null}
+            onSelect={selectUnstaged}
+            flat
+            showStage
+            showDiscard
+            onStage={onStage}
+            onDiscard={onDiscard}
+          />
+        ) : (
+          <div class="change-section-empty">No changes</div>
+        )}
+      </ChangeSection>
+    </div>
   );
 }
 
-function mapStatus(status) {
-  switch (status) {
-    case 'A': return 'added';
-    case 'D': return 'deleted';
-    case 'M': return 'modified';
-    case 'R': return 'renamed';
-    case 'C': return 'modified';
-    default: return 'untracked';
-  }
+/**
+ * @param {Object} props
+ * @param {string} props.title
+ * @param {number} props.count
+ * @param {boolean} props.open
+ * @param {() => void} props.onToggle
+ * @param {string|null} [props.actionLabel]
+ * @param {() => void} [props.onAction]
+ * @param {import('preact').ComponentChildren} props.children
+ */
+function ChangeSection({ title, count, open, onToggle, actionLabel = null, onAction, children }) {
+  return (
+    <section class="change-section">
+      <div class="change-section-header">
+        <button
+          type="button"
+          class="change-section-toggle"
+          onClick={onToggle}
+          aria-expanded={open}
+        >
+          <span class={`change-section-chevron${open ? ' open' : ''}`} aria-hidden="true">
+            <IconChevronRight size={12} stroke={1.75} />
+          </span>
+          <span class="change-section-title">{title}</span>
+          <span class="change-section-count">{count}</span>
+        </button>
+        {actionLabel && (
+          <button
+            type="button"
+            class="change-section-action"
+            onClick={(e) => {
+              e.stopPropagation();
+              onAction?.();
+            }}
+          >
+            {actionLabel}
+          </button>
+        )}
+      </div>
+      {open && <div class="change-section-body">{children}</div>}
+    </section>
+  );
 }

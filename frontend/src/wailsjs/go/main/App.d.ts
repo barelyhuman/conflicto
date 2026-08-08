@@ -3,11 +3,13 @@
 
 export function DetectGH():Promise<void>;
 
+export function DiscardFile(arg1:string):Promise<void>;
+
 export function EmitEvent(arg1:string,arg2:any):Promise<void>;
 
 export function Fetch():Promise<void>;
 
-export function GetDiff(arg1:string):Promise<void>;
+export function GetDiff(arg1:string,arg2:boolean):Promise<void>;
 
 export function GetPRList():Promise<void>;
 

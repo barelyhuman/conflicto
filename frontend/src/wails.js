@@ -10,6 +10,9 @@ const isWails = typeof window !== 'undefined' && window.go && window.go.main && 
 const terminalDataListeners = new Set();
 const terminalExitListeners = new Set();
 
+/** @type {Record<string, Function>|null} */
+let mockEventCallbacks = null;
+
 function emitTerminalData(data) {
   terminalDataListeners.forEach((fn) => {
     try {
@@ -97,6 +100,7 @@ export function setupWailsEvents(callbacks) {
     // (private Go methods like emitFileStatus are not bound to JS)
     window.go.main.App.Refresh();
   } else {
+    mockEventCallbacks = callbacks;
     // Development fallback: emit mock data after a short delay
     setTimeout(() => {
       callbacks.onFileStatusChanged?.({
@@ -156,6 +160,13 @@ export const api = {
     return Promise.resolve();
   },
 
+  discardFile: (path) => {
+    if (isWails) {
+      return window.go.main.App.DiscardFile(path);
+    }
+    return Promise.resolve();
+  },
+
   switchBranch: (name) => {
     if (isWails) {
       return window.go.main.App.SwitchBranch(name);
@@ -163,9 +174,9 @@ export const api = {
     return Promise.resolve();
   },
 
-  getDiff: (path) => {
+  getDiff: (path, staged = false) => {
     if (isWails) {
-      return window.go.main.App.GetDiff(path);
+      return window.go.main.App.GetDiff(path, !!staged);
     }
     // Mock: return a simple diff for dev mode
     const mockPatch = `diff --git a/${path} b/${path}
@@ -180,7 +191,7 @@ index 1234567..abcdefg 100644
  context line 4
  context line 5
 `;
-    return Promise.resolve({
+    const data = {
       path,
       patch: mockPatch,
       lines: [
@@ -194,7 +205,9 @@ index 1234567..abcdefg 100644
       additions: 1,
       deletions: 1,
       status: 'M',
-    });
+    };
+    mockEventCallbacks?.onDiffLoaded?.(data);
+    return Promise.resolve(data);
   },
 
   pull: () => {

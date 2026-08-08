@@ -2,26 +2,41 @@
  * @param {Object} props
  * @param {boolean} props.open
  * @param {string} props.filename
+ * @param {string} [props.title]
+ * @param {string} [props.message]
+ * @param {string} [props.confirmLabel]
  * @param {() => void} props.onConfirm
  * @param {() => void} props.onCancel
  */
-export function ConfirmDialog({ open, filename, onConfirm, onCancel }) {
+export function ConfirmDialog({
+  open,
+  filename,
+  title = 'Stage conflicted file?',
+  message = null,
+  confirmLabel = 'Stage with markers',
+  onConfirm,
+  onCancel,
+}) {
   if (!open) return null;
+
+  const body = message ?? (
+    <>
+      <code>{filename}</code> contains unresolved merge markers.
+      Are you sure you want to stage it with the conflict markers included?
+    </>
+  );
 
   return (
     <div class="confirm-overlay">
       <div class="confirm-dialog">
-        <div class="confirm-title">Stage conflicted file?</div>
-        <p class="confirm-message">
-          <code>{filename}</code> contains unresolved merge markers.
-          Are you sure you want to stage it with the conflict markers included?
-        </p>
+        <div class="confirm-title">{title}</div>
+        <p class="confirm-message">{body}</p>
         <div class="confirm-actions">
           <button type="button" class="confirm-btn confirm-btn-secondary" onClick={onCancel}>
             Cancel
           </button>
           <button type="button" class="confirm-btn confirm-btn-primary" onClick={onConfirm}>
-            Stage with markers
+            {confirmLabel}
           </button>
         </div>
       </div>

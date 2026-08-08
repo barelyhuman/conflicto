@@ -12,7 +12,13 @@ import { useTheme } from '../theme/ThemeProvider.jsx';
  * @param {{ path: string, line: number, body: string, user: { login: string } }[]} props.comments
  * @param {(path: string, body: string, line: number, side: string) => void} props.onPostComment
  */
-export function DiffViewer({ patch, filename, isPRMode = false, isUnstaged = false, comments = [] }) {
+export function DiffViewer({
+  patch,
+  filename,
+  isPRMode = false,
+  isUnstaged = false,
+  comments = [],
+}) {
   const { theme } = useTheme();
 
   const fileDiff = useMemo(() => {

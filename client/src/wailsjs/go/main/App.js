@@ -18,6 +18,10 @@ export function DetectGH() {
   return window['go']['main']['App']['DetectGH']();
 }
 
+export function DiscardFile(arg1) {
+  return window['go']['main']['App']['DiscardFile'](arg1);
+}
+
 export function EmitEvent(arg1, arg2) {
   return window['go']['main']['App']['EmitEvent'](arg1, arg2);
 }
@@ -30,8 +34,8 @@ export function GetCurrentProject() {
   return window['go']['main']['App']['GetCurrentProject']();
 }
 
-export function GetDiff(arg1) {
-  return window['go']['main']['App']['GetDiff'](arg1);
+export function GetDiff(arg1, arg2) {
+  return window['go']['main']['App']['GetDiff'](arg1, arg2);
 }
 
 export function GetPRComments(arg1) {

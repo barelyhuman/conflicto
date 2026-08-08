@@ -10,13 +10,15 @@ export function CreatePR(arg1:string,arg2:string,arg3:string,arg4:boolean):Promi
 
 export function DetectGH():Promise<void>;
 
+export function DiscardFile(arg1:string):Promise<void>;
+
 export function EmitEvent(arg1:string,arg2:any):Promise<void>;
 
 export function Fetch():Promise<void>;
 
 export function GetCurrentProject():Promise<Record<string, string>>;
 
-export function GetDiff(arg1:string):Promise<void>;
+export function GetDiff(arg1:string,arg2:boolean):Promise<void>;
 
 export function GetPRComments(arg1:number):Promise<void>;
 

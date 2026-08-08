@@ -22,6 +22,8 @@ const EMPTY_FILES = [];
 
 export function App() {
   const [activeFile, setActiveFile] = useState(null);
+  /** @type {[null | 'conflict' | 'staged' | 'unstaged' | 'pr', function]} */
+  const [activeSection, setActiveSection] = useState(null);
   const [activePR, setActivePR] = useState(null);
   const [staged, setStaged] = useState([]);
   const [unstaged, setUnstaged] = useState([]);
@@ -30,7 +32,9 @@ export function App() {
 
   // Confirmation dialog state
   const [confirmOpen, setConfirmOpen] = useState(false);
-  const [pendingStageFile, setPendingStageFile] = useState(null);
+  /** @type {['stage-conflict' | 'discard' | null, function]} */
+  const [confirmKind, setConfirmKind] = useState(null);
+  const [pendingConfirmFile, setPendingConfirmFile] = useState(null);
 
   // Status bar state
   const [behind, setBehind] = useState(0);
@@ -73,29 +77,39 @@ export function App() {
 
   // Refs for stable access in event callbacks
   const activeFileRef = useRef(activeFile);
+  const activeSectionRef = useRef(activeSection);
   const activePRRef = useRef(activePR);
   useEffect(() => { activeFileRef.current = activeFile; }, [activeFile]);
+  useEffect(() => { activeSectionRef.current = activeSection; }, [activeSection]);
   useEffect(() => { activePRRef.current = activePR; }, [activePR]);
 
   // Derived PR mode flags (must be declared before effects that reference them)
   const isPRMode = activePR != null;
   const currentPR = isPRMode ? prList.find((p) => p.number === activePR) : null;
   const currentDiff = activeDiff;
-  const isConflictActive = !isPRMode && activeFile && conflicts.some((f) => f.path === activeFile);
+  const isConflictActive = !isPRMode && activeSection === 'conflict';
 
   // Setup Wails events
   useEffect(() => {
     setupWailsEvents({
       onFileStatusChanged: (data) => {
-        setStaged(data.staged ?? []);
-        setUnstaged(data.unstaged ?? []);
-        setConflicts(data.conflicts ?? []);
+        const nextStaged = data.staged ?? [];
+        const nextUnstaged = data.unstaged ?? [];
+        const nextConflicts = data.conflicts ?? [];
+        setStaged(nextStaged);
+        setUnstaged(nextUnstaged);
+        setConflicts(nextConflicts);
         // Set initial active file if none set
-        setActiveFile((prev) => {
-          if (prev) return prev;
-          const all = [...(data.conflicts ?? []), ...(data.staged ?? []), ...(data.unstaged ?? [])];
-          return all[0]?.path ?? null;
-        });
+        if (!activeFileRef.current) {
+          const first =
+            nextConflicts[0] ?? nextStaged[0] ?? nextUnstaged[0] ?? null;
+          if (first) {
+            setActiveFile(first.path);
+            setActiveSection(
+              nextConflicts[0] ? 'conflict' : nextStaged[0] ? 'staged' : 'unstaged'
+            );
+          }
+        }
       },
       onBranchChanged: (data) => {
         setBranches(data);
@@ -126,6 +140,7 @@ export function App() {
         setActivePR((currentPR) => {
           if (currentPR === number && !activeFileRef.current && files.length > 0) {
             setActiveFile(files[0].path);
+            setActiveSection('pr');
           }
           return currentPR;
         });
@@ -164,6 +179,7 @@ export function App() {
         setProjectName(data.name ?? '');
         setProjectPath(data.path ?? '');
         setActiveFile(null);
+        setActiveSection(null);
         setActiveDiff(null);
         setActivePR(null);
       },
@@ -178,9 +194,10 @@ export function App() {
       onRefreshCompleted: () => {
         // Re-fetch diff for the currently active file
         const file = activeFileRef.current;
+        const section = activeSectionRef.current;
         const pr = activePRRef.current;
         if (file && pr == null) {
-          api.getDiff(file);
+          api.getDiff(file, section === 'staged');
         } else if (file && pr != null) {
           api.getPRFileDiff(pr, file);
         }
@@ -264,15 +281,15 @@ export function App() {
     return () => cleanup();
   }, [isMacOS]);
 
-  // Fetch diff when active file changes
+  // Fetch diff when active file / section changes
   useEffect(() => {
     if (!activeFile) return;
     if (isPRMode && activePR != null) {
       api.getPRFileDiff(activePR, activeFile);
     } else {
-      api.getDiff(activeFile);
+      api.getDiff(activeFile, activeSection === 'staged');
     }
-  }, [activeFile, isPRMode, activePR]);
+  }, [activeFile, activeSection, isPRMode, activePR]);
 
   // Fetch PR comments when active PR changes
   useEffect(() => {
@@ -291,7 +308,13 @@ export function App() {
       setPrPrompt(pr);
     } else {
       setActivePR(null);
-      setActiveFile(staged[0]?.path ?? unstaged[0]?.path ?? conflicts[0]?.path ?? null);
+      const next =
+        conflicts[0] ? { path: conflicts[0].path, section: 'conflict' }
+          : staged[0] ? { path: staged[0].path, section: 'staged' }
+            : unstaged[0] ? { path: unstaged[0].path, section: 'unstaged' }
+              : null;
+      setActiveFile(next?.path ?? null);
+      setActiveSection(next?.section ?? null);
       setActiveDiff(null);
     }
   }, [staged, unstaged, conflicts]);
@@ -309,8 +332,10 @@ export function App() {
     setActivePR(pr.number);
     if (pr.files && pr.files.length > 0) {
       setActiveFile(pr.files[0].path);
+      setActiveSection('pr');
     } else {
       setActiveFile(null);
+      setActiveSection(null);
       api.getPRFiles(pr.number);
     }
   }, []);
@@ -333,17 +358,22 @@ export function App() {
     }
     if (isPRMode) {
       setActivePR(null);
+      setActiveFile(null);
+      setActiveSection(null);
+      setActiveDiff(null);
     }
   }, [isPRMode]);
 
-  const handleSelectFile = useCallback((path) => {
+  const handleSelectFile = useCallback((path, section) => {
     setActiveFile(path);
+    setActiveSection(section);
   }, []);
 
   const handleStage = useCallback((path) => {
     const conflictFile = conflicts.find((f) => f.path === path);
     if (conflictFile) {
-      setPendingStageFile(path);
+      setPendingConfirmFile(path);
+      setConfirmKind('stage-conflict');
       setConfirmOpen(true);
       return;
     }
@@ -353,17 +383,37 @@ export function App() {
     });
   }, [conflicts]);
 
-  const handleConfirmStageConflict = useCallback(() => {
-    api.stageFile(pendingStageFile).catch((err) => {
-      pushToast('Stage Error', err.message);
-    });
-    setConfirmOpen(false);
-    setPendingStageFile(null);
-  }, [pendingStageFile]);
+  const handleDiscard = useCallback((path) => {
+    setPendingConfirmFile(path);
+    setConfirmKind('discard');
+    setConfirmOpen(true);
+  }, []);
 
-  const handleCancelStageConflict = useCallback(() => {
+  const handleConfirmDialog = useCallback(() => {
+    const path = pendingConfirmFile;
+    const kind = confirmKind;
     setConfirmOpen(false);
-    setPendingStageFile(null);
+    setPendingConfirmFile(null);
+    setConfirmKind(null);
+    if (!path) return;
+
+    if (kind === 'stage-conflict') {
+      api.stageFile(path).catch((err) => {
+        pushToast('Stage Error', err.message);
+      });
+      return;
+    }
+    if (kind === 'discard') {
+      api.discardFile(path).catch((err) => {
+        pushToast('Discard Error', err.message);
+      });
+    }
+  }, [pendingConfirmFile, confirmKind]);
+
+  const handleCancelConfirm = useCallback(() => {
+    setConfirmOpen(false);
+    setPendingConfirmFile(null);
+    setConfirmKind(null);
   }, []);
 
   const handleUnstage = useCallback((path) => {
@@ -371,6 +421,30 @@ export function App() {
       pushToast('Unstage Error', err.message);
     });
   }, []);
+
+  const handleStageAll = useCallback(async () => {
+    const paths = unstaged.map((f) => f.path);
+    for (const path of paths) {
+      try {
+        await api.stageFile(path);
+      } catch (err) {
+        pushToast('Stage Error', err.message);
+        break;
+      }
+    }
+  }, [unstaged]);
+
+  const handleUnstageAll = useCallback(async () => {
+    const paths = staged.map((f) => f.path);
+    for (const path of paths) {
+      try {
+        await api.unstageFile(path);
+      } catch (err) {
+        pushToast('Unstage Error', err.message);
+        break;
+      }
+    }
+  }, [staged]);
 
   const handlePull = useCallback(() => {
     api.pull().catch((err) => {
@@ -412,7 +486,7 @@ export function App() {
 
   const shellClass = `app-shell${isMacOS ? ' macos' : ''}${isMacOS && isFullscreenMode ? ' macos-fullscreen' : ''}`;
 
-  const isUnstaged = unstaged.some((f) => f.path === activeFile);
+  const isUnstaged = activeSection === 'unstaged';
 
   return (
     <ThemeProvider>
@@ -450,9 +524,13 @@ export function App() {
               prFiles={isPRMode ? (currentPR?.files ?? EMPTY_FILES) : EMPTY_FILES}
               isPRMode={isPRMode}
               activeFile={activeFile}
+              activeSection={activeSection}
               onSelect={handleSelectFile}
               onStage={handleStage}
               onUnstage={handleUnstage}
+              onDiscard={handleDiscard}
+              onStageAll={handleStageAll}
+              onUnstageAll={handleUnstageAll}
             />
           </aside>
 
@@ -468,7 +546,7 @@ export function App() {
                   patch={currentDiff.patch}
                   filename={currentDiff.path}
                   isPRMode={isPRMode}
-                  isUnstaged={false}
+                  isUnstaged={isUnstaged}
                   comments={isPRMode ? prComments : []}
                   onPostComment={handlePostComment}
                 />
@@ -488,9 +566,19 @@ export function App() {
 
           <ConfirmDialog
             open={confirmOpen}
-            filename={pendingStageFile ?? ''}
-            onConfirm={handleConfirmStageConflict}
-            onCancel={handleCancelStageConflict}
+            filename={pendingConfirmFile ?? ''}
+            title={confirmKind === 'discard' ? 'Discard changes?' : 'Stage conflicted file?'}
+            message={
+              confirmKind === 'discard' ? (
+                <>
+                  Discard unstaged changes in <code>{pendingConfirmFile ?? ''}</code>?
+                  This cannot be undone.
+                </>
+              ) : undefined
+            }
+            confirmLabel={confirmKind === 'discard' ? 'Discard' : 'Stage with markers'}
+            onConfirm={handleConfirmDialog}
+            onCancel={handleCancelConfirm}
           />
 
           <StatusBar
