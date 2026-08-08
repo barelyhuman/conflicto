@@ -3,10 +3,13 @@
 <p align="center">
 <img src="./resources/app-icon/conflicto.png" height="135">
 </p>
+<p align="center">
+  <span>Small on purpose. Sharp on every diff.</span>
+</p>
 
-The last git diff and github PR Reviewer tool you'll ever need. 
 
-> [!NOTE]
+
+> [!WARNING]
 > 
 > Alpha software, expects bugs 
 
