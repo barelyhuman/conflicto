@@ -130,6 +130,10 @@ export function TerminalWrite(arg1, arg2) {
   return window['go']['main']['App']['TerminalWrite'](arg1, arg2);
 }
 
+export function ToggleFullscreen() {
+  return window['go']['main']['App']['ToggleFullscreen']();
+}
+
 export function UnstageFile(arg1) {
   return window['go']['main']['App']['UnstageFile'](arg1);
 }

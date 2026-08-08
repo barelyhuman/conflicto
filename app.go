@@ -999,6 +999,18 @@ func (a *App) GetCurrentProject() (map[string]string, error) {
 	}, nil
 }
 
+// ToggleFullscreen enters or exits fullscreen via the Wails runtime.
+func (a *App) ToggleFullscreen() {
+	if a.ctx == nil {
+		return
+	}
+	if runtime.WindowIsFullscreen(a.ctx) {
+		runtime.WindowUnfullscreen(a.ctx)
+		return
+	}
+	runtime.WindowFullscreen(a.ctx)
+}
+
 // Refresh re-fetches and re-emits all application state
 func (a *App) Refresh() {
 	a.EmitEvent("platformInfo", map[string]string{
