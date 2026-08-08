@@ -16,7 +16,6 @@ export function ThemeProvider({ children }) {
   }, []);
 
   const theme = {
-    name: 'conflicto-dark',
     dark: 'conflicto-dark',
     light: 'conflicto-dark',
   };
