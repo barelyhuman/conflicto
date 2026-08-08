@@ -67,6 +67,7 @@ export function DiffViewer({ patch, filename, isPRMode = false, isUnstaged = fal
           diffStyle: 'unified',
           overflow: 'wrap',
           disableFileHeader: false,
+          stickyHeader: true,
           unsafeCSS: `
             :host {
               /* Flush with app surface */
@@ -124,8 +125,9 @@ export function DiffViewer({ patch, filename, isPRMode = false, isUnstaged = fal
         .diff-viewer-wrapper {
           display: flex;
           flex-direction: column;
-          height: 100%;
-          overflow: hidden;
+          flex: 1;
+          min-height: 0;
+          overflow: auto;
         }
         .diff-comment {
           display: flex;

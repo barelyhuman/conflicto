@@ -133,6 +133,7 @@ export function setupWailsEvents(callbacks) {
           { name: 'dotfiles', path: '/Users/sid/dotfiles', openedAt: new Date(Date.now() - 86400000).toISOString() },
         ],
       });
+      callbacks.onPlatformInfo?.({ platform: 'darwin' });
     }, 100);
   }
 }

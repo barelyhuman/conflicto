@@ -96,14 +96,15 @@ export function ProjectPicker({ currentName, currentPath, recents, onSwitchProje
           display: flex;
           align-items: center;
           gap: 6px;
-          padding: 4px 8px;
-          border-radius: 6px;
+          padding: 2px 6px;
+          border-radius: 5px;
           border: none;
           background: transparent;
           color: var(--text);
           font-family: var(--font-sans);
           font-size: 13px;
           font-weight: 500;
+          line-height: 1.25;
           cursor: pointer;
           transition: background 0.15s;
         }

@@ -202,14 +202,15 @@ export function PRPicker({ selectedPR, currentPR, onSelect, onError }) {
         .pr-trigger {
           display: flex;
           align-items: center;
-          gap: 8px;
-          padding: 5px 10px;
-          border-radius: 6px;
+          gap: 6px;
+          padding: 2px 8px;
+          border-radius: 5px;
           border: none;
           background: var(--surface-raised);
           color: var(--text-muted);
           font-family: var(--font-sans);
           font-size: 12px;
+          line-height: 1.25;
           cursor: pointer;
           transition: background 0.15s, color 0.15s;
           max-width: 200px;

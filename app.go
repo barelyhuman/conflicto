@@ -74,19 +74,8 @@ func (a *App) startup(ctx context.Context) {
 	// Detect gh CLI status
 	a.DetectGH()
 
-	// Emit platform info for frontend titlebar handling
-	a.EmitEvent("platformInfo", map[string]string{
-		"platform": goruntime.GOOS,
-	})
-
-	// Emit initial project state
-	a.emitProjectChanged()
-	a.emitRecentProjectsUpdated()
-
-	// Emit initial file status
-	a.emitFileStatus()
-	a.emitBranchStatus()
-	a.emitAheadBehind()
+	// Initial UI state is emitted from Refresh() once the frontend
+	// has registered event listeners (startup races ahead of that).
 
 	// Fetch PR list if gh is available and we're in a repo
 	if a.git != nil && a.git.IsRepo() {
@@ -979,6 +968,9 @@ func (a *App) GetCurrentProject() (map[string]string, error) {
 
 // Refresh re-fetches and re-emits all application state
 func (a *App) Refresh() {
+	a.EmitEvent("platformInfo", map[string]string{
+		"platform": goruntime.GOOS,
+	})
 	a.emitProjectChanged()
 	a.emitRecentProjectsUpdated()
 	a.emitFileStatus()

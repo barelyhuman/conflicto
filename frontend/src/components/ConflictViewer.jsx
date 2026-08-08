@@ -46,14 +46,16 @@ export function ConflictViewer({ patch }) {
           diffStyle: 'unified',
           overflow: 'wrap',
           disableFileHeader: false,
+          stickyHeader: true,
         }}
       />
       <style>{`
         .conflict-viewer-wrapper {
           display: flex;
           flex-direction: column;
-          height: 100%;
-          overflow: hidden;
+          flex: 1;
+          min-height: 0;
+          overflow: auto;
         }
       `}</style>
     </div>

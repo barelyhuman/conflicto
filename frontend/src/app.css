@@ -7,6 +7,11 @@
   overflow: hidden;
 }
 
+/* macOS: compact header to align with traffic lights */
+.app-shell.macos {
+  grid-template-rows: 30px 1fr minmax(0, auto) 30px;
+}
+
 /* Header */
 .app-header {
   grid-column: 1 / -1;
@@ -24,6 +29,7 @@
   display: flex;
   align-items: center;
   gap: 8px;
+  min-height: 0;
 }
 
 .app-logo {
@@ -41,7 +47,7 @@
 
 /* macOS: provide padding for traffic lights with hidden titlebar */
 .app-shell.macos .app-header {
-  padding-left: 80px;
+  padding-left: 70px;
 }
 
 /* macOS fullscreen: traffic lights hidden, revert padding */
@@ -52,19 +58,21 @@
 .app-header-actions {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
+  min-height: 0;
   -webkit-app-region: no-drag;
 }
 
 .create-pr-trigger {
-  padding: 4px 10px;
-  border-radius: 6px;
+  padding: 2px 8px;
+  border-radius: 5px;
   border: none;
   background: var(--accent-bg);
   color: var(--text-h);
   font-family: var(--font-sans);
   font-size: 12px;
   font-weight: 500;
+  line-height: 1.25;
   cursor: pointer;
   transition: background 0.15s;
 }
@@ -88,7 +96,8 @@
   grid-row: 2;
   grid-column: 2;
   background: var(--surface);
-  overflow: auto;
+  min-height: 0;
+  overflow: hidden;
   display: flex;
   flex-direction: column;
 }

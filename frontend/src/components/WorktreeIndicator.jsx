@@ -30,9 +30,9 @@ export function WorktreeIndicator({ path }) {
           display: flex;
           align-items: center;
           justify-content: center;
-          width: 28px;
-          height: 28px;
-          border-radius: 6px;
+          width: 24px;
+          height: 24px;
+          border-radius: 5px;
           color: var(--text-muted);
           cursor: help;
           position: relative;
