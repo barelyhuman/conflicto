@@ -1,7 +1,7 @@
 # conflicto 
 
 <p align="center">
-<img src="./resources/app-icon/conflicto.png" height="135">
+<img src="./resources/docs/preview.png">
 </p>
 <p align="center">
   <span>Small on purpose. Sharp on every diff.</span>
@@ -48,3 +48,19 @@ Useful targets:
 | `make clean` | Remove build artifacts |
 
 Frontend-only: `make frontend-dev` / `make frontend-build` (runs `pnpm` in `frontend/`). Vite alone has no Go backend — use `make dev` for a working UI.
+
+## Keybindings
+
+| Shortcut | Action |
+| --- | --- |
+| `Cmd/Ctrl+,` | Preferences |
+| `Escape` | Close Preferences |
+| `Cmd/Ctrl+R` | Reload |
+| `Cmd+Ctrl+F` (macOS) / `Ctrl+F` | Full Screen |
+| `Cmd/Ctrl+W` | Close window |
+| `Cmd/Ctrl+Enter` | Commit (from commit message field) |
+| `Ctrl+\`` | Toggle terminal dock |
+| `Ctrl+Shift+\`` | New terminal tab (opens dock if needed) |
+| `Cmd/Ctrl+\\` | Split terminal right (dock open) |
+
+On macOS, the Edit menu also provides the usual text-editing shortcuts (`Cmd+A/C/V/X/Z`).

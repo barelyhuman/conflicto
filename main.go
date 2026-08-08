@@ -36,14 +36,17 @@ func main() {
 		app.Refresh()
 	})
 	ViewMenu.AddSeparator()
-	ViewMenu.AddText("Full Screen", keys.CmdOrCtrl("f"), func(cd *menu.CallbackData) {
-		// Handled by Wails runtime
+	// macOS system convention is Control+Command+F for fullscreen
+	fullscreenAccel := keys.CmdOrCtrl("f")
+	if goruntime.GOOS == "darwin" {
+		fullscreenAccel = keys.Combo("f", keys.CmdOrCtrlKey, keys.ControlKey)
+	}
+	ViewMenu.AddText("Full Screen", fullscreenAccel, func(cd *menu.CallbackData) {
+		app.ToggleFullscreen()
 	})
 
 	// Window Menu
 	WindowMenu := AppMenu.AddSubmenu("Window")
-	WindowMenu.AddText("Minimize", keys.CmdOrCtrl("m"), nil)
-	WindowMenu.AddSeparator()
 	WindowMenu.AddText("Close", keys.CmdOrCtrl("w"), nil)
 
 	// Help Menu
