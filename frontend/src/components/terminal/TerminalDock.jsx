@@ -6,12 +6,16 @@ import {
   getTerminalStoreSnapshot,
   createTabPlaceholder,
   bindSession,
-  setActiveTab,
+  setActivePane,
+  setActiveLayout,
   splitRight,
   setSplitRatio,
-  removeTab,
-  removeTabBySessionId,
+  removeLayout,
+  removePaneBySessionId,
   hasTabs,
+  layoutTitle,
+  updatePaneCwdBySessionId,
+  updatePaneTitleBySessionId,
 } from './terminalStore.js';
 import './terminal.css';
 
@@ -32,7 +36,7 @@ function useTerminalStore() {
  * pane hosts mounted so PTY + scrollback survive.
  */
 export function TerminalDock({ open, height, onHeightChange, projectPath, onRequestOpen, onTabClosed }) {
-  const { tabs, activeLocalId, splitLocalIds, splitRatio } = useTerminalStore();
+  const { panes, layouts, activeLayoutId, activeLocalId, splitLocalIds, splitRatio } = useTerminalStore();
   const [dragging, setDragging] = useState(false);
   const dragRef = useRef(null);
   const splitDragRef = useRef(null);
@@ -41,8 +45,8 @@ export function TerminalDock({ open, height, onHeightChange, projectPath, onRequ
 
   const ensureSession = useCallback(async (localId) => {
     const snap = getTerminalStoreSnapshot();
-    const tab = snap.tabs.find((t) => t.localId === localId);
-    if (!tab || tab.sessionId) return;
+    const pane = snap.panes.find((t) => t.localId === localId);
+    if (!pane || pane.sessionId) return;
     try {
       const result = await api.terminalStart({
         cwd: projectPath || null,
@@ -61,7 +65,7 @@ export function TerminalDock({ open, height, onHeightChange, projectPath, onRequ
     if (!open) return;
     if (hasTabs()) {
       const snap = getTerminalStoreSnapshot();
-      snap.tabs.forEach((t) => {
+      snap.panes.forEach((t) => {
         if (!t.sessionId) void ensureSession(t.localId);
       });
       return;
@@ -75,10 +79,10 @@ export function TerminalDock({ open, height, onHeightChange, projectPath, onRequ
   }, [open, ensureSession]);
 
   useEffect(() => {
-    tabs.forEach((t) => {
+    panes.forEach((t) => {
       if (!t.sessionId) void ensureSession(t.localId);
     });
-  }, [tabs, ensureSession]);
+  }, [panes, ensureSession]);
 
   useEffect(() => {
     if (!dragging) return;
@@ -129,22 +133,22 @@ export function TerminalDock({ open, height, onHeightChange, projectPath, onRequ
     window.addEventListener('pointerup', onUp);
   }
 
-  async function handleCloseTab(localId, e) {
+  async function handleCloseLayout(layoutId, e) {
     e?.stopPropagation();
-    const sessionId = removeTab(localId);
-    if (sessionId) {
+    const sessionIds = removeLayout(layoutId);
+    for (const sessionId of sessionIds) {
       try {
         await api.terminalStop(sessionId);
-        onTabClosed?.([...tabs.filter((t) => t.localId !== localId)]);
       } catch {
         // ignore
       }
     }
+    onTabClosed?.(getTerminalStoreSnapshot().layouts);
   }
 
   function handleExit(sessionId) {
-    removeTabBySessionId(sessionId);
-    onTabClosed?.([...tabs.filter((t) => t.sessionId !== sessionId)]);
+    removePaneBySessionId(sessionId);
+    onTabClosed?.(getTerminalStoreSnapshot().layouts);
   }
 
   function handleNewTab() {
@@ -172,7 +176,7 @@ export function TerminalDock({ open, height, onHeightChange, projectPath, onRequ
     return () => document.removeEventListener('keydown', onKey, true);
   }, [open, ensureSession]);
 
-  // Ctrl+Shift+` — open dock (if needed) and create a new terminal tab
+  // Ctrl+Shift+` — open dock (if needed) and create a new terminal layout tab
   useEffect(() => {
     function onKey(e) {
       // Shift+` often reports as '~' depending on layout
@@ -190,6 +194,7 @@ export function TerminalDock({ open, height, onHeightChange, projectPath, onRequ
 
   const dockHeight = open ? height : 0;
   const splitMode = splitLocalIds.length > 1;
+  const twoPaneSplit = splitLocalIds.length === 2;
 
   return (
     <div
@@ -207,20 +212,20 @@ export function TerminalDock({ open, height, onHeightChange, projectPath, onRequ
       />
       <div class="terminal-dock-header">
         <div class="terminal-tabs">
-          {tabs.map((tab) => (
+          {layouts.map((layout) => (
             <button
               type="button"
-              key={tab.localId}
-              class={`terminal-tab${tab.localId === activeLocalId ? ' active' : ''}`}
-              onClick={() => setActiveTab(tab.localId)}
+              key={layout.layoutId}
+              class={`terminal-tab${layout.layoutId === activeLayoutId ? ' active' : ''}`}
+              onClick={() => setActiveLayout(layout.layoutId)}
             >
-              <span class="terminal-tab-title">{tab.title || 'Terminal'}</span>
+              <span class="terminal-tab-title">{layoutTitle(layout)}</span>
               <span
                 class="terminal-tab-close"
                 role="button"
                 tabIndex={-1}
-                onClick={(e) => handleCloseTab(tab.localId, e)}
-                aria-label="Close terminal"
+                onClick={(e) => handleCloseLayout(layout.layoutId, e)}
+                aria-label="Close terminal layout"
               >
                 ×
               </span>
@@ -237,23 +242,30 @@ export function TerminalDock({ open, height, onHeightChange, projectPath, onRequ
         </div>
       </div>
       <div class={`terminal-dock-body${splitMode ? ' split' : ''}`} ref={bodyRef}>
-        {tabs.map((tab) => {
-          const inSplit = splitLocalIds.includes(tab.localId);
-          const splitIndex = splitLocalIds.indexOf(tab.localId);
+        {[
+          ...splitLocalIds.map((id) => panes.find((p) => p.localId === id)).filter(Boolean),
+          ...panes.filter((p) => !splitLocalIds.includes(p.localId)),
+        ].map((pane) => {
+          const inSplit = splitLocalIds.includes(pane.localId);
+          const splitIndex = splitLocalIds.indexOf(pane.localId);
           const visible = inSplit;
+          let slotStyle;
+          if (splitMode && visible) {
+            if (twoPaneSplit && splitIndex === 0) {
+              slotStyle = { flex: `0 0 ${splitRatio * 100}%` };
+            } else if (twoPaneSplit) {
+              slotStyle = { flex: '1 1 auto' };
+            } else {
+              slotStyle = { flex: '1 1 0', minWidth: 0 };
+            }
+          }
           return (
             <div
-              key={tab.localId}
+              key={pane.localId}
               class={`terminal-slot${visible ? ' visible' : ' parked'}`}
-              style={
-                splitMode && visible && splitIndex === 0
-                  ? { flex: `0 0 ${splitRatio * 100}%` }
-                  : splitMode && visible
-                    ? { flex: '1 1 auto' }
-                    : undefined
-              }
+              style={slotStyle}
             >
-              {splitMode && visible && splitIndex > 0 && (
+              {twoPaneSplit && visible && splitIndex > 0 && (
                 <div
                   class="terminal-split-handle"
                   onPointerDown={onSplitPointerDown}
@@ -262,12 +274,14 @@ export function TerminalDock({ open, height, onHeightChange, projectPath, onRequ
                 />
               )}
               <div class="terminal-slot-inner">
-                {tab.sessionId ? (
+                {pane.sessionId ? (
                   <TerminalPane
-                    sessionId={tab.sessionId}
-                    focused={open && visible && tab.localId === activeLocalId}
-                    onFocus={() => setActiveTab(tab.localId)}
+                    sessionId={pane.sessionId}
+                    focused={open && visible && pane.localId === activeLocalId}
+                    onFocus={() => setActivePane(pane.localId)}
                     onExit={handleExit}
+                    onCwdChange={updatePaneCwdBySessionId}
+                    onTitleChange={updatePaneTitleBySessionId}
                   />
                 ) : (
                   <div class="terminal-pane-loading">Starting…</div>

@@ -30,12 +30,16 @@ export function TerminalPane({
   focused,
   onFocus,
   onExit,
+  onCwdChange,
+  onTitleChange,
 }) {
   const hostRef = useRef(null);
   const termRef = useRef(null);
   const fitRef = useRef(null);
   const sessionIdRef = useRef(sessionId);
   const onExitRef = useRef(onExit);
+  const onCwdChangeRef = useRef(onCwdChange);
+  const onTitleChangeRef = useRef(onTitleChange);
   const disposedRef = useRef(false);
 
   useEffect(() => {
@@ -45,6 +49,14 @@ export function TerminalPane({
   useEffect(() => {
     onExitRef.current = onExit;
   }, [onExit]);
+
+  useEffect(() => {
+    onCwdChangeRef.current = onCwdChange;
+  }, [onCwdChange]);
+
+  useEffect(() => {
+    onTitleChangeRef.current = onTitleChange;
+  }, [onTitleChange]);
 
   useEffect(() => {
     const host = hostRef.current;
@@ -134,6 +146,17 @@ export function TerminalPane({
       void api.terminalWrite(sessionIdRef.current, data);
     });
 
+    // OSC 7: file://host/path — shell reports cwd (macOS Terminal / iTerm / modern zsh)
+    const osc7Disp = term.parser.registerOscHandler(7, (data) => {
+      const cwd = parseOsc7Cwd(data);
+      if (cwd) onCwdChangeRef.current?.(sessionIdRef.current, cwd);
+      return true;
+    });
+
+    const titleDisp = term.onTitleChange((title) => {
+      onTitleChangeRef.current?.(sessionIdRef.current, title);
+    });
+
     const offData = api.onTerminalData((payload) => {
       if (!payload || payload.id !== sessionIdRef.current) return;
       if (disposedRef.current) return;
@@ -177,6 +200,8 @@ export function TerminalPane({
       offData?.();
       offExit?.();
       onDataDisp.dispose();
+      osc7Disp.dispose();
+      titleDisp.dispose();
       try {
         webgl?.dispose();
       } catch {
@@ -223,4 +248,24 @@ export function TerminalPane({
       <div class="terminal-host" ref={hostRef} />
     </div>
   );
+}
+
+/** Parse OSC 7 payload like `file://hostname/Users/foo` → `/Users/foo`. */
+// TODO: reaper - probably need a more reliable way to get this out
+function parseOsc7Cwd(data) {
+  if (!data || typeof data !== 'string') return null;
+  try {
+    if (data.startsWith('file://')) {
+      const url = new URL(data);
+      let path = decodeURIComponent(url.pathname || '');
+      // Windows: file:///C:/Users/... → pathname "/C:/Users/..."
+      if (/^\/[A-Za-z]:\//.test(path)) path = path.slice(1);
+      return path || null;
+    }
+    // Some shells send a bare path
+    if (data.startsWith('/')) return data;
+  } catch {
+    // ignore malformed
+  }
+  return null;
 }
