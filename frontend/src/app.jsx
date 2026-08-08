@@ -29,9 +29,6 @@ export function App() {
   const [unstaged, setUnstaged] = useState([]);
   const [conflicts, setConflicts] = useState([]);
   const [branches, setBranches] = useState({ current: 'main', local: [], remote: [] });
-  const [commitMessage, setCommitMessage] = useState('');
-  const [committing, setCommitting] = useState(false);
-
   // Confirmation dialog state
   const [confirmOpen, setConfirmOpen] = useState(false);
   /** @type {['stage-conflict' | 'discard' | null, function]} */
@@ -424,19 +421,14 @@ export function App() {
     });
   }, []);
 
-  const handleCommit = useCallback(async () => {
-    const message = commitMessage.trim();
-    if (!message || staged.length === 0 || committing) return;
-    setCommitting(true);
+  const handleCommit = useCallback(async (message) => {
     try {
-      await api.commit(message);
-      setCommitMessage('');
+      await api.commit(message.trim());
     } catch (err) {
       pushToast('Commit Error', err.message);
-    } finally {
-      setCommitting(false);
+      throw err;
     }
-  }, [commitMessage, staged.length, committing]);
+  }, []);
 
   const handleStageAll = useCallback(async () => {
     const paths = unstaged.map((f) => f.path);
@@ -547,10 +539,7 @@ export function App() {
               onDiscard={handleDiscard}
               onStageAll={handleStageAll}
               onUnstageAll={handleUnstageAll}
-              commitMessage={commitMessage}
-              onCommitMessageChange={setCommitMessage}
               onCommit={handleCommit}
-              committing={committing}
             />
           </aside>
 

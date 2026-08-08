@@ -1,6 +1,7 @@
 import { useState, useCallback } from 'preact/hooks';
 import { IconChevronRight } from '@tabler/icons-preact';
 import { ChangeTree } from './ChangeTree.jsx';
+import { CommitPanel } from './CommitPanel.jsx';
 
 /**
  * @typedef {'conflict' | 'staged' | 'unstaged' | 'pr'} FileSection
@@ -23,10 +24,7 @@ import { ChangeTree } from './ChangeTree.jsx';
  * @param {(path: string) => void} [props.onDiscard]
  * @param {() => void} [props.onStageAll]
  * @param {() => void} [props.onUnstageAll]
- * @param {string} [props.commitMessage]
- * @param {(value: string) => void} [props.onCommitMessageChange]
- * @param {() => void} [props.onCommit]
- * @param {boolean} [props.committing]
+ * @param {(message: string) => void | Promise<void>} [props.onCommit]
  */
 export function FileTree({
   conflicts,
@@ -42,10 +40,7 @@ export function FileTree({
   onDiscard,
   onStageAll,
   onUnstageAll,
-  commitMessage = '',
-  onCommitMessageChange,
   onCommit,
-  committing = false,
 }) {
   const [conflictsOpen, setConflictsOpen] = useState(true);
   const [stagedOpen, setStagedOpen] = useState(true);
@@ -69,11 +64,6 @@ export function FileTree({
       </div>
     );
   }
-
-  const canCommit = staged.length > 0 && commitMessage.trim().length > 0 && !committing;
-  const modKey = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform)
-    ? '⌘'
-    : 'Ctrl';
 
   return (
     <div class="file-tree-sidebar">
@@ -124,38 +114,7 @@ export function FileTree({
             )}
           </div>
 
-          <div class="commit-panel">
-            <textarea
-              class="commit-message-input"
-              rows={3}
-              placeholder={
-                staged.length > 0
-                  ? `Message (${modKey}+Enter to commit)`
-                  : 'Stage changes to commit'
-              }
-              value={commitMessage}
-              onInput={(e) => onCommitMessageChange?.(e.currentTarget.value)}
-              onKeyDown={(e) => {
-                if ((e.metaKey || e.ctrlKey) && e.key === 'Enter' && canCommit) {
-                  e.preventDefault();
-                  onCommit?.();
-                }
-              }}
-              disabled={committing}
-            />
-            <button
-              type="button"
-              class="commit-button"
-              disabled={!canCommit}
-              onClick={() => onCommit?.()}
-            >
-              {committing
-                ? 'Committing…'
-                : staged.length > 0
-                  ? `Commit ${staged.length} file${staged.length === 1 ? '' : 's'}`
-                  : 'Commit'}
-            </button>
-          </div>
+          <CommitPanel stagedCount={staged.length} onCommit={onCommit} />
 
           {stagedOpen && (
             <div class="change-section-body">
