@@ -340,7 +340,7 @@
   font: inherit;
   text-align: left;
   cursor: pointer;
-  padding: 0;
+  padding: 4px 0;
 }
 
 .change-tree-chevron {

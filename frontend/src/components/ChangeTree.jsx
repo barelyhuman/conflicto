@@ -1,4 +1,5 @@
 import { useMemo, useState, useCallback } from 'preact/hooks';
+import {IconPlus,IconMinus, IconArrowBackUp} from "@tabler/icons-preact"
 
 /**
  * @typedef {{ name: string, path: string, status?: string, children?: TreeNode[] }} TreeNode
@@ -225,10 +226,10 @@ function FileRow({
         title={title}
         onClick={() => onSelect?.(path)}
       >
-        <span class="change-tree-name">{label}</span>
         {status && (
           <span class="change-tree-status">{status}</span>
         )}
+        <span class="change-tree-name">{label}</span>
       </button>
       <div class="change-tree-actions">
         {showDiscard && (
@@ -242,7 +243,7 @@ function FileRow({
               onDiscard?.(path);
             }}
           >
-            ↺
+            <IconArrowBackUp size={14} />
           </button>
         )}
         {showStage && (
@@ -256,7 +257,7 @@ function FileRow({
               onStage?.(path);
             }}
           >
-            +
+            <IconPlus size={14} />
           </button>
         )}
         {showUnstage && (
@@ -270,7 +271,7 @@ function FileRow({
               onUnstage?.(path);
             }}
           >
-            −
+            <IconMinus size={14}/>
           </button>
         )}
       </div>
