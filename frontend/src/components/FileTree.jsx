@@ -1,12 +1,17 @@
-import { useCallback } from 'preact/hooks';
+import { useState, useCallback } from 'preact/hooks';
 import { useComputed } from '@preact/signals';
 import { Show } from '@preact/signals/utils';
-import { IconSquarePlus, IconSquareMinus } from '@tabler/icons-preact';
+import {
+  IconSquarePlus,
+  IconSquareMinus,
+  IconChevronRight,
+} from '@tabler/icons-preact';
 import { ChangeTree } from './ChangeTree.jsx';
 import { CommitPanel } from './CommitPanel.jsx';
 
 /**
  * Sidebar file list: PR mode is a single tree; otherwise Conflicts / Staged / Unstaged sections.
+ * Each section collapses independently and scrolls in its own body.
  *
  * @param {Object} props
  * @param {InstanceType<typeof import('../models/workingTree.js').WorkingTreeModel>} props.workingTree
@@ -34,6 +39,10 @@ export function FileTree({
   onUnstageAll,
   onCommit,
 }) {
+  const [conflictsOpen, setConflictsOpen] = useState(true);
+  const [stagedOpen, setStagedOpen] = useState(true);
+  const [unstagedOpen, setUnstagedOpen] = useState(true);
+
   const selectConflict = useCallback(
     (path) => selection.select(path, 'conflict'),
     [selection]
@@ -61,14 +70,18 @@ export function FileTree({
   if (isPRMode) {
     return (
       <div class="file-tree-sidebar">
-        <div class="file-list file-tree-scroll">
-          <SignalChangeTree
-            filesSignal={null}
-            files={prFiles}
-            selection={selection}
-            section="pr"
-            onSelect={selectPR}
-          />
+        <div class="file-sections">
+          <div class="change-section change-section-open">
+            <div class="change-section-body file-tree-scroll">
+              <SignalChangeTree
+                filesSignal={null}
+                files={prFiles}
+                selection={selection}
+                section="pr"
+                onSelect={selectPR}
+              />
+            </div>
+          </div>
         </div>
       </div>
     );
@@ -76,14 +89,15 @@ export function FileTree({
 
   return (
     <div class="file-tree-sidebar">
-      <div class="file-list file-tree-scroll">
+      <div class="file-sections">
         <Show when={hasConflicts}>
           {() => (
-            <>
-              <SectionHeader
-                title="Conflicts"
-                countSignal={conflictsCount}
-              />
+            <ChangeSection
+              title="Conflicts"
+              countSignal={conflictsCount}
+              open={conflictsOpen}
+              onToggle={() => setConflictsOpen((v) => !v)}
+            >
               <SignalChangeTree
                 filesSignal={workingTree.conflicts}
                 selection={selection}
@@ -93,64 +107,67 @@ export function FileTree({
                 showStage
                 onStage={onStage}
               />
-              <div class="divider" />
-            </>
+            </ChangeSection>
           )}
         </Show>
 
-        <SectionHeader
+        <ChangeSection
           title="Staged Changes"
           countSignal={stagedCount}
+          open={stagedOpen}
+          onToggle={() => setStagedOpen((v) => !v)}
           actionTitle="Unstage All"
           actionIcon={<IconSquareMinus size={13} stroke={2} />}
           showAction={hasStaged}
           onAction={onUnstageAll}
-        />
-        <Show
-          when={hasStaged}
-          fallback={<div class="change-section-empty">No staged changes</div>}
         >
-          {() => (
-            <SignalChangeTree
-              filesSignal={workingTree.staged}
-              selection={selection}
-              section="staged"
-              onSelect={selectStaged}
-              flat
-              showUnstage
-              onUnstage={onUnstage}
-            />
-          )}
-        </Show>
+          <Show
+            when={hasStaged}
+            fallback={<div class="change-section-empty">No staged changes</div>}
+          >
+            {() => (
+              <SignalChangeTree
+                filesSignal={workingTree.staged}
+                selection={selection}
+                section="staged"
+                onSelect={selectStaged}
+                flat
+                showUnstage
+                onUnstage={onUnstage}
+              />
+            )}
+          </Show>
+        </ChangeSection>
 
-        <div class="divider" />
-
-        <SectionHeader
+        <ChangeSection
           title="Changes"
           countSignal={unstagedCount}
+          open={unstagedOpen}
+          onToggle={() => setUnstagedOpen((v) => !v)}
           actionTitle="Stage All"
           actionIcon={<IconSquarePlus size={13} stroke={2} />}
           showAction={hasUnstaged}
           onAction={onStageAll}
-        />
-        <Show
-          when={hasUnstaged}
-          fallback={<div class="change-section-empty">No changes</div>}
         >
-          {() => (
-            <SignalChangeTree
-              filesSignal={workingTree.unstaged}
-              selection={selection}
-              section="unstaged"
-              onSelect={selectUnstaged}
-              flat
-              showStage
-              showDiscard
-              onStage={onStage}
-              onDiscard={onDiscard}
-            />
-          )}
-        </Show>
+          <Show
+            when={hasUnstaged}
+            fallback={<div class="change-section-empty">No changes</div>}
+          >
+            {() => (
+              <SignalChangeTree
+                filesSignal={workingTree.unstaged}
+                selection={selection}
+                section="unstaged"
+                onSelect={selectUnstaged}
+                flat
+                showStage
+                showDiscard
+                onStage={onStage}
+                onDiscard={onDiscard}
+              />
+            )}
+          </Show>
+        </ChangeSection>
       </div>
 
       <CommitPanel
@@ -203,26 +220,57 @@ function SignalChangeTree({
  * @param {Object} props
  * @param {string} props.title
  * @param {import('@preact/signals-core').Signal<number>} props.countSignal
+ * @param {boolean} props.open
+ * @param {() => void} props.onToggle
  * @param {string} [props.actionTitle]
  * @param {import('preact').ComponentChildren} [props.actionIcon]
  * @param {import('@preact/signals-core').Signal<boolean>|boolean} [props.showAction]
  * @param {() => void} [props.onAction]
+ * @param {import('preact').ComponentChildren} props.children
  */
-function SectionHeader({
+function ChangeSection({
   title,
   countSignal,
+  open,
+  onToggle,
   actionTitle,
   actionIcon,
   showAction,
   onAction,
+  children,
 }) {
   return (
-    <div class="sg-header change-section-header">
-      <div class="sg-title change-section-title">{title}</div>
-      <div class="sg-actions change-section-actions">
-        {actionIcon && showAction != null && (
-          typeof showAction === 'object' && 'value' in showAction ? (
-            <Show when={showAction}>
+    <section class={`change-section${open ? ' change-section-open' : ' change-section-collapsed'}`}>
+      <div class="sg-header change-section-header">
+        <button
+          type="button"
+          class="change-section-toggle"
+          onClick={onToggle}
+          aria-expanded={open}
+        >
+          <span class={`change-section-chevron${open ? ' open' : ''}`} aria-hidden="true">
+            <IconChevronRight size={12} stroke={1.75} />
+          </span>
+          <span class="sg-title change-section-title">{title}</span>
+        </button>
+        <div class="sg-actions change-section-actions">
+          {actionIcon && showAction != null && (
+            typeof showAction === 'object' && 'value' in showAction ? (
+              <Show when={showAction}>
+                <button
+                  type="button"
+                  class="sg-icon-btn change-section-action"
+                  title={actionTitle}
+                  aria-label={actionTitle}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onAction?.();
+                  }}
+                >
+                  {actionIcon}
+                </button>
+              </Show>
+            ) : showAction ? (
               <button
                 type="button"
                 class="sg-icon-btn change-section-action"
@@ -235,24 +283,12 @@ function SectionHeader({
               >
                 {actionIcon}
               </button>
-            </Show>
-          ) : showAction ? (
-            <button
-              type="button"
-              class="sg-icon-btn change-section-action"
-              title={actionTitle}
-              aria-label={actionTitle}
-              onClick={(e) => {
-                e.stopPropagation();
-                onAction?.();
-              }}
-            >
-              {actionIcon}
-            </button>
-          ) : null
-        )}
-        <span class="sg-count change-section-count">{countSignal}</span>
+            ) : null
+          )}
+          <span class="sg-count change-section-count">{countSignal}</span>
+        </div>
       </div>
-    </div>
+      {open && <div class="change-section-body">{children}</div>}
+    </section>
   );
 }

@@ -65,6 +65,14 @@
   --wails-draggable: no-drag;
 }
 
+/* When the sidebar is closed, sit in the island header band so the dots
+   share a vertical center with the sidebar toggle / file header. */
+.window:has(.sidebar-collapsed) .titlebar {
+  top: 0;
+  left: 18px;
+  height: 44px;
+}
+
 .titlebar .dot {
   width: 12px;
   height: 12px;
@@ -128,6 +136,10 @@
 /* Clear traffic lights when the island is full-bleed */
 .window-body.sidebar-collapsed .island-header {
   padding-left: 72px;
+}
+
+.window-body.sidebar-collapsed .diffs-header-sidebar-toggle {
+  margin-left: 72px;
 }
 
 .sidebar-project {
@@ -276,13 +288,21 @@
   color: var(--text);
 }
 
-/* File list */
+/* File list — sections share height; each body scrolls on its own */
 
 .file-tree-sidebar {
   display: flex;
   flex-direction: column;
   flex: 1;
   min-height: 0;
+}
+
+.file-sections {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
 
 .file-list,
@@ -292,18 +312,66 @@
   min-height: 0;
 }
 
+.change-section {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+
+.change-section-open {
+  flex: 1 1 0;
+}
+
+.change-section-collapsed {
+  flex: 0 0 auto;
+}
+
 .sg-header,
 .change-section-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 10px 12px 6px;
-  position: sticky;
-  top: 0;
-  z-index: 2;
-  background: color-mix(in srgb, var(--card-bg) 35%, transparent);
-  backdrop-filter: blur(24px);
-  -webkit-backdrop-filter: blur(24px);
+  padding: 8px 12px 6px;
+  flex-shrink: 0;
+  background: transparent;
+}
+
+.change-section-toggle {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  border: none;
+  background: transparent;
+  color: var(--grey);
+  font-family: inherit;
+  cursor: pointer;
+  padding: 2px 4px 2px 0;
+  border-radius: 4px;
+  text-align: left;
+}
+
+.change-section-toggle:hover {
+  color: var(--text);
+}
+
+.change-section-chevron {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 12px;
+  height: 12px;
+  flex-shrink: 0;
+  line-height: 1;
+  transform: rotate(0deg);
+  transition: transform 0.12s ease;
+  color: var(--grey);
+}
+
+.change-section-chevron.open {
+  transform: rotate(90deg);
 }
 
 .sg-title,
@@ -312,7 +380,10 @@
   font-weight: 600;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: var(--grey);
+  color: inherit;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .sg-count,
@@ -330,6 +401,7 @@
   display: flex;
   align-items: center;
   gap: 6px;
+  flex-shrink: 0;
 }
 
 .sg-icon-btn,
@@ -360,14 +432,12 @@
   stroke: currentColor;
 }
 
-.change-section {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-}
-
 .change-section-body {
+  flex: 1;
+  min-height: 0;
   min-width: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
 }
 
 .change-section-empty {
@@ -380,6 +450,7 @@
   height: 1px;
   background: var(--light-grey);
   margin: 10px 0;
+  flex-shrink: 0;
 }
 
 /* File rows */
@@ -719,10 +790,11 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 10px 14px;
+  padding: 0 14px;
   border-bottom: 1px solid var(--light-grey);
   --wails-draggable: drag;
   min-height: 44px;
+  height: 44px;
   box-sizing: border-box;
 }
 
@@ -734,7 +806,7 @@
 .sidebar-toggle {
   width: 28px;
   height: 28px;
-  display: flex;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
   border: none;
@@ -756,11 +828,13 @@
 .sidebar-toggle svg {
   width: 16px;
   height: 16px;
+  display: block;
 }
 
 /* Toggle injected into Pierre's file header via renderHeaderPrefix */
 .diffs-header-sidebar-toggle {
   margin-right: 4px;
+  vertical-align: middle;
 }
 
 .app-main {
