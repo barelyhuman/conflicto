@@ -7,7 +7,6 @@ import { WorkingTreeModel } from './models/workingTree.js';
 import { SelectionModel } from './models/selection.js';
 import { ThemeProvider } from './theme/ThemeProvider.jsx';
 import { EditProvider } from './components/EditProvider.jsx';
-import { PRPicker } from './components/PRPicker.jsx';
 import { FileTree } from './components/FileTree.jsx';
 import { DiffViewer } from './components/DiffViewer.jsx';
 import { ConflictViewer } from './components/ConflictViewer.jsx';
@@ -19,7 +18,7 @@ import { PRCheckoutPrompt } from './components/PRCheckoutPrompt.jsx';
 import { CreatePRModal } from './components/CreatePRModal.jsx';
 import { TerminalDock, isTerminalFocusTarget } from './components/terminal/TerminalDock.jsx';
 import { SidebarActions } from './components/SidebarActions.jsx';
-import { SidebarToggle } from './components/SidebarToggle.jsx';
+import { IslandHeader } from './components/IslandHeader.jsx';
 
 /** Stable empty list so FileTree does not remount on unrelated App re-renders. */
 const EMPTY_FILES = [];
@@ -168,6 +167,7 @@ export function App() {
         setCreatePROpen(false);
       },
       onError: (data) => {
+        selectionRef.current.diffLoading.value = false;
         const toast = {
           id: Date.now().toString(),
           title: data?.title ?? 'Error',
@@ -305,13 +305,11 @@ export function App() {
 
   const handleViewPRDiff = useCallback((pr) => {
     setPrPrompt(null);
+    // Clear selection before entering PR mode so the diff-fetch effect does not
+    // call GetPRFileDiff with a stale working-tree path against an empty cache.
+    selection.clear();
     setActivePRBoth(pr.number);
-    if (pr.files && pr.files.length > 0) {
-      selection.select(pr.files[0].path, 'pr');
-    } else {
-      selection.clear();
-      api.getPRFiles(pr.number);
-    }
+    api.getPRFiles(pr.number);
   }, [selection, setActivePRBoth]);
 
   const handleCheckoutPRLocal = useCallback((pr) => {
@@ -441,22 +439,6 @@ export function App() {
                     onSwitchProject={handleSwitchProject}
                     onOpenProject={handleOpenProject}
                   />
-                  <div class="sidebar-project-actions">
-                    <button
-                      type="button"
-                      class="create-pr-trigger"
-                      onClick={() => setCreatePROpen(true)}
-                      title="Create PR"
-                    >
-                      +PR
-                    </button>
-                    <PRPicker
-                      selectedPR={activePR}
-                      currentPR={currentPR}
-                      onSelect={handleSelectPR}
-                      onError={pushToast}
-                    />
-                  </div>
                 </div>
 
                 <SidebarActions
@@ -488,19 +470,20 @@ export function App() {
               <div class="content-well">
                 <div class="content">
                   <main class="app-main">
+                    <IslandHeader
+                      sidebarOpen={sidebarOpen}
+                      onToggleSidebar={() => setSidebarOpen((open) => !open)}
+                      activeFile={selection.activeFile}
+                      selectedPR={activePR}
+                      currentPR={currentPR}
+                      onSelectPR={handleSelectPR}
+                      onError={pushToast}
+                      onCreatePR={() => setCreatePROpen(true)}
+                    />
                     <Show
-                      when={selection.activeDiff}
+                      when={selection.activeFile}
                       fallback={
-                        <>
-                          <div class="island-header">
-                            <SidebarToggle
-                              open={sidebarOpen}
-                              onToggle={() => setSidebarOpen((open) => !open)}
-                            />
-                            <div class="island-header-spacer" />
-                          </div>
-                          <div class="diff-empty">Select a file to view changes</div>
-                        </>
+                        <div class="diff-empty">Select a file to view changes</div>
                       }
                     >
                       {() => (
@@ -509,19 +492,17 @@ export function App() {
                           fallback={
                             <DiffViewer
                               activeDiff={selection.activeDiff}
+                              loading={selection.diffLoading}
                               isPRMode={isPRMode}
                               isUnstaged={selection.isUnstaged}
                               comments={isPRMode ? prComments : []}
                               onPostComment={handlePostComment}
-                              sidebarOpen={sidebarOpen}
-                              onToggleSidebar={() => setSidebarOpen((open) => !open)}
                             />
                           }
                         >
                           <ConflictViewer
                             activeDiff={selection.activeDiff}
-                            sidebarOpen={sidebarOpen}
-                            onToggleSidebar={() => setSidebarOpen((open) => !open)}
+                            loading={selection.diffLoading}
                           />
                         </Show>
                       )}

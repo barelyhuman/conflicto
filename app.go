@@ -565,17 +565,6 @@ func (a *App) GetPRFiles(number int) error {
 		return err
 	}
 
-	cmd := exec.Command("gh", "api", fmt.Sprintf("repos/%s/pulls/%d/files", slug, number))
-	cmd.Dir = a.git.path
-	out, err := cmd.Output()
-	if err != nil {
-		a.EmitEvent("error", map[string]string{
-			"title":   "PR Files Error",
-			"message": fmt.Sprintf("Failed to fetch files for PR #%d", number),
-		})
-		return err
-	}
-
 	var apiFiles []struct {
 		Filename  string `json:"filename"`
 		Status    string `json:"status"`
@@ -583,12 +572,46 @@ func (a *App) GetPRFiles(number int) error {
 		Deletions int    `json:"deletions"`
 		Patch     string `json:"patch"`
 	}
-	if err := json.Unmarshal(out, &apiFiles); err != nil {
-		a.EmitEvent("error", map[string]string{
-			"title":   "PR Files Parse Error",
-			"message": err.Error(),
-		})
-		return err
+
+	// GitHub paginates at 30 by default (max 100); walk pages until exhausted.
+	const perPage = 100
+	for page := 1; ; page++ {
+		cmd := exec.Command(
+			"gh", "api",
+			fmt.Sprintf("repos/%s/pulls/%d/files?per_page=%d&page=%d", slug, number, perPage, page),
+		)
+		cmd.Dir = a.git.path
+		out, err := cmd.Output()
+		if err != nil {
+			a.EmitEvent("error", map[string]string{
+				"title":   "PR Files Error",
+				"message": fmt.Sprintf("Failed to fetch files for PR #%d", number),
+			})
+			return err
+		}
+
+		var pageFiles []struct {
+			Filename  string `json:"filename"`
+			Status    string `json:"status"`
+			Additions int    `json:"additions"`
+			Deletions int    `json:"deletions"`
+			Patch     string `json:"patch"`
+		}
+		if err := json.Unmarshal(out, &pageFiles); err != nil {
+			a.EmitEvent("error", map[string]string{
+				"title":   "PR Files Parse Error",
+				"message": err.Error(),
+			})
+			return err
+		}
+		apiFiles = append(apiFiles, pageFiles...)
+		if len(pageFiles) < perPage {
+			break
+		}
+		// GitHub caps list-files at 3000 entries.
+		if len(apiFiles) >= 3000 {
+			break
+		}
 	}
 
 	files := make([]PRFile, 0, len(apiFiles))
@@ -643,16 +666,36 @@ func (a *App) GetPRFileDiff(number int, path string) error {
 			"title":   "PR Diff Error",
 			"message": fmt.Sprintf("PR #%d not loaded. Fetch files first.", number),
 		})
+		// Clear the frontend loading state even on failure.
+		a.EmitEvent("diffLoaded", &FileDiff{Path: path, Patch: ""})
 		return fmt.Errorf("PR #%d not cached", number)
 	}
 
 	for _, f := range cache.Files {
 		if f.Path == path {
-			parsed, err := ParseUnifiedDiff([]byte(f.Patch))
+			// Empty patch: GitHub omits it for binary / oversized files. Still emit
+			// so the UI can leave the loading state with a clear empty message.
+			if f.Patch == "" {
+				a.EmitEvent("diffLoaded", &FileDiff{
+					Path:   f.Path,
+					Status: f.Status,
+					Patch:  "",
+				})
+				return nil
+			}
+
+			patch := normalizeGitHubPatch(f.Path, f.Status, f.Patch)
+
+			parsed, err := ParseUnifiedDiff([]byte(patch))
 			if err != nil {
 				a.EmitEvent("error", map[string]string{
 					"title":   "Diff Parse Error",
 					"message": err.Error(),
+				})
+				a.EmitEvent("diffLoaded", &FileDiff{
+					Path:   f.Path,
+					Status: f.Status,
+					Patch:  "",
 				})
 				return err
 			}
@@ -664,7 +707,7 @@ func (a *App) GetPRFileDiff(number int, path string) error {
 				Deletions: parsed.Deletions,
 				Lines:     parsed.Lines,
 				Hunks:     parsed.Hunks,
-				Patch:     f.Patch,
+				Patch:     patch,
 			})
 			return nil
 		}
@@ -674,7 +717,43 @@ func (a *App) GetPRFileDiff(number int, path string) error {
 		"title":   "PR Diff Error",
 		"message": fmt.Sprintf("File %s not found in PR #%d", path, number),
 	})
+	a.EmitEvent("diffLoaded", &FileDiff{Path: path, Patch: ""})
 	return fmt.Errorf("file %s not found in PR #%d", path, number)
+}
+
+// normalizeGitHubPatch wraps a GitHub pull-files "patch" (often hunk-only) in a
+// synthetic unified diff header so Pierre processFile({ isGitDiff: true }) can parse it.
+func normalizeGitHubPatch(path, status, patch string) string {
+	if strings.HasPrefix(patch, "diff --git") {
+		return patch
+	}
+
+	oldPath := "a/" + path
+	newPath := "b/" + path
+	switch strings.ToUpper(status) {
+	case "A", "ADDED":
+		oldPath = "/dev/null"
+	case "D", "REMOVED", "DELETED":
+		newPath = "/dev/null"
+	}
+
+	var b strings.Builder
+	b.WriteString("diff --git a/")
+	b.WriteString(path)
+	b.WriteString(" b/")
+	b.WriteString(path)
+	b.WriteByte('\n')
+	b.WriteString("--- ")
+	b.WriteString(oldPath)
+	b.WriteByte('\n')
+	b.WriteString("+++ ")
+	b.WriteString(newPath)
+	b.WriteByte('\n')
+	b.WriteString(patch)
+	if !strings.HasSuffix(patch, "\n") {
+		b.WriteByte('\n')
+	}
+	return b.String()
 }
 
 // InvalidatePRCache resets all PR cache timestamps so the next fetch hits the API

@@ -1,5 +1,6 @@
-import { useState, useRef, useEffect } from 'preact/hooks';
+import { useState, useRef } from 'preact/hooks';
 import { IconChevronDown } from '@tabler/icons-preact';
+import { AnchoredMenu } from './AnchoredMenu.jsx';
 
 /**
  * @param {Object} props
@@ -21,19 +22,7 @@ export function BranchPicker({
   remoteBranches = [],
 }) {
   const [open, setOpen] = useState(false);
-  const ref = useRef(null);
-
-  useEffect(() => {
-    function onClick(e) {
-      if (ref.current && !ref.current.contains(e.target)) {
-        setOpen(false);
-      }
-    }
-    if (open) {
-      document.addEventListener('mousedown', onClick);
-      return () => document.removeEventListener('mousedown', onClick);
-    }
-  }, [open]);
+  const triggerRef = useRef(null);
 
   function select(branch) {
     onSelect?.(branch);
@@ -49,8 +38,9 @@ export function BranchPicker({
     .join(' ');
 
   return (
-    <div class="branch-picker" ref={ref}>
+    <div class="branch-picker">
       <button
+        ref={triggerRef}
         type="button"
         class={triggerClass}
         onClick={() => setOpen(!open)}
@@ -62,36 +52,42 @@ export function BranchPicker({
         {!pill && <IconChevronDown size={10} class={open ? 'open' : ''} />}
       </button>
 
-      {open && (
-        <div class="branch-dropdown">
-          <div class="branch-group">
-            <div class="branch-group-label">Local</div>
-            {localBranches.map((b) => (
-              <button
-                key={b}
-                type="button"
-                class={`branch-option${currentBranch === b ? ' active' : ''}`}
-                onClick={() => select(b)}
-              >
-                {b}
-              </button>
-            ))}
-          </div>
-          <div class="branch-group">
-            <div class="branch-group-label">Remote</div>
-            {remoteBranches.map((b) => (
-              <button
-                key={b}
-                type="button"
-                class={`branch-option${currentBranch === b ? ' active' : ''}`}
-                onClick={() => select(b)}
-              >
-                {b}
-              </button>
-            ))}
-          </div>
+      <AnchoredMenu
+        open={open}
+        onClose={() => setOpen(false)}
+        anchorRef={triggerRef}
+        placement="bottom"
+        alignment="start"
+        offset={4}
+        className="branch-dropdown"
+      >
+        <div class="branch-group">
+          <div class="branch-group-label">Local</div>
+          {localBranches.map((b) => (
+            <button
+              key={b}
+              type="button"
+              class={`branch-option${currentBranch === b ? ' active' : ''}`}
+              onClick={() => select(b)}
+            >
+              {b}
+            </button>
+          ))}
         </div>
-      )}
+        <div class="branch-group">
+          <div class="branch-group-label">Remote</div>
+          {remoteBranches.map((b) => (
+            <button
+              key={b}
+              type="button"
+              class={`branch-option${currentBranch === b ? ' active' : ''}`}
+              onClick={() => select(b)}
+            >
+              {b}
+            </button>
+          ))}
+        </div>
+      </AnchoredMenu>
 
       <style>{`
         .branch-picker {
@@ -141,19 +137,9 @@ export function BranchPicker({
           text-overflow: ellipsis;
           white-space: nowrap;
         }
-        .branch-dropdown {
-          position: absolute;
-          top: calc(100% + 4px);
-          left: 0;
+        .anchored-menu.branch-dropdown {
           min-width: 220px;
           max-width: 280px;
-          max-height: 40vh;
-          overflow-y: auto;
-          background: var(--card-bg);
-          border: 1px solid var(--light-grey);
-          border-radius: 8px;
-          box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
-          z-index: 100;
           padding: 4px;
           display: flex;
           flex-direction: column;

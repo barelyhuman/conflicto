@@ -1,5 +1,6 @@
-import { useState, useRef, useEffect } from 'preact/hooks';
+import { useState, useRef } from 'preact/hooks';
 import { IconChevronDown, IconFolder } from '@tabler/icons-preact';
+import { AnchoredMenu } from './AnchoredMenu.jsx';
 
 /**
  * @param {Object} props
@@ -11,19 +12,7 @@ import { IconChevronDown, IconFolder } from '@tabler/icons-preact';
  */
 export function ProjectPicker({ currentName, currentPath, recents, onSwitchProject, onOpenProject }) {
   const [open, setOpen] = useState(false);
-  const ref = useRef(null);
-
-  useEffect(() => {
-    function onClick(e) {
-      if (ref.current && !ref.current.contains(e.target)) {
-        setOpen(false);
-      }
-    }
-    if (open) {
-      document.addEventListener('mousedown', onClick);
-      return () => document.removeEventListener('mousedown', onClick);
-    }
-  }, [open]);
+  const triggerRef = useRef(null);
 
   function select(path) {
     onSwitchProject?.(path);
@@ -38,8 +27,9 @@ export function ProjectPicker({ currentName, currentPath, recents, onSwitchProje
   const displayName = currentName || 'No project';
 
   return (
-    <div class="project-picker" ref={ref}>
+    <div class="project-picker">
       <button
+        ref={triggerRef}
         type="button"
         class="project-trigger"
         onClick={() => setOpen(!open)}
@@ -50,42 +40,48 @@ export function ProjectPicker({ currentName, currentPath, recents, onSwitchProje
         <IconChevronDown size={10} class={open ? 'open' : ''} />
       </button>
 
-      {open && (
-        <div class="project-dropdown">
-          {recents.length > 0 && (
-            <div class="project-group">
-              {recents.map((p) => (
-                <button
-                  key={p.path}
-                  type="button"
-                  class={`project-option${p.path === currentPath ? ' active' : ''}`}
-                  onClick={() => select(p.path)}
-                  title={p.path}
-                >
-                  <IconFolder size={14} />
-                  <span class="project-option-info">
-                    <span class="project-option-name">{p.name}</span>
-                    <span class="project-option-path">{p.path}</span>
-                  </span>
-                </button>
-              ))}
-            </div>
-          )}
+      <AnchoredMenu
+        open={open}
+        onClose={() => setOpen(false)}
+        anchorRef={triggerRef}
+        placement="bottom"
+        alignment="start"
+        offset={6}
+        className="project-dropdown"
+      >
+        {recents.length > 0 && (
+          <div class="project-group">
+            {recents.map((p) => (
+              <button
+                key={p.path}
+                type="button"
+                class={`project-option${p.path === currentPath ? ' active' : ''}`}
+                onClick={() => select(p.path)}
+                title={p.path}
+              >
+                <IconFolder size={14} />
+                <span class="project-option-info">
+                  <span class="project-option-name">{p.name}</span>
+                  <span class="project-option-path">{p.path}</span>
+                </span>
+              </button>
+            ))}
+          </div>
+        )}
 
-          <div class="project-divider" />
+        <div class="project-divider" />
 
-          <button
-            type="button"
-            class="project-option project-option-open"
-            onClick={openFolder}
-          >
-            <IconFolder size={14} />
-            <span class="project-option-info">
-              <span class="project-option-name">Open Other Folder...</span>
-            </span>
-          </button>
-        </div>
-      )}
+        <button
+          type="button"
+          class="project-option project-option-open"
+          onClick={openFolder}
+        >
+          <IconFolder size={14} />
+          <span class="project-option-info">
+            <span class="project-option-name">Open Other Folder...</span>
+          </span>
+        </button>
+      </AnchoredMenu>
 
       <style>{`
         .project-picker {
@@ -124,19 +120,9 @@ export function ProjectPicker({ currentName, currentPath, recents, onSwitchProje
           text-overflow: ellipsis;
           white-space: nowrap;
         }
-        .project-dropdown {
-          position: absolute;
-          top: calc(100% + 6px);
-          left: 0;
+        .anchored-menu.project-dropdown {
           min-width: 280px;
           max-width: 360px;
-          max-height: 40vh;
-          overflow-y: auto;
-          background: var(--surface-raised);
-          border: 1px solid var(--border);
-          border-radius: 8px;
-          box-shadow: 0 8px 24px rgba(0,0,0,0.4);
-          z-index: 100;
           padding: 4px;
           display: flex;
           flex-direction: column;

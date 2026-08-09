@@ -76,10 +76,6 @@
   padding-left: 78px;
 }
 
-.app-shell.macos .window-body.sidebar-collapsed .diffs-header-sidebar-toggle {
-  margin-left: 78px;
-}
-
 /* Fullscreen hides system traffic lights — revert clearance */
 .app-shell.macos.macos-fullscreen .sidebar {
   padding-top: 12px;
@@ -87,10 +83,6 @@
 
 .app-shell.macos.macos-fullscreen .window-body.sidebar-collapsed .island-header {
   padding-left: 0;
-}
-
-.app-shell.macos.macos-fullscreen .window-body.sidebar-collapsed .diffs-header-sidebar-toggle {
-  margin-left: 0;
 }
 
 .sidebar-project {
@@ -104,13 +96,6 @@
 .sidebar-project .project-picker {
   flex: 1;
   min-width: 0;
-}
-
-.sidebar-project-actions {
-  display: flex;
-  align-items: center;
-  gap: 2px;
-  flex-shrink: 0;
 }
 
 .actions-row {
@@ -754,6 +739,43 @@
   min-width: 0;
 }
 
+.island-header-file {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  overflow: hidden;
+}
+
+.island-header-filename {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex-shrink: 0;
+  max-width: 60%;
+}
+
+.island-header-dir {
+  font-size: 11px;
+  color: var(--grey);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+.island-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex-shrink: 0;
+  --wails-draggable: no-drag;
+}
+
 .sidebar-toggle {
   width: 28px;
   height: 28px;
@@ -782,13 +804,6 @@
   display: block;
 }
 
-/* Toggle injected into Pierre's file header via renderHeaderPrefix */
-.diffs-header-sidebar-toggle {
-  margin-right: 4px;
-  vertical-align: middle;
-  --wails-draggable: no-drag;
-}
-
 .app-main {
   flex: 1;
   min-height: 0;
@@ -796,24 +811,6 @@
   display: flex;
   flex-direction: column;
   background: transparent;
-}
-
-/* Monochrome Pierre header stats (override any hue) */
-.diff-viewer-wrapper [data-diffs-header],
-.conflict-viewer-wrapper [data-diffs-header] {
-  color: var(--text);
-  /* File header is a window drag region (needed when the sidebar is closed). */
-  --wails-draggable: drag;
-  cursor: default;
-}
-
-.diff-viewer-wrapper [data-diffs-header] button,
-.diff-viewer-wrapper [data-diffs-header] a,
-.diff-viewer-wrapper [data-diffs-header] input,
-.conflict-viewer-wrapper [data-diffs-header] button,
-.conflict-viewer-wrapper [data-diffs-header] a,
-.conflict-viewer-wrapper [data-diffs-header] input {
-  --wails-draggable: no-drag;
 }
 
 .diff-viewer-wrapper {
@@ -864,8 +861,8 @@
   white-space: nowrap;
 }
 
-/* PR picker compact next to project */
-.sidebar-project-actions .pr-picker .pr-trigger {
+/* PR picker compact in island header */
+.island-header-actions .pr-picker .pr-trigger {
   height: 24px;
   padding: 0 6px;
   font-size: 11px;
@@ -875,7 +872,7 @@
   color: var(--grey);
 }
 
-.sidebar-project-actions .pr-picker .pr-trigger:hover {
+.island-header-actions .pr-picker .pr-trigger:hover {
   background: rgba(127, 127, 127, 0.14);
   color: var(--text);
 }

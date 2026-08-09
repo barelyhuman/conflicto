@@ -3,7 +3,7 @@ import { BranchPicker } from './BranchPicker.jsx';
 
 /**
  * Sidebar actions row: branch pill + pull/push with presence badges.
- * Keep this row uncrowded — PR controls live with the project picker.
+ * PR controls live in the content island header.
  *
  * @param {Object} props
  * @param {string} props.currentBranch
