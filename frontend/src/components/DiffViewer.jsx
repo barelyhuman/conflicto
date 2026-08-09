@@ -2,6 +2,7 @@ import { useMemo } from 'preact/hooks';
 import { FileDiff } from '@pierre/diffs/react';
 import { processFile } from '@pierre/diffs';
 import { useTheme } from '../theme/ThemeProvider.jsx';
+import { SidebarToggle } from './SidebarToggle.jsx';
 
 /**
  * @param {Object} props
@@ -10,14 +11,18 @@ import { useTheme } from '../theme/ThemeProvider.jsx';
  * @param {import('@preact/signals-core').ReadonlySignal<boolean>|boolean} props.isUnstaged
  * @param {{ path: string, line: number, body: string, user: { login: string } }[]} props.comments
  * @param {(path: string, body: string, line: number, side: string) => void} [props.onPostComment]
+ * @param {boolean} [props.sidebarOpen]
+ * @param {() => void} [props.onToggleSidebar]
  */
 export function DiffViewer({
   activeDiff,
   isPRMode = false,
   isUnstaged = false,
   comments = [],
+  sidebarOpen = true,
+  onToggleSidebar,
 }) {
-  const { theme } = useTheme();
+  const { theme, themeType } = useTheme();
   const diff = activeDiff.value;
   const patch = diff?.patch;
   const filename = diff?.path ?? '';
@@ -71,12 +76,23 @@ export function DiffViewer({
         edit={unstaged}
         options={{
           theme,
-          themeType: 'dark',
+          themeType: themeType === 'light' ? 'light' : 'dark',
           diffStyle: 'unified',
           overflow: 'wrap',
           disableFileHeader: false,
           stickyHeader: true,
         }}
+        renderHeaderPrefix={
+          onToggleSidebar
+            ? () => (
+                <SidebarToggle
+                  open={sidebarOpen}
+                  onToggle={onToggleSidebar}
+                  className="diffs-header-sidebar-toggle"
+                />
+              )
+            : undefined
+        }
         lineAnnotations={lineAnnotations}
       />
       <style>{`

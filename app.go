@@ -85,7 +85,8 @@ func (a *App) startup(ctx context.Context) {
 
 // domReady is called after the frontend has loaded
 func (a *App) domReady(ctx context.Context) {
-	// Frontend is ready to receive events
+	// Native mask: round the vibrancy + webview layers so frost and radius coexist.
+	applyMacWindowCornerRadius(16)
 }
 
 // shutdown is called at application termination

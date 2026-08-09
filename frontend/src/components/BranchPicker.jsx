@@ -5,11 +5,21 @@ import { IconChevronDown } from '@tabler/icons-preact';
  * @param {Object} props
  * @param {(branch: string) => void} props.onSelect
  * @param {string} props.currentBranch
- * @param {boolean} props.compact
+ * @param {boolean} [props.compact]
+ * @param {boolean} [props.pill] - monochrome island pill style for sidebar
+ * @param {import('preact').ComponentChildren} [props.icon]
  * @param {string[]} props.localBranches
  * @param {string[]} props.remoteBranches
  */
-export function BranchPicker({ onSelect, currentBranch, compact, localBranches = [], remoteBranches = [] }) {
+export function BranchPicker({
+  onSelect,
+  currentBranch,
+  compact,
+  pill,
+  icon,
+  localBranches = [],
+  remoteBranches = [],
+}) {
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
 
@@ -30,20 +40,30 @@ export function BranchPicker({ onSelect, currentBranch, compact, localBranches =
     setOpen(false);
   }
 
+  const triggerClass = [
+    'branch-trigger',
+    compact ? 'compact' : '',
+    pill ? 'pill' : '',
+  ]
+    .filter(Boolean)
+    .join(' ');
+
   return (
     <div class="branch-picker" ref={ref}>
       <button
         type="button"
-        class={`branch-trigger${compact ? ' compact' : ''}`}
+        class={triggerClass}
         onClick={() => setOpen(!open)}
         aria-expanded={open}
+        title={currentBranch || 'main'}
       >
+        {icon}
         <span class="branch-current">{currentBranch || 'main'}</span>
-        <IconChevronDown size={10} class={open ? 'open' : ''} />
+        {!pill && <IconChevronDown size={10} class={open ? 'open' : ''} />}
       </button>
 
       {open && (
-        <div class={`branch-dropdown${compact ? ' placement-top' : ''}`}>
+        <div class="branch-dropdown">
           <div class="branch-group">
             <div class="branch-group-label">Local</div>
             {localBranches.map((b) => (
@@ -77,6 +97,7 @@ export function BranchPicker({ onSelect, currentBranch, compact, localBranches =
         .branch-picker {
           position: relative;
           display: inline-block;
+          min-width: 0;
         }
         .branch-trigger {
           display: flex;
@@ -85,7 +106,7 @@ export function BranchPicker({ onSelect, currentBranch, compact, localBranches =
           padding: 5px 10px;
           border-radius: 6px;
           border: none;
-          background: var(--surface-raised);
+          background: var(--card-bg);
           color: var(--text);
           font-family: var(--font-mono);
           font-size: 12px;
@@ -93,9 +114,9 @@ export function BranchPicker({ onSelect, currentBranch, compact, localBranches =
           transition: background 0.15s;
         }
         .branch-trigger:hover {
-          background: var(--accent-hover);
+          background: rgba(127, 127, 127, 0.16);
         }
-        .branch-trigger.compact {
+        .branch-trigger.compact:not(.pill) {
           border: none;
           background: transparent;
           padding: 0 10px;
@@ -103,18 +124,19 @@ export function BranchPicker({ onSelect, currentBranch, compact, localBranches =
           border-radius: 0;
           gap: 6px;
         }
-        .branch-trigger.compact:hover {
-          background: var(--accent-hover);
+        .branch-trigger.compact:not(.pill):hover {
+          background: rgba(127, 127, 127, 0.14);
         }
         .branch-trigger svg {
           transition: transform 0.15s;
-          color: var(--text-muted);
+          color: var(--grey);
+          flex-shrink: 0;
         }
         .branch-trigger svg.open {
           transform: rotate(180deg);
         }
         .branch-current {
-          max-width: 160px;
+          max-width: 120px;
           overflow: hidden;
           text-overflow: ellipsis;
           white-space: nowrap;
@@ -122,26 +144,20 @@ export function BranchPicker({ onSelect, currentBranch, compact, localBranches =
         .branch-dropdown {
           position: absolute;
           top: calc(100% + 4px);
-          right: 0;
+          left: 0;
           min-width: 220px;
           max-width: 280px;
           max-height: 40vh;
           overflow-y: auto;
-          background: var(--surface-raised);
-          border: none;
+          background: var(--card-bg);
+          border: 1px solid var(--light-grey);
           border-radius: 8px;
-          box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+          box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
           z-index: 100;
           padding: 4px;
           display: flex;
           flex-direction: column;
           gap: 2px;
-        }
-        .branch-dropdown.placement-top {
-          top: auto;
-          bottom: calc(100% + 4px);
-          left: 0;
-          right: auto;
         }
         .branch-group-label {
           padding: 6px 10px 4px;
@@ -149,7 +165,7 @@ export function BranchPicker({ onSelect, currentBranch, compact, localBranches =
           font-weight: 600;
           text-transform: uppercase;
           letter-spacing: 0.08em;
-          color: var(--text-muted);
+          color: var(--grey);
         }
         .branch-option {
           width: 100%;
@@ -168,11 +184,11 @@ export function BranchPicker({ onSelect, currentBranch, compact, localBranches =
           white-space: nowrap;
         }
         .branch-option:hover {
-          background: var(--accent-bg);
+          background: rgba(127, 127, 127, 0.12);
         }
         .branch-option.active {
-          color: var(--text-h);
-          background: var(--accent-bg);
+          color: var(--text);
+          background: rgba(127, 127, 127, 0.16);
         }
       `}</style>
     </div>

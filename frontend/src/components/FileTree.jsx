@@ -1,13 +1,9 @@
-import { useState, useCallback } from 'preact/hooks';
+import { useCallback } from 'preact/hooks';
 import { useComputed } from '@preact/signals';
 import { Show } from '@preact/signals/utils';
-import { IconChevronRight } from '@tabler/icons-preact';
+import { IconSquarePlus, IconSquareMinus } from '@tabler/icons-preact';
 import { ChangeTree } from './ChangeTree.jsx';
 import { CommitPanel } from './CommitPanel.jsx';
-
-/**
- * @typedef {'conflict' | 'staged' | 'unstaged' | 'pr'} FileSection
- */
 
 /**
  * Sidebar file list: PR mode is a single tree; otherwise Conflicts / Staged / Unstaged sections.
@@ -17,6 +13,7 @@ import { CommitPanel } from './CommitPanel.jsx';
  * @param {InstanceType<typeof import('../models/selection.js').SelectionModel>} props.selection
  * @param {{ path: string, status: string }[]} props.prFiles
  * @param {boolean} props.isPRMode
+ * @param {string} [props.currentBranch]
  * @param {(path: string) => void} [props.onStage]
  * @param {(path: string) => void} [props.onUnstage]
  * @param {(path: string) => void} [props.onDiscard]
@@ -29,6 +26,7 @@ export function FileTree({
   selection,
   prFiles,
   isPRMode,
+  currentBranch = 'main',
   onStage,
   onUnstage,
   onDiscard,
@@ -36,10 +34,6 @@ export function FileTree({
   onUnstageAll,
   onCommit,
 }) {
-  const [conflictsOpen, setConflictsOpen] = useState(true);
-  const [stagedOpen, setStagedOpen] = useState(true);
-  const [unstagedOpen, setUnstagedOpen] = useState(true);
-
   const selectConflict = useCallback(
     (path) => selection.select(path, 'conflict'),
     [selection]
@@ -67,7 +61,7 @@ export function FileTree({
   if (isPRMode) {
     return (
       <div class="file-tree-sidebar">
-        <div class="file-tree-scroll">
+        <div class="file-list file-tree-scroll">
           <SignalChangeTree
             filesSignal={null}
             files={prFiles}
@@ -82,15 +76,14 @@ export function FileTree({
 
   return (
     <div class="file-tree-sidebar">
-      <div class="file-tree-scroll">
+      <div class="file-list file-tree-scroll">
         <Show when={hasConflicts}>
           {() => (
-            <ChangeSection
-              title="Conflicts"
-              countSignal={conflictsCount}
-              open={conflictsOpen}
-              onToggle={() => setConflictsOpen((v) => !v)}
-            >
+            <>
+              <SectionHeader
+                title="Conflicts"
+                countSignal={conflictsCount}
+              />
               <SignalChangeTree
                 filesSignal={workingTree.conflicts}
                 selection={selection}
@@ -100,91 +93,71 @@ export function FileTree({
                 showStage
                 onStage={onStage}
               />
-            </ChangeSection>
+              <div class="divider" />
+            </>
           )}
         </Show>
 
-        <section class="change-section change-section-staged">
-          <div class="change-section-header">
-            <button
-              type="button"
-              class="change-section-toggle"
-              onClick={() => setStagedOpen((v) => !v)}
-              aria-expanded={stagedOpen}
-            >
-              <span class={`change-section-chevron${stagedOpen ? ' open' : ''}`} aria-hidden="true">
-                <IconChevronRight size={12} stroke={1.75} />
-              </span>
-              <span class="change-section-title">Staged Changes</span>
-              <span class="change-section-count">{stagedCount}</span>
-            </button>
-            <Show when={hasStaged}>
-              <button
-                type="button"
-                class="change-section-action"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onUnstageAll?.();
-                }}
-              >
-                Unstage All
-              </button>
-            </Show>
-          </div>
-
-          <StagedCommitPanel stagedCount={stagedCount} onCommit={onCommit} />
-
-          {stagedOpen && (
-            <div class="change-section-body">
-              <Show
-                when={hasStaged}
-                fallback={<div class="change-section-empty">No staged changes</div>}
-              >
-                {() => (
-                  <SignalChangeTree
-                    filesSignal={workingTree.staged}
-                    selection={selection}
-                    section="staged"
-                    onSelect={selectStaged}
-                    flat
-                    showUnstage
-                    onUnstage={onUnstage}
-                  />
-                )}
-              </Show>
-            </div>
+        <SectionHeader
+          title="Staged Changes"
+          countSignal={stagedCount}
+          actionTitle="Unstage All"
+          actionIcon={<IconSquareMinus size={13} stroke={2} />}
+          showAction={hasStaged}
+          onAction={onUnstageAll}
+        />
+        <Show
+          when={hasStaged}
+          fallback={<div class="change-section-empty">No staged changes</div>}
+        >
+          {() => (
+            <SignalChangeTree
+              filesSignal={workingTree.staged}
+              selection={selection}
+              section="staged"
+              onSelect={selectStaged}
+              flat
+              showUnstage
+              onUnstage={onUnstage}
+            />
           )}
-        </section>
+        </Show>
 
-        <ChangeSection
+        <div class="divider" />
+
+        <SectionHeader
           title="Changes"
           countSignal={unstagedCount}
-          open={unstagedOpen}
-          onToggle={() => setUnstagedOpen((v) => !v)}
-          actionLabelSignal={hasUnstaged}
-          actionLabel="Stage All"
+          actionTitle="Stage All"
+          actionIcon={<IconSquarePlus size={13} stroke={2} />}
+          showAction={hasUnstaged}
           onAction={onStageAll}
+        />
+        <Show
+          when={hasUnstaged}
+          fallback={<div class="change-section-empty">No changes</div>}
         >
-          <Show
-            when={hasUnstaged}
-            fallback={<div class="change-section-empty">No changes</div>}
-          >
-            {() => (
-              <SignalChangeTree
-                filesSignal={workingTree.unstaged}
-                selection={selection}
-                section="unstaged"
-                onSelect={selectUnstaged}
-                flat
-                showStage
-                showDiscard
-                onStage={onStage}
-                onDiscard={onDiscard}
-              />
-            )}
-          </Show>
-        </ChangeSection>
+          {() => (
+            <SignalChangeTree
+              filesSignal={workingTree.unstaged}
+              selection={selection}
+              section="unstaged"
+              onSelect={selectUnstaged}
+              flat
+              showStage
+              showDiscard
+              onStage={onStage}
+              onDiscard={onDiscard}
+            />
+          )}
+        </Show>
       </div>
+
+      <CommitPanel
+        stagedCount={stagedCount}
+        currentBranch={currentBranch}
+        onCommit={onCommit}
+      />
     </div>
   );
 }
@@ -226,79 +199,60 @@ function SignalChangeTree({
   );
 }
 
-function StagedCommitPanel({ stagedCount, onCommit }) {
-  return <CommitPanel stagedCount={stagedCount.value} onCommit={onCommit} />;
-}
-
 /**
  * @param {Object} props
  * @param {string} props.title
- * @param {number} [props.count]
- * @param {import('@preact/signals-core').Signal<number>} [props.countSignal]
- * @param {boolean} props.open
- * @param {() => void} props.onToggle
- * @param {string|null} [props.actionLabel]
- * @param {import('@preact/signals-core').Signal<boolean>} [props.actionLabelSignal]
+ * @param {import('@preact/signals-core').Signal<number>} props.countSignal
+ * @param {string} [props.actionTitle]
+ * @param {import('preact').ComponentChildren} [props.actionIcon]
+ * @param {import('@preact/signals-core').Signal<boolean>|boolean} [props.showAction]
  * @param {() => void} [props.onAction]
- * @param {import('preact').ComponentChildren} props.children
  */
-function ChangeSection({
+function SectionHeader({
   title,
-  count,
   countSignal,
-  open,
-  onToggle,
-  actionLabel = null,
-  actionLabelSignal,
+  actionTitle,
+  actionIcon,
+  showAction,
   onAction,
-  children,
 }) {
   return (
-    <section class="change-section">
-      <div class="change-section-header">
-        <button
-          type="button"
-          class="change-section-toggle"
-          onClick={onToggle}
-          aria-expanded={open}
-        >
-          <span class={`change-section-chevron${open ? ' open' : ''}`} aria-hidden="true">
-            <IconChevronRight size={12} stroke={1.75} />
-          </span>
-          <span class="change-section-title">{title}</span>
-          <span class="change-section-count">
-            {countSignal != null ? countSignal : count}
-          </span>
-        </button>
-        {actionLabelSignal != null ? (
-          <Show when={actionLabelSignal}>
+    <div class="sg-header change-section-header">
+      <div class="sg-title change-section-title">{title}</div>
+      <div class="sg-actions change-section-actions">
+        {actionIcon && showAction != null && (
+          typeof showAction === 'object' && 'value' in showAction ? (
+            <Show when={showAction}>
+              <button
+                type="button"
+                class="sg-icon-btn change-section-action"
+                title={actionTitle}
+                aria-label={actionTitle}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onAction?.();
+                }}
+              >
+                {actionIcon}
+              </button>
+            </Show>
+          ) : showAction ? (
             <button
               type="button"
-              class="change-section-action"
+              class="sg-icon-btn change-section-action"
+              title={actionTitle}
+              aria-label={actionTitle}
               onClick={(e) => {
                 e.stopPropagation();
                 onAction?.();
               }}
             >
-              {actionLabel}
+              {actionIcon}
             </button>
-          </Show>
-        ) : (
-          actionLabel && (
-            <button
-              type="button"
-              class="change-section-action"
-              onClick={(e) => {
-                e.stopPropagation();
-                onAction?.();
-              }}
-            >
-              {actionLabel}
-            </button>
-          )
+          ) : null
         )}
+        <span class="sg-count change-section-count">{countSignal}</span>
       </div>
-      {open && <div class="change-section-body">{children}</div>}
-    </section>
+    </div>
   );
 }

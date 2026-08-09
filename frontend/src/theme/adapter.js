@@ -1,75 +1,96 @@
 import { registerCustomTheme } from '@pierre/diffs';
 
+/** @typedef {'light' | 'dark'} ThemeMode */
+
 export const appTokens = {
+  light: {
+    bg: '#fafafa',
+    surface: '#ececec',
+    surfaceRaised: '#ffffff',
+    border: '#e5e5e5',
+    borderSubtle: '#e5e5e5',
+    text: '#171717',
+    textHigh: '#171717',
+    textMuted: '#737373',
+    accent: '#171717',
+    accentBg: 'rgba(127,127,127,0.12)',
+    accentHover: 'rgba(127,127,127,0.16)',
+    added: '#171717',
+    addedBg: 'rgba(127,127,127,0.09)',
+    addedBorder: '#171717',
+    removed: '#737373',
+    removedBg: 'rgba(127,127,127,0.05)',
+    removedBorder: '#737373',
+    conflictAmber: '#737373',
+    conflictAmberBg: 'rgba(127,127,127,0.12)',
+    conflictAmberBorder: '#e5e5e5',
+  },
   dark: {
     bg: '#0a0a0a',
-    surface: '#111111',
+    surface: '#161616',
     surfaceRaised: '#171717',
     border: '#262626',
-    borderSubtle: '#1a1a1a',
-    text: '#e5e5e5',
-    textHigh: '#f5f5f5',
-    textMuted: '#737373',
-    accent: '#f5f5f5',
-    accentBg: '#1a1a1a',
-    accentHover: '#262626',
-    added: '#e5e5e5',
-    addedBg: '#152a15',
-    addedBorder: '#153f15',
-    removed: '#e5e5e5',
-    removedBg: '#2a1515',
-    removedBorder: '#3f1515',
+    borderSubtle: '#262626',
+    text: '#fafafa',
+    textHigh: '#fafafa',
+    textMuted: '#a3a3a3',
+    accent: '#fafafa',
+    accentBg: 'rgba(127,127,127,0.12)',
+    accentHover: 'rgba(127,127,127,0.16)',
+    added: '#fafafa',
+    addedBg: 'rgba(127,127,127,0.09)',
+    addedBorder: '#fafafa',
+    removed: '#a3a3a3',
+    removedBg: 'rgba(127,127,127,0.05)',
+    removedBorder: '#a3a3a3',
     conflictAmber: '#a3a3a3',
-    conflictAmberBg: '#1a1a1a',
+    conflictAmberBg: 'rgba(127,127,127,0.12)',
     conflictAmberBorder: '#262626',
   },
 };
 
-/** Maps token keys to CSS custom property names used by the app. */
-function tokenToCssVar(key) {
-  if (key === 'textHigh') return '--text-h';
-  return '--' + key.replace(/[A-Z]/g, (c) => '-' + c.toLowerCase());
-}
-
-export function injectAppTheme() {
-  const tokens = appTokens.dark;
-  const css = Object.entries(tokens)
-    .map(([k, v]) => `${tokenToCssVar(k)}: ${v};`)
-    .join('\n');
-
-  const existing = document.getElementById('conflicto-theme');
-  if (existing) existing.remove();
-
-  const style = document.createElement('style');
-  style.id = 'conflicto-theme';
-  style.textContent = `:root {\n${css}\n}`;
-  document.head.appendChild(style);
+/**
+ * @param {ThemeMode} [mode]
+ */
+export function resolveThemeMode(mode) {
+  if (mode === 'light' || mode === 'dark') return mode;
+  if (typeof window !== 'undefined' && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+    return 'dark';
+  }
+  return 'light';
 }
 
 /**
- * Full Shiki/VS Code theme derived from appTokens.
- * Pierre reads workbench colors (gitDecoration / ANSI) for add/delete chrome.
+ * CSS variables are owned by index.css + prefers-color-scheme.
+ * Keep this as a no-op injector so callers remain stable.
  */
-export function createAppShikiTheme() {
-  const t = appTokens.dark;
-  // Fixed gray mid-step — do not use addedBorder (green) for syntax
-  const mid = t.conflictAmber;
+export function injectAppTheme() {
+  // Tokens live in index.css; Pierre themes are registered separately.
+}
+
+/**
+ * Full Shiki/VS Code theme derived from appTokens — monochrome only.
+ * @param {ThemeMode} [mode]
+ */
+export function createAppShikiTheme(mode) {
+  const resolved = resolveThemeMode(mode);
+  const t = appTokens[resolved];
+  const mid = t.textMuted;
 
   return {
-    name: 'conflicto-dark',
-    type: 'dark',
+    name: resolved === 'dark' ? 'conflicto-dark' : 'conflicto-light',
+    type: resolved,
     colors: {
-      'editor.background': t.surface,
+      'editor.background': t.surfaceRaised,
       'editor.foreground': t.text,
       'editor.lineHighlightBackground': t.accentBg,
-      'editorGutter.background': t.surface,
+      'editorGutter.background': t.surfaceRaised,
       'editorLineNumber.foreground': t.textMuted,
       'editorLineNumber.activeForeground': t.text,
       'diffEditor.insertedTextBackground': t.addedBg,
       'diffEditor.deletedTextBackground': t.removedBg,
       'diffEditor.insertedLineBackground': t.addedBg,
       'diffEditor.removedLineBackground': t.removedBg,
-      // Pierre → --diffs-addition/deletion/modified-color
       'gitDecoration.addedResourceForeground': t.addedBorder,
       'gitDecoration.deletedResourceForeground': t.removedBorder,
       'gitDecoration.modifiedResourceForeground': t.conflictAmber,
@@ -168,7 +189,6 @@ export function createAppShikiTheme() {
 }
 
 export function registerAppTheme() {
-  const theme = createAppShikiTheme();
-  registerCustomTheme('conflicto-dark', () => Promise.resolve(theme));
-  return theme;
+  registerCustomTheme('conflicto-dark', () => Promise.resolve(createAppShikiTheme('dark')));
+  registerCustomTheme('conflicto-light', () => Promise.resolve(createAppShikiTheme('light')));
 }

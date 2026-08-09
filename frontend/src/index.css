@@ -1,50 +1,64 @@
 :root {
-  /* Base */
-  --font-sans: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  --font-mono: ui-monospace, 'SF Mono', 'Cascadia Mono', 'Segoe UI Mono', 'Roboto Mono', monospace;
+  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", Menlo, monospace;
 
-  /* Monochrome dark — reaper.is inspired */
-  --bg: #0a0a0a;
-  --surface: #111111;
-  --surface-raised: #171717;
-  --border: #262626;
-  --border-subtle: #1a1a1a;
+  /* Spec tokens */
+  --bg: #fafafa;
+  --text: #171717;
+  --grey: #737373;
+  --light-grey: #e5e5e5;
+  --card-bg: #ffffff;
+  --window-bg: #ececec;
 
-  --text: #e5e5e5;
-  --text-h: #f5f5f5;
-  --text-muted: #737373;
+  /* Compatibility aliases used across existing components */
+  --surface: var(--window-bg);
+  --surface-raised: var(--card-bg);
+  --border: var(--light-grey);
+  --border-subtle: var(--light-grey);
+  --text-h: var(--text);
+  --text-muted: var(--grey);
+  --accent: var(--text);
+  --accent-bg: rgba(127, 127, 127, 0.12);
+  --accent-hover: rgba(127, 127, 127, 0.16);
 
-  --accent: #f5f5f5;
-  --accent-bg: #1a1a1a;
-  --accent-hover: #262626;
+  /* Monochrome diff — weight/opacity, never hue */
+  --added: var(--text);
+  --added-bg: rgba(127, 127, 127, 0.09);
+  --added-border: var(--text);
+  --removed: var(--grey);
+  --removed-bg: rgba(127, 127, 127, 0.05);
+  --removed-border: var(--grey);
 
-  /* Diff only — functional colors (monochrome + muted red) */
-  --added: #0a0a0a;
-  --added-bg: #ffffff;
-  --added-border: #a3a3a3;
-  --removed: #e5e5e5;
-  --removed-bg: #2a1515;
-  --removed-border: #3f1515;
+  --conflict-amber: var(--grey);
+  --conflict-amber-bg: rgba(127, 127, 127, 0.12);
+  --conflict-amber-border: var(--light-grey);
+  --conflict-ours-bg: var(--card-bg);
+  --conflict-theirs-bg: rgba(127, 127, 127, 0.06);
+  --conflict-current: var(--text);
+  --conflict-current-bg: rgba(127, 127, 127, 0.12);
+  --conflict-incoming: var(--grey);
+  --conflict-incoming-bg: rgba(127, 127, 127, 0.08);
 
-  /* Conflicts — neutral monochrome */
-  --conflict-amber: #a3a3a3;
-  --conflict-amber-bg: #1a1a1a;
-  --conflict-amber-border: #262626;
-  --conflict-ours-bg: #171717;
-  --conflict-theirs-bg: #141414;
-  --conflict-current: #d4d4d4;
-  --conflict-current-bg: rgba(212, 212, 212, 0.12);
-  --conflict-incoming: #a3a3a3;
-  --conflict-incoming-bg: rgba(163, 163, 163, 0.12);
-
-  color-scheme: dark;
+  color-scheme: light;
   font-family: var(--font-sans);
   font-size: 13px;
   line-height: 1.5;
   color: var(--text);
-  background: var(--bg);
+  background: transparent;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0a0a0a;
+    --text: #fafafa;
+    --grey: #a3a3a3;
+    --light-grey: #262626;
+    --card-bg: #171717;
+    --window-bg: #161616;
+    color-scheme: dark;
+  }
 }
 
 * {
@@ -56,10 +70,49 @@
 html, body, #app {
   height: 100%;
   overflow: hidden;
+  background: transparent;
+  /* Visual radius is native (layer.masksToBounds); keep CSS soft as a fallback. */
+  border-radius: 16px;
+}
+
+body {
+  border: 1px solid transparent;
 }
 
 #app {
   display: flex;
   flex-direction: column;
   border: none;
+  background: transparent;
+  overflow: hidden;
+  border-radius: 16px;
+}
+
+html:has(.app-shell.macos-fullscreen),
+html:has(.app-shell.macos-fullscreen) body,
+html:has(.app-shell.macos-fullscreen) #app {
+  border-radius: 0;
+}
+
+html:has(.app-shell.macos-fullscreen) body {
+  border-color: transparent;
+}
+
+.drag-region {
+  --wails-draggable: drag;
+}
+
+.no-drag {
+  --wails-draggable: no-drag;
+}
+
+button {
+  font-family: inherit;
+}
+
+button:focus-visible,
+textarea:focus-visible,
+input:focus-visible {
+  outline: 1px solid var(--grey);
+  outline-offset: 1px;
 }

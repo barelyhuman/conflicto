@@ -12,13 +12,15 @@ import { FileTree } from './components/FileTree.jsx';
 import { DiffViewer } from './components/DiffViewer.jsx';
 import { ConflictViewer } from './components/ConflictViewer.jsx';
 import { ConfirmDialog } from './components/ConfirmDialog.jsx';
-import { StatusBar } from './components/StatusBar.jsx';
 import { ToastContainer } from './components/ToastContainer.jsx';
 import { PreferencesPage } from './components/PreferencesPage.jsx';
 import { ProjectPicker } from './components/ProjectPicker.jsx';
 import { PRCheckoutPrompt } from './components/PRCheckoutPrompt.jsx';
 import { CreatePRModal } from './components/CreatePRModal.jsx';
 import { TerminalDock, isTerminalFocusTarget } from './components/terminal/TerminalDock.jsx';
+import { Titlebar } from './components/Titlebar.jsx';
+import { SidebarActions } from './components/SidebarActions.jsx';
+import { SidebarToggle } from './components/SidebarToggle.jsx';
 
 /** Stable empty list so FileTree does not remount on unrelated App re-renders. */
 const EMPTY_FILES = [];
@@ -32,7 +34,7 @@ export function App() {
   const [confirmKind, setConfirmKind] = useState(null);
   const [pendingConfirmFile, setPendingConfirmFile] = useState(null);
 
-  // Status bar state
+  // Sync state (sidebar pull/push badges)
   const [behind, setBehind] = useState(0);
   const [ahead, setAhead] = useState(0);
 
@@ -58,6 +60,9 @@ export function App() {
   const [prPrompt, setPrPrompt] = useState(null);
   // Create PR modal
   const [createPROpen, setCreatePROpen] = useState(false);
+
+  // Sidebar visibility (toggled from the content island)
+  const [sidebarOpen, setSidebarOpen] = useState(true);
 
   // Terminal dock
   const [terminalOpen, setTerminalOpen] = useState(false);
@@ -136,7 +141,6 @@ export function App() {
             pr.number === number ? { ...pr, files } : pr
           )
         );
-        // Auto-select first file if this is the active PR and no file selected
         if (
           activePRSignalRef.current.peek() === number &&
           !selectionRef.current.activeFile.peek() &&
@@ -222,7 +226,6 @@ export function App() {
         return !open;
       });
     }
-    // Capture so xterm does not eat Ctrl+` before we toggle
     document.addEventListener('keydown', onKey, true);
     return () => document.removeEventListener('keydown', onKey, true);
   }, []);
@@ -412,9 +415,14 @@ export function App() {
     });
   }, []);
 
-  const shellClass = `app-shell${isMacOS ? ' macos' : ''}${isMacOS && isFullscreenMode ? ' macos-fullscreen' : ''}`;
+  const shellClass = [
+    'app-shell',
+    isMacOS ? 'macos' : '',
+    isMacOS && isFullscreenMode ? 'macos-fullscreen' : '',
+  ]
+    .filter(Boolean)
+    .join(' ');
 
-  // Confirm dialog title/message peek unstaged only when dialog is open (event handlers).
   const pendingUnstagedStatus = pendingConfirmFile
     ? workingTree.unstaged.peek().find((f) => f.path === pendingConfirmFile)?.status
     : undefined;
@@ -423,80 +431,122 @@ export function App() {
     <ThemeProvider>
       <EditProvider>
         <div class={shellClass}>
-          <header class="app-header">
-            <div class="app-header-left">
-              <ProjectPicker
-                currentName={projectName}
-                currentPath={projectPath}
-                recents={recentProjects}
-                onSwitchProject={handleSwitchProject}
-                onOpenProject={handleOpenProject}
-              />
-            </div>
-            <div class="app-header-actions">
-              <button
-                type="button"
-                class="create-pr-trigger"
-                onClick={() => setCreatePROpen(true)}
-                title="Create PR"
-              >
-                + PR
-              </button>
-              <PRPicker selectedPR={activePR} currentPR={currentPR} onSelect={handleSelectPR} onError={pushToast} />
-            </div>
-          </header>
+          <div class="window">
+            <Titlebar />
 
-          <aside class="app-sidebar">
-            <FileTree
-              workingTree={workingTree}
-              selection={selection}
-              prFiles={isPRMode ? (currentPR?.files ?? EMPTY_FILES) : EMPTY_FILES}
-              isPRMode={isPRMode}
-              onStage={handleStage}
-              onUnstage={(path) => workingTree.unstage(path)}
-              onDiscard={handleDiscard}
-              onStageAll={() => workingTree.stageAll()}
-              onUnstageAll={() => workingTree.unstageAll()}
-              onCommit={(message) => workingTree.commit(message)}
-            />
-          </aside>
-
-          <main class="app-main">
-            <Show
-              when={selection.activeDiff}
-              fallback={<div class="diff-empty">Select a file to view changes</div>}
-            >
-              {() => (
-                <Show
-                  when={selection.isConflict}
-                  fallback={
-                    <DiffViewer
-                      activeDiff={selection.activeDiff}
-                      isPRMode={isPRMode}
-                      isUnstaged={selection.isUnstaged}
-                      comments={isPRMode ? prComments : []}
-                      onPostComment={handlePostComment}
+            <div class={`window-body${sidebarOpen ? '' : ' sidebar-collapsed'}`}>
+              <aside class="sidebar" aria-hidden={!sidebarOpen}>
+                <div class="sidebar-project">
+                  <ProjectPicker
+                    currentName={projectName}
+                    currentPath={projectPath}
+                    recents={recentProjects}
+                    onSwitchProject={handleSwitchProject}
+                    onOpenProject={handleOpenProject}
+                  />
+                  <div class="sidebar-project-actions">
+                    <button
+                      type="button"
+                      class="create-pr-trigger"
+                      onClick={() => setCreatePROpen(true)}
+                      title="Create PR"
+                    >
+                      +PR
+                    </button>
+                    <PRPicker
+                      selectedPR={activePR}
+                      currentPR={currentPR}
+                      onSelect={handleSelectPR}
+                      onError={pushToast}
                     />
-                  }
-                >
-                  <ConflictViewer activeDiff={selection.activeDiff} />
-                </Show>
-              )}
-            </Show>
-          </main>
+                  </div>
+                </div>
 
-          <TerminalDock
-            open={terminalOpen}
-            height={terminalHeight}
-            onHeightChange={handleTerminalHeight}
-            projectPath={projectPath}
-            onRequestOpen={() => setTerminalOpen(true)}
-            onTabClosed={(layouts) => {
-              if (layouts.length === 0) {
-                setTerminalOpen(false);
-              }
-            }}
-          />
+                <SidebarActions
+                  currentBranch={branches.current}
+                  localBranches={branches.local}
+                  remoteBranches={branches.remote}
+                  onSelectBranch={handleSelectBranch}
+                  behind={behind}
+                  ahead={ahead}
+                  onPull={handlePull}
+                  onPush={handlePush}
+                />
+
+                <FileTree
+                  workingTree={workingTree}
+                  selection={selection}
+                  prFiles={isPRMode ? (currentPR?.files ?? EMPTY_FILES) : EMPTY_FILES}
+                  isPRMode={isPRMode}
+                  currentBranch={branches.current}
+                  onStage={handleStage}
+                  onUnstage={(path) => workingTree.unstage(path)}
+                  onDiscard={handleDiscard}
+                  onStageAll={() => workingTree.stageAll()}
+                  onUnstageAll={() => workingTree.unstageAll()}
+                  onCommit={(message) => workingTree.commit(message)}
+                />
+              </aside>
+
+              <div class="content-well">
+                <div class="content">
+                  <main class="app-main">
+                    <Show
+                      when={selection.activeDiff}
+                      fallback={
+                        <>
+                          <div class="island-header">
+                            <SidebarToggle
+                              open={sidebarOpen}
+                              onToggle={() => setSidebarOpen((open) => !open)}
+                            />
+                            <div class="island-header-spacer" />
+                          </div>
+                          <div class="diff-empty">Select a file to view changes</div>
+                        </>
+                      }
+                    >
+                      {() => (
+                        <Show
+                          when={selection.isConflict}
+                          fallback={
+                            <DiffViewer
+                              activeDiff={selection.activeDiff}
+                              isPRMode={isPRMode}
+                              isUnstaged={selection.isUnstaged}
+                              comments={isPRMode ? prComments : []}
+                              onPostComment={handlePostComment}
+                              sidebarOpen={sidebarOpen}
+                              onToggleSidebar={() => setSidebarOpen((open) => !open)}
+                            />
+                          }
+                        >
+                          <ConflictViewer
+                            activeDiff={selection.activeDiff}
+                            sidebarOpen={sidebarOpen}
+                            onToggleSidebar={() => setSidebarOpen((open) => !open)}
+                          />
+                        </Show>
+                      )}
+                    </Show>
+                  </main>
+
+                  <TerminalDock
+                    open={terminalOpen}
+                    height={terminalHeight}
+                    onHeightChange={handleTerminalHeight}
+                    projectPath={projectPath}
+                    onRequestOpen={() => setTerminalOpen(true)}
+                    onTabClosed={(layouts) => {
+                      if (layouts.length === 0) {
+                        setTerminalOpen(false);
+                      }
+                    }}
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
 
           <ConfirmDialog
             open={confirmOpen}
@@ -532,17 +582,6 @@ export function App() {
             }
             onConfirm={handleConfirmDialog}
             onCancel={handleCancelConfirm}
-          />
-
-          <StatusBar
-            behind={behind}
-            ahead={ahead}
-            onPull={handlePull}
-            onPush={handlePush}
-            onSelectBranch={handleSelectBranch}
-            currentBranch={branches.current}
-            localBranches={branches.local}
-            remoteBranches={branches.remote}
           />
 
           <ToastContainer

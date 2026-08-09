@@ -67,16 +67,19 @@ func main() {
 		MaxHeight:     1080,
 		DisableResize: false,
 		Fullscreen:    false,
-		Frameless:     false,
+		Frameless:     true,
 		Menu:          AppMenu,
 		AssetServer: &assetserver.Options{
 			Assets: assets,
 		},
-		BackgroundColour: &options.RGBA{R: 17, G: 17, B: 17, A: 1},
+		// Transparent webview + native vibrancy for sidebar frost.
+		// Rounded corners are applied natively in applyMacWindowCornerRadius
+		// (masks the NSVisualEffectView layer — CSS alone cannot clip it).
+		BackgroundColour: &options.RGBA{R: 0, G: 0, B: 0, A: 0},
 		Mac: &mac.Options{
 			TitleBar:             mac.TitleBarHidden(),
-			Appearance:           mac.NSAppearanceNameDarkAqua,
-			WebviewIsTransparent: false,
+			WebviewIsTransparent: true,
+			WindowIsTranslucent:  true,
 			About: &mac.AboutInfo{
 				Title:   "conflicto",
 				Message: "© 2026 conflicto",
