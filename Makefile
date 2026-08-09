@@ -39,7 +39,7 @@ frontend-build:
 frontend-test:
 	$(FRONTEND) test
 
-test: frontend-test
+test: frontend-test frontend-build
 	go test -v ./...
 
 clean:
