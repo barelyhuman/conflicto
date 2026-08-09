@@ -4,7 +4,6 @@ import { setupWailsEvents, api, watchFullscreen } from './wails.js';
 import { ThemeProvider } from './theme/ThemeProvider.jsx';
 import { EditProvider } from './components/EditProvider.jsx';
 import { PRPicker } from './components/PRPicker.jsx';
-import { WorktreeIndicator } from './components/WorktreeIndicator.jsx';
 import { FileTree } from './components/FileTree.jsx';
 import { DiffViewer } from './components/DiffViewer.jsx';
 import { ConflictViewer } from './components/ConflictViewer.jsx';
@@ -520,7 +519,6 @@ export function App() {
                 + PR
               </button>
               <PRPicker selectedPR={activePR} currentPR={currentPR} onSelect={handleSelectPR} onError={pushToast} />
-              <WorktreeIndicator path={null} />
             </div>
           </header>
 

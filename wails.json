@@ -17,7 +17,7 @@
     "productVersion": "0.1.0",
     "copyright": "Copyright (c) 2026 Siddharth Gelera"
   },
-  "wailsjsdir": "./client/src",
+  "wailsjsdir": "./frontend/src",
   "debounceMS": 100,
   "devServer": "localhost:34115",
   "appargs": ""

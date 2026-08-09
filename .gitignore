@@ -21,3 +21,4 @@ secrets.yml
 .pnpm-store/
 .cursor/
 *.local
+.razor/
