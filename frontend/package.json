@@ -24,6 +24,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@preact/eslint-plugin-signals": "^0.3.0",
     "@preact/preset-vite": "^2.10.6",
     "eslint": "^10.8.0",
     "eslint-plugin-react": "^7.37.5",

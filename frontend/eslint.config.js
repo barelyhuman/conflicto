@@ -1,4 +1,5 @@
 import js from '@eslint/js';
+import signals from '@preact/eslint-plugin-signals';
 import react from 'eslint-plugin-react';
 import reactHooks from 'eslint-plugin-react-hooks';
 import globals from 'globals';
@@ -23,6 +24,7 @@ export default [
     plugins: {
       react,
       'react-hooks': reactHooks,
+      signals,
     },
     rules: {
       // Catch variables/functions used before declaration (TDZ issues)
@@ -37,6 +39,14 @@ export default [
       // Hooks rules
       'react-hooks/rules-of-hooks': 'error',
       'react-hooks/exhaustive-deps': 'warn',
+
+      // Preact Signals correctness
+      'signals/no-signal-write-in-computed': 'error',
+      'signals/no-value-after-await': 'error',
+      'signals/no-signal-truthiness': 'warn',
+      'signals/no-signal-in-component-body': 'error',
+      'signals/no-conditional-value-read': 'error',
+      'signals/no-useless-computed': 'warn',
 
       // General
       'no-unused-vars': ['warn', { argsIgnorePattern: '^_', varsIgnorePattern: '^_' }],

@@ -42,6 +42,9 @@ importers:
       '@eslint/js':
         specifier: ^10.0.1
         version: 10.0.1(eslint@10.8.0)
+      '@preact/eslint-plugin-signals':
+        specifier: ^0.3.0
+        version: 0.3.0
       '@preact/preset-vite':
         specifier: ^2.10.6
         version: 2.10.6(@babel/core@7.29.7)(preact@10.29.8)(vite@8.2.0)
@@ -295,6 +298,9 @@ packages:
 
   '@preachjs/popper@0.0.6':
     resolution: {integrity: sha512-CUWN0/UEFCtseOWJlS0emzZs8qfmrHlJ7EtyrBCaTeEpahcQeZkEqwlb7keBhs6Dlxs6qEOJrJpXGGm1qFO9eA==, tarball: https://registry.npmjs.org/@preachjs/popper/-/popper-0.0.6.tgz}
+
+  '@preact/eslint-plugin-signals@0.3.0':
+    resolution: {integrity: sha512-T7FkPg2WmgkNcKYiML/HMuiujMOZh1QDU3OY7wZvs0zuWm4kxwizh8LW6gzUYZSkwetvnvjRzJAMWc9Y/1DgNw==, tarball: https://registry.npmjs.org/@preact/eslint-plugin-signals/-/eslint-plugin-signals-0.3.0.tgz}
 
   '@preact/preset-vite@2.10.6':
     resolution: {integrity: sha512-ZZ5RIT2ZVXg8UxRA8VZpoT8CdpDG7RFIqOT4bELqNBp85+HKvQBbgmh3gsoW1UOQXx26TLe+ZRNKI7q281Kckw==, tarball: https://registry.npmjs.org/@preact/preset-vite/-/preset-vite-2.10.6.tgz}
@@ -2029,6 +2035,8 @@ snapshots:
       - shiki
 
   '@preachjs/popper@0.0.6': {}
+
+  '@preact/eslint-plugin-signals@0.3.0': {}
 
   '@preact/preset-vite@2.10.6(@babel/core@7.29.7)(preact@10.29.8)(vite@8.2.0)':
     dependencies:
