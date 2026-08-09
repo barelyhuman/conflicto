@@ -85,8 +85,8 @@ func (a *App) startup(ctx context.Context) {
 
 // domReady is called after the frontend has loaded
 func (a *App) domReady(ctx context.Context) {
-	// Native mask: round the vibrancy + webview layers so frost and radius coexist.
-	applyMacWindowCornerRadius(16)
+	// Align system traffic lights with the 44px island header (vertically centered).
+	applyMacTrafficLightPosition(16, 16)
 }
 
 // shutdown is called at application termination

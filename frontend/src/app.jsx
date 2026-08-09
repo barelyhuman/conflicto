@@ -18,7 +18,6 @@ import { ProjectPicker } from './components/ProjectPicker.jsx';
 import { PRCheckoutPrompt } from './components/PRCheckoutPrompt.jsx';
 import { CreatePRModal } from './components/CreatePRModal.jsx';
 import { TerminalDock, isTerminalFocusTarget } from './components/terminal/TerminalDock.jsx';
-import { Titlebar } from './components/Titlebar.jsx';
 import { SidebarActions } from './components/SidebarActions.jsx';
 import { SidebarToggle } from './components/SidebarToggle.jsx';
 
@@ -432,8 +431,6 @@ export function App() {
       <EditProvider>
         <div class={shellClass}>
           <div class="window">
-            <Titlebar />
-
             <div class={`window-body${sidebarOpen ? '' : ' sidebar-collapsed'}`}>
               <aside class="sidebar" aria-hidden={!sidebarOpen}>
                 <div class="sidebar-project">

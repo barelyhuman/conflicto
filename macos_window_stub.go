@@ -2,4 +2,4 @@
 
 package main
 
-func applyMacWindowCornerRadius(radius float64) {}
+func applyMacTrafficLightPosition(x, y float64) {}

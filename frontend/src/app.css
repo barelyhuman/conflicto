@@ -8,11 +8,6 @@
   display: flex;
   flex-direction: column;
   padding: 0;
-  border-radius: 16px;
-}
-
-.app-shell.macos-fullscreen {
-  border-radius: 0;
 }
 
 .window {
@@ -23,15 +18,6 @@
   background: transparent;
   position: relative;
   overflow: hidden;
-  border: 1px solid var(--light-grey);
-  border-radius: 16px;
-  box-shadow: 0 40px 80px -24px rgba(0, 0, 0, 0.4);
-}
-
-.app-shell.macos-fullscreen .window {
-  border-radius: 0;
-  border-color: transparent;
-  box-shadow: none;
 }
 
 .window-body {
@@ -53,55 +39,6 @@
   }
 }
 
-/* Custom traffic lights — non-draggable so clicks register */
-.titlebar {
-  position: absolute;
-  top: 20px;
-  left: 20px;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  z-index: 20;
-  --wails-draggable: no-drag;
-}
-
-/* When the sidebar is closed, sit in the island header band so the dots
-   share a vertical center with the sidebar toggle / file header. */
-.window:has(.sidebar-collapsed) .titlebar {
-  top: 0;
-  left: 18px;
-  height: 44px;
-}
-
-.titlebar .dot {
-  width: 12px;
-  height: 12px;
-  border-radius: 50%;
-  padding: 0;
-  border: 1px solid rgba(0, 0, 0, 0.12);
-  background: color-mix(in srgb, var(--grey) 55%, var(--card-bg));
-  cursor: default;
-}
-
-.titlebar .dot:hover {
-  background: color-mix(in srgb, var(--text) 35%, var(--card-bg));
-}
-
-@media (prefers-color-scheme: dark) {
-  .titlebar .dot {
-    border-color: rgba(255, 255, 255, 0.12);
-    background: color-mix(in srgb, var(--grey) 70%, #000);
-  }
-
-  .titlebar .dot:hover {
-    background: color-mix(in srgb, var(--text) 45%, #000);
-  }
-}
-
-.app-shell.macos-fullscreen .titlebar {
-  display: none;
-}
-
 /* ── Sidebar: sits on shared window-body frost (no second tint layer) ── */
 
 .sidebar {
@@ -109,7 +46,8 @@
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
-  padding-top: 56px;
+  /* Clear native macOS traffic lights (TitleBarHidden) */
+  padding-top: 52px;
   min-height: 0;
   position: relative;
   --wails-draggable: drag;
@@ -133,13 +71,26 @@
   border: none;
 }
 
-/* Clear traffic lights when the island is full-bleed */
-.window-body.sidebar-collapsed .island-header {
-  padding-left: 72px;
+/* Clear native traffic lights when the island is full-bleed */
+.app-shell.macos .window-body.sidebar-collapsed .island-header {
+  padding-left: 78px;
 }
 
-.window-body.sidebar-collapsed .diffs-header-sidebar-toggle {
-  margin-left: 72px;
+.app-shell.macos .window-body.sidebar-collapsed .diffs-header-sidebar-toggle {
+  margin-left: 78px;
+}
+
+/* Fullscreen hides system traffic lights — revert clearance */
+.app-shell.macos.macos-fullscreen .sidebar {
+  padding-top: 12px;
+}
+
+.app-shell.macos.macos-fullscreen .window-body.sidebar-collapsed .island-header {
+  padding-left: 0;
+}
+
+.app-shell.macos.macos-fullscreen .window-body.sidebar-collapsed .diffs-header-sidebar-toggle {
+  margin-left: 0;
 }
 
 .sidebar-project {
@@ -835,6 +786,7 @@
 .diffs-header-sidebar-toggle {
   margin-right: 4px;
   vertical-align: middle;
+  --wails-draggable: no-drag;
 }
 
 .app-main {
@@ -847,9 +799,21 @@
 }
 
 /* Monochrome Pierre header stats (override any hue) */
-.diff-viewer-wrapper [data-diffs-header] ,
+.diff-viewer-wrapper [data-diffs-header],
 .conflict-viewer-wrapper [data-diffs-header] {
   color: var(--text);
+  /* File header is a window drag region (needed when the sidebar is closed). */
+  --wails-draggable: drag;
+  cursor: default;
+}
+
+.diff-viewer-wrapper [data-diffs-header] button,
+.diff-viewer-wrapper [data-diffs-header] a,
+.diff-viewer-wrapper [data-diffs-header] input,
+.conflict-viewer-wrapper [data-diffs-header] button,
+.conflict-viewer-wrapper [data-diffs-header] a,
+.conflict-viewer-wrapper [data-diffs-header] input {
+  --wails-draggable: no-drag;
 }
 
 .diff-viewer-wrapper {

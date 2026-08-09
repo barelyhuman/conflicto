@@ -63,18 +63,15 @@ func main() {
 		Height:        768,
 		MinWidth:      800,
 		MinHeight:     600,
-		MaxWidth:      1920,
-		MaxHeight:     1080,
 		DisableResize: false,
 		Fullscreen:    false,
-		Frameless:     true,
+		Frameless:     false,
 		Menu:          AppMenu,
 		AssetServer: &assetserver.Options{
 			Assets: assets,
 		},
 		// Transparent webview + native vibrancy for sidebar frost.
-		// Rounded corners are applied natively in applyMacWindowCornerRadius
-		// (masks the NSVisualEffectView layer — CSS alone cannot clip it).
+		// TitleBarHidden keeps system traffic lights over full-size content.
 		BackgroundColour: &options.RGBA{R: 0, G: 0, B: 0, A: 0},
 		Mac: &mac.Options{
 			TitleBar:             mac.TitleBarHidden(),

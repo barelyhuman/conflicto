@@ -71,12 +71,10 @@ html, body, #app {
   height: 100%;
   overflow: hidden;
   background: transparent;
-  /* Visual radius is native (layer.masksToBounds); keep CSS soft as a fallback. */
-  border-radius: 16px;
 }
 
 body {
-  border: 1px solid transparent;
+  border: none;
 }
 
 #app {
@@ -85,17 +83,6 @@ body {
   border: none;
   background: transparent;
   overflow: hidden;
-  border-radius: 16px;
-}
-
-html:has(.app-shell.macos-fullscreen),
-html:has(.app-shell.macos-fullscreen) body,
-html:has(.app-shell.macos-fullscreen) #app {
-  border-radius: 0;
-}
-
-html:has(.app-shell.macos-fullscreen) body {
-  border-color: transparent;
 }
 
 .drag-region {
