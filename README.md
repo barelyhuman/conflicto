@@ -44,7 +44,8 @@ Useful targets:
 | `make dev` | Wails dev mode (live reload) |
 | `make build` | Local debug binary |
 | `make build-production` | Production binary (`-ldflags="-w -s" -trimpath`) |
-| `make test` | Go tests |
+| `make test` | Go + frontend tests |
+| `make frontend-test` | Frontend unit tests (Vitest) |
 | `make clean` | Remove build artifacts |
 
 Frontend-only: `make frontend-dev` / `make frontend-build` (runs `pnpm` in `frontend/`). Vite alone has no Go backend — use `make dev` for a working UI.

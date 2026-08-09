@@ -11,6 +11,10 @@ export default defineConfig({
       { find: 'react/jsx-runtime', replacement: 'preact/jsx-runtime' },
     ],
   },
+  test: {
+    environment: 'node',
+    include: ['src/**/*.test.js'],
+  },
   build: {
     rolldownOptions: {
       output: {
