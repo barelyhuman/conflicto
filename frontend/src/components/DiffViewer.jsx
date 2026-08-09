@@ -5,21 +5,23 @@ import { useTheme } from '../theme/ThemeProvider.jsx';
 
 /**
  * @param {Object} props
- * @param {string} props.patch - raw unified diff string
- * @param {string} props.filename
+ * @param {import('@preact/signals-core').Signal<{ path?: string, patch?: string }|null>} props.activeDiff
  * @param {boolean} props.isPRMode
- * @param {boolean} props.isUnstaged
+ * @param {import('@preact/signals-core').ReadonlySignal<boolean>|boolean} props.isUnstaged
  * @param {{ path: string, line: number, body: string, user: { login: string } }[]} props.comments
- * @param {(path: string, body: string, line: number, side: string) => void} props.onPostComment
+ * @param {(path: string, body: string, line: number, side: string) => void} [props.onPostComment]
  */
 export function DiffViewer({
-  patch,
-  filename,
+  activeDiff,
   isPRMode = false,
   isUnstaged = false,
   comments = [],
 }) {
   const { theme } = useTheme();
+  const diff = activeDiff.value;
+  const patch = diff?.patch;
+  const filename = diff?.path ?? '';
+  const unstaged = typeof isUnstaged === 'boolean' ? isUnstaged : isUnstaged.value;
 
   const fileDiff = useMemo(() => {
     if (!patch) return null;
@@ -66,7 +68,7 @@ export function DiffViewer({
     <div class="diff-viewer-wrapper">
       <FileDiff
         fileDiff={fileDiff}
-        edit={isUnstaged}
+        edit={unstaged}
         options={{
           theme,
           themeType: 'dark',
@@ -80,8 +82,8 @@ export function DiffViewer({
       <style>{`
         .diff-viewer-wrapper {
           display: flex;
-          flex-direction: column;
           flex: 1;
+          flex-direction: column;
           min-height: 0;
           overflow: auto;
         }

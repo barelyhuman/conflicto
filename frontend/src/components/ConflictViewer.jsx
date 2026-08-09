@@ -5,11 +5,11 @@ import { useTheme } from '../theme/ThemeProvider.jsx';
 
 /**
  * @param {Object} props
- * @param {string} props.patch - raw unified diff string containing conflict markers
- * @param {string} props.filename
+ * @param {import('@preact/signals-core').Signal<{ path?: string, patch?: string }|null>} props.activeDiff
  */
-export function ConflictViewer({ patch }) {
+export function ConflictViewer({ activeDiff }) {
   const { theme } = useTheme();
+  const patch = activeDiff.value?.patch;
 
   const fileDiff = useMemo(() => {
     if (!patch) return null;

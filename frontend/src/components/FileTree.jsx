@@ -1,4 +1,6 @@
 import { useState, useCallback } from 'preact/hooks';
+import { useComputed } from '@preact/signals';
+import { Show } from '@preact/signals/utils';
 import { IconChevronRight } from '@tabler/icons-preact';
 import { ChangeTree } from './ChangeTree.jsx';
 import { CommitPanel } from './CommitPanel.jsx';
@@ -11,14 +13,10 @@ import { CommitPanel } from './CommitPanel.jsx';
  * Sidebar file list: PR mode is a single tree; otherwise Conflicts / Staged / Unstaged sections.
  *
  * @param {Object} props
- * @param {{ path: string, status: string }[]} props.conflicts
- * @param {{ path: string, status: string }[]} props.staged
- * @param {{ path: string, status: string }[]} props.unstaged
+ * @param {InstanceType<typeof import('../models/workingTree.js').WorkingTreeModel>} props.workingTree
+ * @param {InstanceType<typeof import('../models/selection.js').SelectionModel>} props.selection
  * @param {{ path: string, status: string }[]} props.prFiles
  * @param {boolean} props.isPRMode
- * @param {string|null} props.activeFile
- * @param {FileSection|null} props.activeSection
- * @param {(path: string, section: FileSection) => void} props.onSelect
  * @param {(path: string) => void} [props.onStage]
  * @param {(path: string) => void} [props.onUnstage]
  * @param {(path: string) => void} [props.onDiscard]
@@ -27,14 +25,10 @@ import { CommitPanel } from './CommitPanel.jsx';
  * @param {(message: string) => void | Promise<void>} [props.onCommit]
  */
 export function FileTree({
-  conflicts,
-  staged,
-  unstaged,
+  workingTree,
+  selection,
   prFiles,
   isPRMode,
-  activeFile,
-  activeSection,
-  onSelect,
   onStage,
   onUnstage,
   onDiscard,
@@ -46,18 +40,39 @@ export function FileTree({
   const [stagedOpen, setStagedOpen] = useState(true);
   const [unstagedOpen, setUnstagedOpen] = useState(true);
 
-  const selectConflict = useCallback((path) => onSelect?.(path, 'conflict'), [onSelect]);
-  const selectStaged = useCallback((path) => onSelect?.(path, 'staged'), [onSelect]);
-  const selectUnstaged = useCallback((path) => onSelect?.(path, 'unstaged'), [onSelect]);
-  const selectPR = useCallback((path) => onSelect?.(path, 'pr'), [onSelect]);
+  const selectConflict = useCallback(
+    (path) => selection.select(path, 'conflict'),
+    [selection]
+  );
+  const selectStaged = useCallback(
+    (path) => selection.select(path, 'staged'),
+    [selection]
+  );
+  const selectUnstaged = useCallback(
+    (path) => selection.select(path, 'unstaged'),
+    [selection]
+  );
+  const selectPR = useCallback(
+    (path) => selection.select(path, 'pr'),
+    [selection]
+  );
+
+  const hasConflicts = useComputed(() => workingTree.conflicts.value.length > 0);
+  const conflictsCount = useComputed(() => workingTree.conflicts.value.length);
+  const stagedCount = useComputed(() => workingTree.staged.value.length);
+  const unstagedCount = useComputed(() => workingTree.unstaged.value.length);
+  const hasStaged = useComputed(() => workingTree.staged.value.length > 0);
+  const hasUnstaged = useComputed(() => workingTree.unstaged.value.length > 0);
 
   if (isPRMode) {
     return (
       <div class="file-tree-sidebar">
         <div class="file-tree-scroll">
-          <ChangeTree
+          <SignalChangeTree
+            filesSignal={null}
             files={prFiles}
-            activeFile={activeSection === 'pr' ? activeFile : null}
+            selection={selection}
+            section="pr"
             onSelect={selectPR}
           />
         </div>
@@ -68,23 +83,26 @@ export function FileTree({
   return (
     <div class="file-tree-sidebar">
       <div class="file-tree-scroll">
-        {conflicts.length > 0 && (
-          <ChangeSection
-            title="Conflicts"
-            count={conflicts.length}
-            open={conflictsOpen}
-            onToggle={() => setConflictsOpen((v) => !v)}
-          >
-            <ChangeTree
-              files={conflicts}
-              activeFile={activeSection === 'conflict' ? activeFile : null}
-              onSelect={selectConflict}
-              flat
-              showStage
-              onStage={onStage}
-            />
-          </ChangeSection>
-        )}
+        <Show when={hasConflicts}>
+          {() => (
+            <ChangeSection
+              title="Conflicts"
+              countSignal={conflictsCount}
+              open={conflictsOpen}
+              onToggle={() => setConflictsOpen((v) => !v)}
+            >
+              <SignalChangeTree
+                filesSignal={workingTree.conflicts}
+                selection={selection}
+                section="conflict"
+                onSelect={selectConflict}
+                flat
+                showStage
+                onStage={onStage}
+              />
+            </ChangeSection>
+          )}
+        </Show>
 
         <section class="change-section change-section-staged">
           <div class="change-section-header">
@@ -98,9 +116,9 @@ export function FileTree({
                 <IconChevronRight size={12} stroke={1.75} />
               </span>
               <span class="change-section-title">Staged Changes</span>
-              <span class="change-section-count">{staged.length}</span>
+              <span class="change-section-count">{stagedCount}</span>
             </button>
-            {staged.length > 0 && (
+            <Show when={hasStaged}>
               <button
                 type="button"
                 class="change-section-action"
@@ -111,51 +129,60 @@ export function FileTree({
               >
                 Unstage All
               </button>
-            )}
+            </Show>
           </div>
 
-          <CommitPanel stagedCount={staged.length} onCommit={onCommit} />
+          <StagedCommitPanel stagedCount={stagedCount} onCommit={onCommit} />
 
           {stagedOpen && (
             <div class="change-section-body">
-              {staged.length > 0 ? (
-                <ChangeTree
-                  files={staged}
-                  activeFile={activeSection === 'staged' ? activeFile : null}
-                  onSelect={selectStaged}
-                  flat
-                  showUnstage
-                  onUnstage={onUnstage}
-                />
-              ) : (
-                <div class="change-section-empty">No staged changes</div>
-              )}
+              <Show
+                when={hasStaged}
+                fallback={<div class="change-section-empty">No staged changes</div>}
+              >
+                {() => (
+                  <SignalChangeTree
+                    filesSignal={workingTree.staged}
+                    selection={selection}
+                    section="staged"
+                    onSelect={selectStaged}
+                    flat
+                    showUnstage
+                    onUnstage={onUnstage}
+                  />
+                )}
+              </Show>
             </div>
           )}
         </section>
 
         <ChangeSection
           title="Changes"
-          count={unstaged.length}
+          countSignal={unstagedCount}
           open={unstagedOpen}
           onToggle={() => setUnstagedOpen((v) => !v)}
-          actionLabel={unstaged.length > 0 ? 'Stage All' : null}
+          actionLabelSignal={hasUnstaged}
+          actionLabel="Stage All"
           onAction={onStageAll}
         >
-          {unstaged.length > 0 ? (
-            <ChangeTree
-              files={unstaged}
-              activeFile={activeSection === 'unstaged' ? activeFile : null}
-              onSelect={selectUnstaged}
-              flat
-              showStage
-              showDiscard
-              onStage={onStage}
-              onDiscard={onDiscard}
-            />
-          ) : (
-            <div class="change-section-empty">No changes</div>
-          )}
+          <Show
+            when={hasUnstaged}
+            fallback={<div class="change-section-empty">No changes</div>}
+          >
+            {() => (
+              <SignalChangeTree
+                filesSignal={workingTree.unstaged}
+                selection={selection}
+                section="unstaged"
+                onSelect={selectUnstaged}
+                flat
+                showStage
+                showDiscard
+                onStage={onStage}
+                onDiscard={onDiscard}
+              />
+            )}
+          </Show>
         </ChangeSection>
       </div>
     </div>
@@ -163,16 +190,69 @@ export function FileTree({
 }
 
 /**
+ * Unboxes file-list + selection signals so ChangeTree stays array-based.
+ */
+function SignalChangeTree({
+  filesSignal,
+  files,
+  selection,
+  section,
+  onSelect,
+  flat,
+  showStage,
+  showUnstage,
+  showDiscard,
+  onStage,
+  onUnstage,
+  onDiscard,
+}) {
+  const list = filesSignal ? filesSignal.value : files;
+  const activeFile =
+    selection.activeSection.value === section ? selection.activeFile.value : null;
+
+  return (
+    <ChangeTree
+      files={list}
+      activeFile={activeFile}
+      onSelect={onSelect}
+      flat={flat}
+      showStage={showStage}
+      showUnstage={showUnstage}
+      showDiscard={showDiscard}
+      onStage={onStage}
+      onUnstage={onUnstage}
+      onDiscard={onDiscard}
+    />
+  );
+}
+
+function StagedCommitPanel({ stagedCount, onCommit }) {
+  return <CommitPanel stagedCount={stagedCount.value} onCommit={onCommit} />;
+}
+
+/**
  * @param {Object} props
  * @param {string} props.title
- * @param {number} props.count
+ * @param {number} [props.count]
+ * @param {import('@preact/signals-core').Signal<number>} [props.countSignal]
  * @param {boolean} props.open
  * @param {() => void} props.onToggle
  * @param {string|null} [props.actionLabel]
+ * @param {import('@preact/signals-core').Signal<boolean>} [props.actionLabelSignal]
  * @param {() => void} [props.onAction]
  * @param {import('preact').ComponentChildren} props.children
  */
-function ChangeSection({ title, count, open, onToggle, actionLabel = null, onAction, children }) {
+function ChangeSection({
+  title,
+  count,
+  countSignal,
+  open,
+  onToggle,
+  actionLabel = null,
+  actionLabelSignal,
+  onAction,
+  children,
+}) {
   return (
     <section class="change-section">
       <div class="change-section-header">
@@ -186,19 +266,36 @@ function ChangeSection({ title, count, open, onToggle, actionLabel = null, onAct
             <IconChevronRight size={12} stroke={1.75} />
           </span>
           <span class="change-section-title">{title}</span>
-          <span class="change-section-count">{count}</span>
+          <span class="change-section-count">
+            {countSignal != null ? countSignal : count}
+          </span>
         </button>
-        {actionLabel && (
-          <button
-            type="button"
-            class="change-section-action"
-            onClick={(e) => {
-              e.stopPropagation();
-              onAction?.();
-            }}
-          >
-            {actionLabel}
-          </button>
+        {actionLabelSignal != null ? (
+          <Show when={actionLabelSignal}>
+            <button
+              type="button"
+              class="change-section-action"
+              onClick={(e) => {
+                e.stopPropagation();
+                onAction?.();
+              }}
+            >
+              {actionLabel}
+            </button>
+          </Show>
+        ) : (
+          actionLabel && (
+            <button
+              type="button"
+              class="change-section-action"
+              onClick={(e) => {
+                e.stopPropagation();
+                onAction?.();
+              }}
+            >
+              {actionLabel}
+            </button>
+          )
         )}
       </div>
       {open && <div class="change-section-body">{children}</div>}

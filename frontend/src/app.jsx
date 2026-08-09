@@ -1,6 +1,10 @@
 import { useState, useCallback, useEffect, useRef } from 'preact/hooks';
+import { useModel, useSignal } from '@preact/signals';
+import { Show } from '@preact/signals/utils';
 import './app.css';
 import { setupWailsEvents, api, watchFullscreen } from './wails.js';
+import { WorkingTreeModel } from './models/workingTree.js';
+import { SelectionModel } from './models/selection.js';
 import { ThemeProvider } from './theme/ThemeProvider.jsx';
 import { EditProvider } from './components/EditProvider.jsx';
 import { PRPicker } from './components/PRPicker.jsx';
@@ -20,13 +24,7 @@ import { TerminalDock, isTerminalFocusTarget } from './components/terminal/Termi
 const EMPTY_FILES = [];
 
 export function App() {
-  const [activeFile, setActiveFile] = useState(null);
-  /** @type {[null | 'conflict' | 'staged' | 'unstaged' | 'pr', function]} */
-  const [activeSection, setActiveSection] = useState(null);
   const [activePR, setActivePR] = useState(null);
-  const [staged, setStaged] = useState([]);
-  const [unstaged, setUnstaged] = useState([]);
-  const [conflicts, setConflicts] = useState([]);
   const [branches, setBranches] = useState({ current: 'main', local: [], remote: [] });
   // Confirmation dialog state
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -43,9 +41,6 @@ export function App() {
 
   // Preferences state
   const [preferencesOpen, setPreferencesOpen] = useState(false);
-
-  // Active diff data (from Go events)
-  const [activeDiff, setActiveDiff] = useState(null);
 
   // Project state
   const [projectName, setProjectName] = useState('');
@@ -73,41 +68,48 @@ export function App() {
   useEffect(() => { terminalOpenRef.current = terminalOpen; }, [terminalOpen]);
   useEffect(() => { terminalHeightRef.current = terminalHeight; }, [terminalHeight]);
 
-  // Refs for stable access in event callbacks
-  const activeFileRef = useRef(activeFile);
-  const activeSectionRef = useRef(activeSection);
+  // Bridge remaining PR useState into a live signal for SelectionModel.
+  // Keep writes synchronous so selection's diff-fetch effect never sees a stale PR.
+  const activePRSignal = useSignal(/** @type {number|null} */ (null));
+  const setActivePRBoth = useCallback((next) => {
+    const value = typeof next === 'function' ? next(activePRSignal.peek()) : next;
+    activePRSignal.value = value;
+    setActivePR(value);
+  }, [activePRSignal]);
+
+  const workingTree = useModel(() => new WorkingTreeModel({
+    onError: (title, message) => {
+      setToasts((prev) => [...prev, { id: Date.now().toString(), title, message }]);
+    },
+  }));
+
+  const selection = useModel(() => new SelectionModel({
+    workingTree,
+    activePR: activePRSignal,
+  }));
+
+  // Models / PR bridge are stable for App lifetime; keep refs for the mount-once event effect.
+  const workingTreeRef = useRef(workingTree);
+  const selectionRef = useRef(selection);
+  const activePRSignalRef = useRef(activePRSignal);
+  workingTreeRef.current = workingTree;
+  selectionRef.current = selection;
+  activePRSignalRef.current = activePRSignal;
+
   const activePRRef = useRef(activePR);
-  useEffect(() => { activeFileRef.current = activeFile; }, [activeFile]);
-  useEffect(() => { activeSectionRef.current = activeSection; }, [activeSection]);
   useEffect(() => { activePRRef.current = activePR; }, [activePR]);
 
-  // Derived PR mode flags (must be declared before effects that reference them)
   const isPRMode = activePR != null;
   const currentPR = isPRMode ? prList.find((p) => p.number === activePR) : null;
-  const currentDiff = activeDiff;
-  const isConflictActive = !isPRMode && activeSection === 'conflict';
 
   // Setup Wails events
   useEffect(() => {
     setupWailsEvents({
       onFileStatusChanged: (data) => {
-        const nextStaged = data.staged ?? [];
-        const nextUnstaged = data.unstaged ?? [];
-        const nextConflicts = data.conflicts ?? [];
-        setStaged(nextStaged);
-        setUnstaged(nextUnstaged);
-        setConflicts(nextConflicts);
-        // Set initial active file if none set
-        if (!activeFileRef.current) {
-          const first =
-            nextConflicts[0] ?? nextStaged[0] ?? nextUnstaged[0] ?? null;
-          if (first) {
-            setActiveFile(first.path);
-            setActiveSection(
-              nextConflicts[0] ? 'conflict' : nextStaged[0] ? 'staged' : 'unstaged'
-            );
-          }
-        }
+        const wt = workingTreeRef.current;
+        const sel = selectionRef.current;
+        wt.applyStatus(data);
+        sel.selectFirstFromWorkingTreeIfNeeded();
       },
       onBranchChanged: (data) => {
         setBranches(data);
@@ -117,7 +119,7 @@ export function App() {
         setAhead(data.ahead ?? 0);
       },
       onDiffLoaded: (data) => {
-        setActiveDiff(data);
+        selectionRef.current.applyDiff(data);
       },
       onGHStatusChanged: (data) => {
         setGhStatus(data ?? { installed: false, version: '', user: '' });
@@ -135,13 +137,13 @@ export function App() {
           )
         );
         // Auto-select first file if this is the active PR and no file selected
-        setActivePR((currentPR) => {
-          if (currentPR === number && !activeFileRef.current && files.length > 0) {
-            setActiveFile(files[0].path);
-            setActiveSection('pr');
-          }
-          return currentPR;
-        });
+        if (
+          activePRSignalRef.current.peek() === number &&
+          !selectionRef.current.activeFile.peek() &&
+          files.length > 0
+        ) {
+          selectionRef.current.select(files[0].path, 'pr');
+        }
       },
       onPRCommentsUpdated: (data) => {
         try {
@@ -176,9 +178,8 @@ export function App() {
       onProjectChanged: (data) => {
         setProjectName(data.name ?? '');
         setProjectPath(data.path ?? '');
-        setActiveFile(null);
-        setActiveSection(null);
-        setActiveDiff(null);
+        selectionRef.current.clear();
+        activePRSignalRef.current.value = null;
         setActivePR(null);
       },
       onRecentProjectsUpdated: (data) => {
@@ -190,15 +191,7 @@ export function App() {
         }
       },
       onRefreshCompleted: () => {
-        // Re-fetch diff for the currently active file
-        const file = activeFileRef.current;
-        const section = activeSectionRef.current;
-        const pr = activePRRef.current;
-        if (file && pr == null) {
-          api.getDiff(file, section === 'staged');
-        } else if (file && pr != null) {
-          api.getPRFileDiff(pr, file);
-        }
+        selectionRef.current.refetch();
       },
     });
   }, []);
@@ -279,16 +272,6 @@ export function App() {
     return () => cleanup();
   }, [isMacOS]);
 
-  // Fetch diff when active file / section changes
-  useEffect(() => {
-    if (!activeFile) return;
-    if (isPRMode && activePR != null) {
-      api.getPRFileDiff(activePR, activeFile);
-    } else {
-      api.getDiff(activeFile, activeSection === 'staged');
-    }
-  }, [activeFile, activeSection, isPRMode, activePR]);
-
   // Fetch PR comments when active PR changes
   useEffect(() => {
     if (isPRMode && activePR != null) {
@@ -305,17 +288,10 @@ export function App() {
       );
       setPrPrompt(pr);
     } else {
-      setActivePR(null);
-      const next =
-        conflicts[0] ? { path: conflicts[0].path, section: 'conflict' }
-          : staged[0] ? { path: staged[0].path, section: 'staged' }
-            : unstaged[0] ? { path: unstaged[0].path, section: 'unstaged' }
-              : null;
-      setActiveFile(next?.path ?? null);
-      setActiveSection(next?.section ?? null);
-      setActiveDiff(null);
+      setActivePRBoth(null);
+      selection.selectFirstFromWorkingTree();
     }
-  }, [staged, unstaged, conflicts]);
+  }, [selection, setActivePRBoth]);
 
   function pushToast(title, message) {
     setToasts((prev) => [...prev, { id: Date.now().toString(), title, message }]);
@@ -327,16 +303,14 @@ export function App() {
 
   const handleViewPRDiff = useCallback((pr) => {
     setPrPrompt(null);
-    setActivePR(pr.number);
+    setActivePRBoth(pr.number);
     if (pr.files && pr.files.length > 0) {
-      setActiveFile(pr.files[0].path);
-      setActiveSection('pr');
+      selection.select(pr.files[0].path, 'pr');
     } else {
-      setActiveFile(null);
-      setActiveSection(null);
+      selection.clear();
       api.getPRFiles(pr.number);
     }
-  }, []);
+  }, [selection, setActivePRBoth]);
 
   const handleCheckoutPRLocal = useCallback((pr) => {
     api.checkoutPR(pr.number).catch((err) => {
@@ -355,31 +329,21 @@ export function App() {
       api.switchBranch(branch);
     }
     if (isPRMode) {
-      setActivePR(null);
-      setActiveFile(null);
-      setActiveSection(null);
-      setActiveDiff(null);
+      setActivePRBoth(null);
+      selection.clear();
     }
-  }, [isPRMode]);
-
-  const handleSelectFile = useCallback((path, section) => {
-    setActiveFile(path);
-    setActiveSection(section);
-  }, []);
+  }, [isPRMode, selection, setActivePRBoth]);
 
   const handleStage = useCallback((path) => {
-    const conflictFile = conflicts.find((f) => f.path === path);
+    const conflictFile = workingTree.conflicts.peek().find((f) => f.path === path);
     if (conflictFile) {
       setPendingConfirmFile(path);
       setConfirmKind('stage-conflict');
       setConfirmOpen(true);
       return;
     }
-
-    api.stageFile(path).catch((err) => {
-      pushToast('Stage Error', err.message);
-    });
-  }, [conflicts]);
+    workingTree.stage(path);
+  }, [workingTree]);
 
   const handleDiscard = useCallback((path) => {
     setPendingConfirmFile(path);
@@ -396,62 +360,19 @@ export function App() {
     if (!path) return;
 
     if (kind === 'stage-conflict') {
-      api.stageFile(path).catch((err) => {
-        pushToast('Stage Error', err.message);
-      });
+      workingTree.stage(path);
       return;
     }
     if (kind === 'discard') {
-      api.discardFile(path).catch((err) => {
-        pushToast('Discard Error', err.message);
-      });
+      workingTree.discard(path);
     }
-  }, [pendingConfirmFile, confirmKind]);
+  }, [pendingConfirmFile, confirmKind, workingTree]);
 
   const handleCancelConfirm = useCallback(() => {
     setConfirmOpen(false);
     setPendingConfirmFile(null);
     setConfirmKind(null);
   }, []);
-
-  const handleUnstage = useCallback((path) => {
-    api.unstageFile(path).catch((err) => {
-      pushToast('Unstage Error', err.message);
-    });
-  }, []);
-
-  const handleCommit = useCallback(async (message) => {
-    try {
-      await api.commit(message.trim());
-    } catch (err) {
-      pushToast('Commit Error', err.message);
-      throw err;
-    }
-  }, []);
-
-  const handleStageAll = useCallback(async () => {
-    const paths = unstaged.map((f) => f.path);
-    for (const path of paths) {
-      try {
-        await api.stageFile(path);
-      } catch (err) {
-        pushToast('Stage Error', err.message);
-        break;
-      }
-    }
-  }, [unstaged]);
-
-  const handleUnstageAll = useCallback(async () => {
-    const paths = staged.map((f) => f.path);
-    for (const path of paths) {
-      try {
-        await api.unstageFile(path);
-      } catch (err) {
-        pushToast('Unstage Error', err.message);
-        break;
-      }
-    }
-  }, [staged]);
 
   const handlePull = useCallback(() => {
     api.pull().catch((err) => {
@@ -493,7 +414,10 @@ export function App() {
 
   const shellClass = `app-shell${isMacOS ? ' macos' : ''}${isMacOS && isFullscreenMode ? ' macos-fullscreen' : ''}`;
 
-  const isUnstaged = activeSection === 'unstaged';
+  // Confirm dialog title/message peek unstaged only when dialog is open (event handlers).
+  const pendingUnstagedStatus = pendingConfirmFile
+    ? workingTree.unstaged.peek().find((f) => f.path === pendingConfirmFile)?.status
+    : undefined;
 
   return (
     <ThemeProvider>
@@ -524,43 +448,41 @@ export function App() {
 
           <aside class="app-sidebar">
             <FileTree
-              conflicts={isPRMode ? EMPTY_FILES : conflicts}
-              staged={isPRMode ? EMPTY_FILES : staged}
-              unstaged={isPRMode ? EMPTY_FILES : unstaged}
+              workingTree={workingTree}
+              selection={selection}
               prFiles={isPRMode ? (currentPR?.files ?? EMPTY_FILES) : EMPTY_FILES}
               isPRMode={isPRMode}
-              activeFile={activeFile}
-              activeSection={activeSection}
-              onSelect={handleSelectFile}
               onStage={handleStage}
-              onUnstage={handleUnstage}
+              onUnstage={(path) => workingTree.unstage(path)}
               onDiscard={handleDiscard}
-              onStageAll={handleStageAll}
-              onUnstageAll={handleUnstageAll}
-              onCommit={handleCommit}
+              onStageAll={() => workingTree.stageAll()}
+              onUnstageAll={() => workingTree.unstageAll()}
+              onCommit={(message) => workingTree.commit(message)}
             />
           </aside>
 
           <main class="app-main">
-            {currentDiff ? (
-              isConflictActive ? (
-                <ConflictViewer
-                  patch={currentDiff.patch}
-                  filename={currentDiff.path}
-                />
-              ) : (
-                <DiffViewer
-                  patch={currentDiff.patch}
-                  filename={currentDiff.path}
-                  isPRMode={isPRMode}
-                  isUnstaged={isUnstaged}
-                  comments={isPRMode ? prComments : []}
-                  onPostComment={handlePostComment}
-                />
-              )
-            ) : (
-              <div class="diff-empty">Select a file to view changes</div>
-            )}
+            <Show
+              when={selection.activeDiff}
+              fallback={<div class="diff-empty">Select a file to view changes</div>}
+            >
+              {() => (
+                <Show
+                  when={selection.isConflict}
+                  fallback={
+                    <DiffViewer
+                      activeDiff={selection.activeDiff}
+                      isPRMode={isPRMode}
+                      isUnstaged={selection.isUnstaged}
+                      comments={isPRMode ? prComments : []}
+                      onPostComment={handlePostComment}
+                    />
+                  }
+                >
+                  <ConflictViewer activeDiff={selection.activeDiff} />
+                </Show>
+              )}
+            </Show>
           </main>
 
           <TerminalDock
@@ -581,14 +503,14 @@ export function App() {
             filename={pendingConfirmFile ?? ''}
             title={
               confirmKind === 'discard'
-                ? (unstaged.find((f) => f.path === pendingConfirmFile)?.status === 'U'
+                ? (pendingUnstagedStatus === 'U'
                     ? 'Delete untracked file?'
                     : 'Discard changes?')
                 : 'Stage conflicted file?'
             }
             message={
               confirmKind === 'discard' ? (
-                unstaged.find((f) => f.path === pendingConfirmFile)?.status === 'U' ? (
+                pendingUnstagedStatus === 'U' ? (
                   <>
                     Permanently delete <code>{pendingConfirmFile ?? ''}</code>?
                     This cannot be undone.
@@ -603,7 +525,7 @@ export function App() {
             }
             confirmLabel={
               confirmKind === 'discard'
-                ? (unstaged.find((f) => f.path === pendingConfirmFile)?.status === 'U'
+                ? (pendingUnstagedStatus === 'U'
                     ? 'Delete'
                     : 'Discard')
                 : 'Stage with markers'
