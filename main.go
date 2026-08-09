@@ -63,8 +63,6 @@ func main() {
 		Height:        768,
 		MinWidth:      800,
 		MinHeight:     600,
-		MaxWidth:      1920,
-		MaxHeight:     1080,
 		DisableResize: false,
 		Fullscreen:    false,
 		Frameless:     false,
@@ -72,11 +70,13 @@ func main() {
 		AssetServer: &assetserver.Options{
 			Assets: assets,
 		},
-		BackgroundColour: &options.RGBA{R: 17, G: 17, B: 17, A: 1},
+		// Transparent webview + native vibrancy for sidebar frost.
+		// TitleBarHidden keeps system traffic lights over full-size content.
+		BackgroundColour: &options.RGBA{R: 0, G: 0, B: 0, A: 0},
 		Mac: &mac.Options{
 			TitleBar:             mac.TitleBarHidden(),
-			Appearance:           mac.NSAppearanceNameDarkAqua,
-			WebviewIsTransparent: false,
+			WebviewIsTransparent: true,
+			WindowIsTranslucent:  true,
 			About: &mac.AboutInfo{
 				Title:   "conflicto",
 				Message: "© 2026 conflicto",

@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from 'preact/hooks';
 import { IconChevronDown, IconX } from '@tabler/icons-preact';
 import { VirtualList } from './VirtualList.jsx';
+import { AnchoredMenu } from './AnchoredMenu.jsx';
 import { api } from '../wails.js';
 
 /**
@@ -18,7 +19,7 @@ export function PRPicker({ selectedPR, currentPR, onSelect, onError }) {
   const [loading, setLoading] = useState(false);
   const [hasMore, setHasMore] = useState(true);
 
-  const ref = useRef(null);
+  const triggerRef = useRef(null);
   const searchRef = useRef(null);
   const cacheRef = useRef({ query: '', limit: 10, results: [], fetchedAt: 0 });
   const lastFetchRef = useRef(0);
@@ -56,19 +57,6 @@ export function PRPicker({ selectedPR, currentPR, onSelect, onError }) {
     },
     [onError]
   );
-
-  // Close on click outside
-  useEffect(() => {
-    function onClick(e) {
-      if (ref.current && !ref.current.contains(e.target)) {
-        setOpen(false);
-      }
-    }
-    if (open) {
-      document.addEventListener('mousedown', onClick);
-      return () => document.removeEventListener('mousedown', onClick);
-    }
-  }, [open]);
 
   // Auto-focus search when dropdown opens
   useEffect(() => {
@@ -121,8 +109,9 @@ export function PRPicker({ selectedPR, currentPR, onSelect, onError }) {
   }
 
   return (
-    <div class="pr-picker" ref={ref}>
+    <div class="pr-picker">
       <button
+        ref={triggerRef}
         type="button"
         class={`pr-trigger${selectedPR ? ' active' : ''}`}
         onClick={() => setOpen(!open)}
@@ -134,65 +123,69 @@ export function PRPicker({ selectedPR, currentPR, onSelect, onError }) {
         <IconChevronDown size={10} class={open ? 'open' : ''} />
       </button>
 
-      {open && (
-        <div class="pr-dropdown">
-          {/* Header: isolated from the scrollable body */}
-          <div class="pr-dropdown-header">
-            {selectedPR && (
-              <button type="button" class="pr-close" onClick={closePR}>
-                <IconX size={12} />
-                Close PR #{selectedPR}
-              </button>
-            )}
-            <input
-              ref={searchRef}
-              type="text"
-              class="pr-search"
-              value={query}
-              placeholder="Search PRs..."
-              onInput={(e) => setQuery(e.target.value)}
-              onKeyDown={(e) => {
-                if ((e.metaKey || e.ctrlKey) && e.key === 'a') {
-                  e.preventDefault();
-                  e.target.select();
-                }
-              }}
-            />
-          </div>
-
-          {/* Body: scrollable area */}
-          <div class="pr-dropdown-body">
-            {results.length === 0 && !loading ? (
-              <div class="pr-empty">No PRs found</div>
-            ) : (
-              <VirtualList
-                className="pr-virtual-list"
-                items={results}
-                itemHeight={48}
-                overscan={3}
-                onScrollEnd={handleScrollEnd}
-                renderItem={(pr) => (
-                  <button
-                    type="button"
-                    class={`pr-option${selectedPR === pr.number ? ' selected' : ''}`}
-                    onClick={() => selectPR(pr)}
-                  >
-                    <div class="pr-option-top">
-                      <span class="pr-number">#{pr.number}</span>
-                      <span class="pr-title">{pr.title}</span>
-                    </div>
-                    <div class="pr-option-meta">
-                      {pr.author} &rarr; {pr.baseBranch}
-                    </div>
-                  </button>
-                )}
-              />
-            )}
-
-            {loading && <div class="pr-loading">Loading...</div>}
-          </div>
+      <AnchoredMenu
+        open={open}
+        onClose={() => setOpen(false)}
+        anchorRef={triggerRef}
+        placement="bottom"
+        alignment="end"
+        offset={4}
+        className="pr-dropdown"
+      >
+        <div class="pr-dropdown-header">
+          {selectedPR && (
+            <button type="button" class="pr-close" onClick={closePR}>
+              <IconX size={12} />
+              Close PR #{selectedPR}
+            </button>
+          )}
+          <input
+            ref={searchRef}
+            type="text"
+            class="pr-search"
+            value={query}
+            placeholder="Search PRs..."
+            onInput={(e) => setQuery(e.target.value)}
+            onKeyDown={(e) => {
+              if ((e.metaKey || e.ctrlKey) && e.key === 'a') {
+                e.preventDefault();
+                e.target.select();
+              }
+            }}
+          />
         </div>
-      )}
+
+        <div class="pr-dropdown-body">
+          {results.length === 0 && !loading ? (
+            <div class="pr-empty">No PRs found</div>
+          ) : (
+            <VirtualList
+              className="pr-virtual-list"
+              items={results}
+              itemHeight={48}
+              overscan={3}
+              onScrollEnd={handleScrollEnd}
+              renderItem={(pr) => (
+                <button
+                  type="button"
+                  class={`pr-option${selectedPR === pr.number ? ' selected' : ''}`}
+                  onClick={() => selectPR(pr)}
+                >
+                  <div class="pr-option-top">
+                    <span class="pr-number">#{pr.number}</span>
+                    <span class="pr-title">{pr.title}</span>
+                  </div>
+                  <div class="pr-option-meta">
+                    {pr.author} &rarr; {pr.baseBranch}
+                  </div>
+                </button>
+              )}
+            />
+          )}
+
+          {loading && <div class="pr-loading">Loading...</div>}
+        </div>
+      </AnchoredMenu>
 
       <style>{`
         .pr-picker {
@@ -235,18 +228,9 @@ export function PRPicker({ selectedPR, currentPR, onSelect, onError }) {
           white-space: nowrap;
           min-width: 0;
         }
-        .pr-dropdown {
-          position: absolute;
-          top: calc(100% + 4px);
-          right: 0;
+        .anchored-menu.pr-dropdown {
           min-width: 280px;
           max-width: 340px;
-          max-height: 40vh;
-          background: var(--surface-raised);
-          border: none;
-          border-radius: 8px;
-          box-shadow: 0 8px 24px rgba(0,0,0,0.4);
-          z-index: 100;
           padding: 4px;
           display: flex;
           flex-direction: column;

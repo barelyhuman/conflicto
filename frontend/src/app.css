@@ -1,100 +1,230 @@
+/* ── Window shell: flat sidebar + floating content island ── */
+
 .app-shell {
-  display: grid;
-  grid-template-rows: 38px 1fr minmax(0, auto) 32px;
-  grid-template-columns: 260px 1fr;
   height: 100%;
   width: 100%;
   overflow: hidden;
+  background: transparent;
+  display: flex;
+  flex-direction: column;
+  padding: 0;
 }
 
-/* macOS: compact header to align with traffic lights */
-.app-shell.macos {
-  grid-template-rows: 30px 1fr minmax(0, auto) 30px;
+.window {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  background: transparent;
+  position: relative;
+  overflow: hidden;
 }
 
-/* Header — Wails drag region (not Electron -webkit-app-region) */
-.app-header {
-  grid-column: 1 / -1;
+.window-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  position: relative;
+  /* Shared frost chrome under sidebar + island notches */
+  background: color-mix(in srgb, var(--card-bg) 35%, transparent);
+  backdrop-filter: blur(48px) saturate(190%) brightness(1.08);
+  -webkit-backdrop-filter: blur(48px) saturate(190%) brightness(1.08);
+}
+
+@media (prefers-color-scheme: light) {
+  .window-body {
+    background: color-mix(in srgb, var(--card-bg) 55%, transparent);
+    backdrop-filter: blur(48px) saturate(170%) brightness(1.1);
+    -webkit-backdrop-filter: blur(48px) saturate(170%) brightness(1.1);
+  }
+}
+
+/* ── Sidebar: sits on shared window-body frost (no second tint layer) ── */
+
+.sidebar {
+  width: 250px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  /* Clear native macOS traffic lights (TitleBarHidden) */
+  padding-top: 52px;
+  min-height: 0;
+  position: relative;
+  --wails-draggable: drag;
+  background: transparent;
+  border-right: none;
+  transition: width 0.18s ease, opacity 0.18s ease, padding 0.18s ease;
+  overflow: hidden;
+}
+
+.sidebar > * {
+  position: relative;
+  z-index: 1;
+  --wails-draggable: no-drag;
+}
+
+.window-body.sidebar-collapsed .sidebar {
+  width: 0;
+  padding-top: 0;
+  opacity: 0;
+  pointer-events: none;
+  border: none;
+}
+
+/* Clear native traffic lights when the island is full-bleed */
+.app-shell.macos .window-body.sidebar-collapsed .island-header {
+  padding-left: 78px;
+}
+
+/* Fullscreen hides system traffic lights — revert clearance */
+.app-shell.macos.macos-fullscreen .sidebar {
+  padding-top: 12px;
+}
+
+.app-shell.macos.macos-fullscreen .window-body.sidebar-collapsed .island-header {
+  padding-left: 0;
+}
+
+.sidebar-project {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 12px 8px;
+  min-width: 0;
+}
+
+.sidebar-project .project-picker {
+  flex: 1;
+  min-width: 0;
+}
+
+.actions-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 16px;
-  background: var(--surface);
-  flex-shrink: 0;
-  z-index: 10;
-  --wails-draggable: drag;
-}
-
-.app-header-left {
-  display: flex;
-  align-items: center;
+  padding: 0 12px 10px;
   gap: 8px;
-  min-height: 0;
 }
 
-.app-header-left .project-picker {
-  --wails-draggable: no-drag;
-}
-
-.app-logo {
-  font-size: 14px;
-  font-weight: 500;
-  letter-spacing: 0.02em;
-  color: var(--text-h);
-}
-
-.app-breadcrumb-sep {
-  color: var(--text-muted);
-  font-size: 13px;
-  user-select: none;
-}
-
-/* macOS: provide padding for traffic lights with hidden titlebar */
-.app-shell.macos .app-header {
-  padding-left: 70px;
-}
-
-/* macOS fullscreen: traffic lights hidden, revert padding */
-.app-shell.macos.macos-fullscreen .app-header {
-  padding-left: 16px;
-}
-
-.app-header-actions {
+.actions-row-end {
   display: flex;
   align-items: center;
-  gap: 6px;
-  min-height: 0;
-  --wails-draggable: no-drag;
+  gap: 4px;
+  flex-shrink: 0;
 }
 
-.create-pr-trigger {
-  padding: 2px 8px;
-  border-radius: 5px;
+.branch-pill,
+.branch-picker .branch-trigger.pill {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 9px;
+  background: rgba(127, 127, 127, 0.12);
+  border-radius: 7px;
   border: none;
-  background: var(--accent-bg);
-  color: var(--text-h);
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text);
+  cursor: pointer;
+  max-width: 140px;
+  min-width: 0;
+}
+
+.branch-pill svg,
+.branch-picker .branch-trigger.pill svg {
+  width: 11px;
+  height: 11px;
+  flex-shrink: 0;
+  stroke: var(--grey);
+}
+
+.branch-picker .branch-trigger.pill .branch-current {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   font-family: var(--font-sans);
   font-size: 12px;
   font-weight: 500;
-  line-height: 1.25;
-  cursor: pointer;
-  transition: background 0.15s;
-}
-.create-pr-trigger:hover {
-  background: var(--accent-hover);
 }
 
-/* Sidebar */
-.app-sidebar {
-  grid-row: 2;
-  grid-column: 1;
-  background: var(--surface);
-  overflow-y: auto;
-  overflow-x: hidden;
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
+.branch-picker .branch-trigger.pill:hover {
+  background: rgba(127, 127, 127, 0.18);
 }
+
+.sync-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.icon-btn {
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  border: none;
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+  position: relative;
+  padding: 0;
+}
+
+.icon-btn:hover {
+  background: rgba(127, 127, 127, 0.14);
+}
+
+.icon-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.icon-btn:disabled:hover {
+  background: transparent;
+}
+
+.icon-btn svg {
+  width: 13px;
+  height: 13px;
+  stroke: currentColor;
+}
+
+.icon-btn .dot-badge {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--text);
+  border: 1.5px solid color-mix(in srgb, var(--card-bg) 35%, transparent);
+}
+
+.create-pr-trigger {
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  border: none;
+  background: transparent;
+  color: var(--grey);
+  font-family: var(--font-sans);
+  font-size: 10px;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0;
+}
+
+.create-pr-trigger:hover {
+  background: rgba(127, 127, 127, 0.14);
+  color: var(--text);
+}
+
+/* File list — sections share height; each body scrolls on its own */
 
 .file-tree-sidebar {
   display: flex;
@@ -103,29 +233,44 @@
   min-height: 0;
 }
 
-.file-tree-scroll {
+.file-sections {
   flex: 1;
   min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.file-list,
+.file-tree-scroll {
+  flex: 1;
   overflow-y: auto;
-  overflow-x: hidden;
-  padding-bottom: 8px;
+  min-height: 0;
 }
 
 .change-section {
   display: flex;
   flex-direction: column;
   min-width: 0;
+  min-height: 0;
 }
 
+.change-section-open {
+  flex: 1 1 0;
+}
+
+.change-section-collapsed {
+  flex: 0 0 auto;
+}
+
+.sg-header,
 .change-section-header {
   display: flex;
   align-items: center;
-  gap: 4px;
-  padding: 6px 6px 6px 4px;
-  position: sticky;
-  top: 0;
-  z-index: 2;
-  background: var(--surface);
+  justify-content: space-between;
+  padding: 8px 12px 6px;
+  flex-shrink: 0;
+  background: transparent;
 }
 
 .change-section-toggle {
@@ -136,21 +281,16 @@
   gap: 6px;
   border: none;
   background: transparent;
-  color: var(--text-muted);
-  font-family: var(--font-sans);
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.02em;
-  text-transform: uppercase;
+  color: var(--grey);
+  font-family: inherit;
   cursor: pointer;
-  padding: 2px 4px;
+  padding: 2px 4px 2px 0;
   border-radius: 4px;
   text-align: left;
 }
 
 .change-section-toggle:hover {
-  background: var(--accent-bg);
-  color: var(--text-h);
+  color: var(--text);
 }
 
 .change-section-chevron {
@@ -163,121 +303,94 @@
   line-height: 1;
   transform: rotate(0deg);
   transition: transform 0.12s ease;
-  color: var(--text-muted);
+  color: var(--grey);
 }
 
 .change-section-chevron.open {
   transform: rotate(90deg);
 }
 
+.sg-title,
 .change-section-title {
-  flex: 1;
-  min-width: 0;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: inherit;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
+.sg-count,
 .change-section-count {
+  font-size: 11px;
+  color: var(--grey);
+  background: rgba(127, 127, 127, 0.16);
+  border-radius: 10px;
+  padding: 1px 7px;
   font-variant-numeric: tabular-nums;
-  color: var(--text-muted);
-  font-weight: 500;
 }
 
-.change-section-action {
+.sg-actions,
+.change-section-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   flex-shrink: 0;
+}
+
+.sg-icon-btn,
+.change-section-action.sg-icon-btn {
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 5px;
   border: none;
   background: transparent;
-  color: var(--text-muted);
-  font-family: var(--font-sans);
-  font-size: 11px;
-  font-weight: 500;
-  padding: 2px 6px;
-  border-radius: 4px;
+  color: var(--grey);
   cursor: pointer;
+  padding: 0;
+  transition: background 0.12s ease, color 0.12s ease;
 }
 
-.change-section-action:hover {
-  background: var(--accent-bg);
-  color: var(--text-h);
+.sg-icon-btn:hover,
+.change-section-action.sg-icon-btn:hover {
+  background: rgba(127, 127, 127, 0.16);
+  color: var(--text);
+}
+
+.sg-icon-btn svg {
+  width: 13px;
+  height: 13px;
+  stroke: currentColor;
 }
 
 .change-section-body {
+  flex: 1;
+  min-height: 0;
   min-width: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
 }
 
 .change-section-empty {
-  padding: 4px 12px 8px 28px;
-  color: var(--text-muted);
+  padding: 4px 12px 8px 12px;
+  color: var(--grey);
   font-size: 12px;
 }
 
-.commit-panel {
+.divider {
+  height: 1px;
+  background: var(--light-grey);
+  margin: 10px 0;
   flex-shrink: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  padding: 4px 10px 10px;
-  background: var(--surface);
 }
 
-.change-section-staged .commit-panel {
-  border-bottom: 1px solid color-mix(in srgb, var(--text-muted) 18%, transparent);
-  margin-bottom: 2px;
-}
+/* File rows */
 
-.commit-message-input {
-  width: 100%;
-  box-sizing: border-box;
-  resize: vertical;
-  min-height: 56px;
-  max-height: 140px;
-  padding: 8px 10px;
-  border: 1px solid color-mix(in srgb, var(--text-muted) 30%, transparent);
-  border-radius: 6px;
-  background: color-mix(in srgb, var(--accent-bg) 55%, transparent);
-  color: var(--text-h);
-  font-family: var(--font-sans);
-  font-size: 12px;
-  line-height: 1.4;
-}
-
-.commit-message-input::placeholder {
-  color: var(--text-muted);
-}
-
-.commit-message-input:focus {
-  outline: none;
-  border-color: color-mix(in srgb, var(--text-h) 35%, transparent);
-}
-
-.commit-message-input:disabled {
-  opacity: 0.6;
-}
-
-.commit-button {
-  align-self: stretch;
-  border: none;
-  border-radius: 6px;
-  padding: 7px 10px;
-  font-family: var(--font-sans);
-  font-size: 12px;
-  font-weight: 600;
-  cursor: pointer;
-  background: var(--accent-hover);
-  color: var(--text-h);
-}
-
-.commit-button:hover:not(:disabled) {
-  filter: brightness(1.08);
-}
-
-.commit-button:disabled {
-  opacity: 0.45;
-  cursor: not-allowed;
-}
-
-/* Custom sidebar change tree */
 .change-tree {
   display: flex;
   flex-direction: column;
@@ -285,47 +398,31 @@
   padding-bottom: 4px;
 }
 
-.change-tree-row {
+.file-row,
+.change-tree-row.change-tree-file {
   display: flex;
   align-items: center;
+  gap: 8px;
+  padding: 4px 8px 4px 12px;
+  cursor: default;
+  border-radius: 6px;
+  margin: 0 4px;
   min-height: 26px;
   min-width: 0;
-  gap: 4px;
   border: none;
   background: transparent;
   color: var(--text);
-  font-family: var(--font-sans);
-  font-size: 12px;
-  line-height: 1.25;
-  text-align: left;
-  padding-top: 2px;
-  padding-bottom: 2px;
-  padding-right: 6px;
   box-sizing: border-box;
 }
 
-.change-tree-folder {
-  width: 100%;
-  cursor: pointer;
-  color: var(--text-muted);
+.file-row:hover,
+.change-tree-file:hover {
+  background: rgba(127, 127, 127, 0.1);
 }
 
-.change-tree-folder:hover {
-  background: var(--accent-bg);
-  color: var(--text-h);
-}
-
-.change-tree-file {
-  width: 100%;
-}
-
-.change-tree-file:hover,
+.file-row.active,
 .change-tree-file.active {
-  background: var(--accent-bg);
-}
-
-.change-tree-file.active {
-  color: var(--text-h);
+  background: rgba(127, 127, 127, 0.16);
 }
 
 .change-tree-file-main {
@@ -333,14 +430,154 @@
   min-width: 0;
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
   border: none;
   background: transparent;
   color: inherit;
   font: inherit;
   text-align: left;
   cursor: pointer;
-  padding: 4px 0;
+  padding: 0;
+  overflow: hidden;
+}
+
+.status-badge {
+  width: 15px;
+  height: 15px;
+  flex-shrink: 0;
+  border-radius: 4px;
+  border: 1px solid var(--light-grey);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 9px;
+  font-weight: 700;
+  font-family: var(--font-mono);
+  color: var(--grey);
+  background: transparent;
+}
+
+.status-badge.modified {
+  color: var(--text);
+  border-color: var(--grey);
+}
+
+.status-badge.added {
+  color: var(--text);
+  background: rgba(127, 127, 127, 0.2);
+}
+
+.status-badge.deleted {
+  color: var(--grey);
+  text-decoration: line-through;
+}
+
+.status-badge.conflict {
+  color: var(--text);
+  border-color: var(--text);
+}
+
+.file-name {
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex-shrink: 1;
+  min-width: 0;
+}
+
+.file-path {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--grey);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-left: -2px;
+  flex-shrink: 2;
+  min-width: 0;
+}
+
+.row-actions,
+.change-tree-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+.stage-btn,
+.revert-btn {
+  flex-shrink: 0;
+  width: 18px;
+  height: 18px;
+  border: 1px solid var(--light-grey);
+  border-radius: 5px;
+  background: var(--card-bg);
+  color: var(--grey);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1;
+  opacity: 0;
+  cursor: pointer;
+  padding: 0;
+  transition: opacity 0.12s ease, background 0.12s ease, color 0.12s ease, border-color 0.12s ease;
+}
+
+.file-row:hover .stage-btn,
+.file-row:hover .revert-btn,
+.change-tree-file:hover .stage-btn,
+.change-tree-file:hover .revert-btn {
+  opacity: 1;
+}
+
+.stage-btn:hover {
+  background: var(--text);
+  color: var(--bg);
+  border-color: var(--text);
+}
+
+.revert-btn svg {
+  width: 10px;
+  height: 10px;
+  stroke: currentColor;
+}
+
+.revert-btn:hover {
+  background: rgba(127, 127, 127, 0.14);
+  border-color: var(--grey);
+  color: var(--text);
+}
+
+/* Nested tree (PR mode) */
+
+.change-tree-folder {
+  width: calc(100% - 8px);
+  margin: 0 4px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 26px;
+  padding: 4px 8px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--grey);
+  font-family: var(--font-sans);
+  font-size: 12px;
+  cursor: pointer;
+  text-align: left;
+}
+
+.change-tree-folder:hover {
+  background: rgba(127, 127, 127, 0.1);
+  color: var(--text);
 }
 
 .change-tree-chevron {
@@ -351,7 +588,7 @@
   line-height: 1;
   transform: rotate(0deg);
   transition: transform 0.12s ease;
-  color: var(--text-muted);
+  color: var(--grey);
 }
 
 .change-tree-chevron.open {
@@ -364,71 +601,278 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  font-family: var(--font-mono);
+  font-size: 12.5px;
 }
 
-.change-tree-status {
+/* Commit footer — pinned bottom of sidebar */
+
+.commit-footer,
+.commit-panel {
   flex-shrink: 0;
-  font-size: 11px;
-  font-weight: 500;
-  color: var(--text-muted);
-  font-variant-numeric: tabular-nums;
-}
-
-.change-tree-actions {
+  padding: 10px;
   display: flex;
-  align-items: center;
-  gap: 1px;
-  flex-shrink: 0;
-  opacity: 0;
+  flex-direction: column;
+  gap: 8px;
+  background: transparent;
 }
 
-.change-tree-file:hover .change-tree-actions,
-.change-tree-file.active .change-tree-actions {
+.commit-input,
+.commit-message-input {
+  width: 100%;
+  resize: none;
+  border: 1px solid var(--light-grey);
+  border-radius: 8px;
+  background: var(--card-bg);
+  color: var(--text);
+  font-family: inherit;
+  font-size: 12.5px;
+  padding: 8px 10px;
+  height: 50px;
+  min-height: 50px;
+  max-height: 120px;
+  outline: none;
+  box-sizing: border-box;
+  line-height: 1.4;
+}
+
+.commit-input::placeholder,
+.commit-message-input::placeholder {
+  color: var(--grey);
+}
+
+.commit-input:focus,
+.commit-message-input:focus {
+  outline: none;
+  border-color: var(--grey);
+}
+
+.commit-input:disabled,
+.commit-message-input:disabled {
+  opacity: 0.6;
+}
+
+.commit-btn,
+.commit-button {
+  width: 100%;
+  padding: 7px 10px;
+  background: var(--text);
+  color: var(--bg);
+  border: none;
+  border-radius: 8px;
+  font-size: 12.5px;
+  font-weight: 500;
+  cursor: pointer;
+  opacity: 0.35;
+  font-family: inherit;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.commit-btn.enabled,
+.commit-button:not(:disabled) {
   opacity: 1;
 }
 
-.change-tree-action {
+.commit-btn:disabled,
+.commit-button:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.commit-btn.enabled:hover,
+.commit-button:not(:disabled):hover {
+  filter: brightness(1.05);
+}
+
+/* ── Content island ── */
+
+.content-well {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+  min-height: 0;
+  min-width: 0;
+  background: transparent;
+}
+
+.content {
+  flex: 1;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  background: var(--card-bg);
+  border: 1px solid var(--light-grey);
+  /* Full radius — left corners cut the intentional chrome notches against the sidebar. */
+  border-radius: 14px;
+  /* Shadow biased right so it doesn't tint the left notches differently at top vs bottom. */
+  box-shadow:
+    1px 0 2px rgba(0, 0, 0, 0.04),
+    8px 0 24px -12px rgba(0, 0, 0, 0.18);
+  overflow: hidden;
+  min-height: 0;
+}
+
+.window-body.sidebar-collapsed .content {
+  box-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.05),
+    0 12px 24px -12px rgba(0, 0, 0, 0.15);
+}
+
+.island-header {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 14px;
+  border-bottom: 1px solid var(--light-grey);
+  --wails-draggable: drag;
+  min-height: 44px;
+  height: 44px;
+  box-sizing: border-box;
+}
+
+.island-header-spacer {
+  flex: 1;
+  min-width: 0;
+}
+
+.island-header-file {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  overflow: hidden;
+}
+
+.island-header-filename {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex-shrink: 0;
+  max-width: 60%;
+}
+
+.island-header-dir {
+  font-size: 11px;
+  color: var(--grey);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+.island-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex-shrink: 0;
+  --wails-draggable: no-drag;
+}
+
+.sidebar-toggle {
+  width: 28px;
+  height: 28px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 20px;
-  height: 20px;
   border: none;
-  border-radius: 4px;
+  border-radius: 7px;
   background: transparent;
-  color: var(--text-muted);
-  font-family: var(--font-sans);
-  font-size: 13px;
-  font-weight: 500;
-  line-height: 1;
+  color: var(--grey);
   cursor: pointer;
   padding: 0;
+  flex-shrink: 0;
+  --wails-draggable: no-drag;
+  transition: background 0.12s ease, color 0.12s ease;
 }
 
-.change-tree-action:hover {
-  background: var(--accent-hover);
-  color: var(--text-h);
+.sidebar-toggle:hover {
+  background: rgba(127, 127, 127, 0.14);
+  color: var(--text);
 }
 
-/* Main / Diff */
+.sidebar-toggle svg {
+  width: 16px;
+  height: 16px;
+  display: block;
+}
+
 .app-main {
-  grid-row: 2;
-  grid-column: 2;
-  background: var(--surface);
+  flex: 1;
   min-height: 0;
   overflow: hidden;
   display: flex;
   flex-direction: column;
+  background: transparent;
 }
 
+.diff-viewer-wrapper {
+  /* Force monochrome addition/deletion chrome from Pierre */
+  --diffs-addition-color: var(--text);
+  --diffs-deletion-color: var(--grey);
+  --diffs-modified-color: var(--grey);
+}
 
-
-/* Empty state */
 .diff-empty {
   flex: 1;
   display: flex;
   align-items: center;
   justify-content: center;
-  color: var(--text-muted);
+  color: var(--grey);
   font-size: 13px;
+  letter-spacing: 0.02em;
+}
+
+/* Project picker — compact for sidebar */
+.sidebar .project-picker {
+  width: 100%;
+}
+
+.sidebar .project-trigger {
+  width: 100%;
+  justify-content: space-between;
+  padding: 4px 8px;
+  border-radius: 7px;
+  background: transparent;
+  border: none;
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.sidebar .project-trigger:hover {
+  background: rgba(127, 127, 127, 0.12);
+}
+
+.sidebar .project-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* PR picker compact in island header */
+.island-header-actions .pr-picker .pr-trigger {
+  height: 24px;
+  padding: 0 6px;
+  font-size: 11px;
+  border-radius: 6px;
+  background: transparent;
+  border: none;
+  color: var(--grey);
+}
+
+.island-header-actions .pr-picker .pr-trigger:hover {
+  background: rgba(127, 127, 127, 0.14);
+  color: var(--text);
 }

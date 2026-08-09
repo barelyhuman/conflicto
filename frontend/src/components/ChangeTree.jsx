@@ -1,5 +1,5 @@
 import { useMemo, useState, useCallback } from 'preact/hooks';
-import {IconPlus,IconMinus, IconArrowBackUp} from "@tabler/icons-preact"
+import { IconArrowBackUp } from '@tabler/icons-preact';
 
 /**
  * @typedef {{ name: string, path: string, status?: string, children?: TreeNode[] }} TreeNode
@@ -92,6 +92,40 @@ function sortFlatFiles(files) {
 }
 
 /**
+ * Split a path into basename + directory suffix for the file row layout.
+ * @param {string} path
+ * @returns {{ name: string, dir: string }}
+ */
+export function splitPath(path) {
+  const idx = path.lastIndexOf('/');
+  if (idx < 0) return { name: path, dir: './' };
+  return { name: path.slice(idx + 1), dir: path.slice(0, idx + 1) };
+}
+
+/**
+ * Map git status letter → badge class + glyph.
+ * @param {string} [status]
+ * @returns {{ glyph: string, kind: string }}
+ */
+export function statusBadge(status) {
+  const s = (status || 'M').toUpperCase().charAt(0);
+  switch (s) {
+    case 'A':
+    case 'U':
+    case '?':
+      return { glyph: 'A', kind: 'added' };
+    case 'D':
+      return { glyph: 'D', kind: 'deleted' };
+    case 'C':
+      return { glyph: 'C', kind: 'conflict' };
+    case 'R':
+    case 'M':
+    default:
+      return { glyph: s === 'R' ? 'M' : s || 'M', kind: 'modified' };
+  }
+}
+
+/**
  * Custom change list for the sidebar.
  *
  * @param {Object} props
@@ -120,7 +154,6 @@ export function ChangeTree({
 }) {
   const tree = useMemo(() => (flat ? null : buildFileTree(files)), [files, flat]);
   const flatFiles = useMemo(() => (flat ? sortFlatFiles(files) : null), [files, flat]);
-  // Paths in this set are collapsed (default: all expanded).
   const [collapsed, setCollapsed] = useState(() => new Set());
 
   const toggleFolder = useCallback((path) => {
@@ -137,24 +170,27 @@ export function ChangeTree({
   if (flat) {
     return (
       <div class="change-tree change-tree-flat" role="list">
-        {flatFiles.map((file) => (
-          <FileRow
-            key={file.path}
-            path={file.path}
-            label={file.path}
-            status={file.status}
-            title={file.path}
-            active={activeFile === file.path}
-            pad={8}
-            onSelect={onSelect}
-            showStage={showStage}
-            showUnstage={showUnstage}
-            showDiscard={showDiscard}
-            onStage={onStage}
-            onUnstage={onUnstage}
-            onDiscard={onDiscard}
-          />
-        ))}
+        {flatFiles.map((file) => {
+          const { name, dir } = splitPath(file.path);
+          return (
+            <FileRow
+              key={file.path}
+              path={file.path}
+              name={name}
+              dir={dir}
+              status={file.status}
+              title={file.path}
+              active={activeFile === file.path}
+              onSelect={onSelect}
+              showStage={showStage}
+              showUnstage={showUnstage}
+              showDiscard={showDiscard}
+              onStage={onStage}
+              onUnstage={onUnstage}
+              onDiscard={onDiscard}
+            />
+          );
+        })}
       </div>
     );
   }
@@ -185,11 +221,11 @@ export function ChangeTree({
 /**
  * @param {Object} props
  * @param {string} props.path
- * @param {string} props.label
+ * @param {string} props.name
+ * @param {string} [props.dir]
  * @param {string} [props.status]
  * @param {string} [props.title]
  * @param {boolean} props.active
- * @param {number} props.pad
  * @param {(path: string) => void} props.onSelect
  * @param {boolean} props.showStage
  * @param {boolean} props.showUnstage
@@ -200,11 +236,11 @@ export function ChangeTree({
  */
 function FileRow({
   path,
-  label,
+  name,
+  dir,
   status,
   title,
   active,
-  pad,
   onSelect,
   showStage,
   showUnstage,
@@ -213,10 +249,11 @@ function FileRow({
   onUnstage,
   onDiscard,
 }) {
+  const badge = statusBadge(status);
+
   return (
     <div
-      class={`change-tree-row change-tree-file${active ? ' active' : ''}`}
-      style={`padding-left: ${pad}px`}
+      class={`file-row change-tree-row change-tree-file${active ? ' active' : ''}`}
       role="listitem"
       aria-selected={active}
     >
@@ -226,30 +263,29 @@ function FileRow({
         title={title}
         onClick={() => onSelect?.(path)}
       >
-        {status && (
-          <span class="change-tree-status">{status}</span>
-        )}
-        <span class="change-tree-name">{label}</span>
+        <span class={`status-badge ${badge.kind}`}>{badge.glyph}</span>
+        <span class="file-name">{name}</span>
+        {dir != null && <span class="file-path">{dir}</span>}
       </button>
-      <div class="change-tree-actions">
+      <div class="row-actions change-tree-actions">
         {showDiscard && (
           <button
             type="button"
-            class="change-tree-action"
-            title="Discard changes"
-            aria-label="Discard changes"
+            class="revert-btn"
+            title="Revert changes"
+            aria-label="Revert changes"
             onClick={(e) => {
               e.stopPropagation();
               onDiscard?.(path);
             }}
           >
-            <IconArrowBackUp size={14} />
+            <IconArrowBackUp size={10} stroke={2.2} />
           </button>
         )}
         {showStage && (
           <button
             type="button"
-            class="change-tree-action"
+            class="stage-btn"
             title="Stage"
             aria-label="Stage"
             onClick={(e) => {
@@ -257,13 +293,13 @@ function FileRow({
               onStage?.(path);
             }}
           >
-            <IconPlus size={14} />
+            +
           </button>
         )}
         {showUnstage && (
           <button
             type="button"
-            class="change-tree-action"
+            class="stage-btn"
             title="Unstage"
             aria-label="Unstage"
             onClick={(e) => {
@@ -271,7 +307,7 @@ function FileRow({
               onUnstage?.(path);
             }}
           >
-            <IconMinus size={14}/>
+            −
           </button>
         )}
       </div>
@@ -352,19 +388,20 @@ function TreeNodeRow({
   }
 
   return (
-    <FileRow
-      path={node.path}
-      label={node.name}
-      status={node.status}
-      active={isActive}
-      pad={pad}
-      onSelect={onSelect}
-      showStage={showStage}
-      showUnstage={showUnstage}
-      showDiscard={showDiscard}
-      onStage={onStage}
-      onUnstage={onUnstage}
-      onDiscard={onDiscard}
-    />
+    <div style={`padding-left: ${Math.max(0, depth * 12)}px`}>
+      <FileRow
+        path={node.path}
+        name={node.name}
+        status={node.status}
+        active={isActive}
+        onSelect={onSelect}
+        showStage={showStage}
+        showUnstage={showUnstage}
+        showDiscard={showDiscard}
+        onStage={onStage}
+        onUnstage={onUnstage}
+        onDiscard={onDiscard}
+      />
+    </div>
   );
 }

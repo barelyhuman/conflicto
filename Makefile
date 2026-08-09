@@ -1,4 +1,4 @@
-.PHONY: help icon dev build build-production frontend-dev frontend-build test clean
+.PHONY: help icon dev build build-production frontend-dev frontend-build frontend-test test clean
 
 WAILS := go run github.com/wailsapp/wails/v2/cmd/wails
 FRONTEND := cd frontend && pnpm
@@ -13,7 +13,8 @@ help:
 	@echo "  make build-production  Build a production binary"
 	@echo "  make frontend-dev      Run frontend dev server only (Vite)"
 	@echo "  make frontend-build    Build frontend assets for production"
-	@echo "  make test              Run Go tests"
+	@echo "  make frontend-test     Run frontend unit tests (Vitest)"
+	@echo "  make test              Run Go + frontend tests"
 	@echo "  make clean             Remove build artifacts"
 
 icon:
@@ -35,7 +36,10 @@ frontend-dev:
 frontend-build:
 	$(FRONTEND) build
 
-test:
+frontend-test:
+	$(FRONTEND) test
+
+test: frontend-test frontend-build
 	go test -v ./...
 
 clean:
