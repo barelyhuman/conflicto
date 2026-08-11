@@ -40,9 +40,9 @@ export function PRCheckoutPrompt({ pr, onViewDiff, onCheckoutLocal, onCheckoutWo
               <button type="button" class="pr-prompt-btn" onClick={() => setMode('local')}>
                 Checkout locally
               </button>
-              <button type="button" class="pr-prompt-btn" onClick={() => setMode('worktree')}>
+              {/* <button type="button" class="pr-prompt-btn" onClick={() => setMode('worktree')}>
                 Checkout in worktree
-              </button>
+              </button> */}
             </div>
           )}
 
