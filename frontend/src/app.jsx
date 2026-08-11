@@ -5,6 +5,7 @@ import './app.css';
 import { setupWailsEvents, api, watchFullscreen } from './wails.js';
 import { WorkingTreeModel } from './models/workingTree.js';
 import { SelectionModel } from './models/selection.js';
+import { SyncModel } from './models/sync.js';
 import { ThemeProvider } from './theme/ThemeProvider.jsx';
 import { EditProvider } from './components/EditProvider.jsx';
 import { FileTree } from './components/FileTree.jsx';
@@ -32,9 +33,10 @@ export function App() {
   const [confirmKind, setConfirmKind] = useState(null);
   const [pendingConfirmFile, setPendingConfirmFile] = useState(null);
 
-  // Sync state (sidebar pull/push badges)
-  const [behind, setBehind] = useState(0);
-  const [ahead, setAhead] = useState(0);
+  // Sync domain model (ahead/behind + push/pull/fetch loading states)
+  const sync = useModel(() => new SyncModel({
+    onError: (title, message) => pushToast(title, message),
+  }));
 
   // Toast notifications
   const [toasts, setToasts] = useState([]);
@@ -118,8 +120,7 @@ export function App() {
         setBranches(data);
       },
       onAheadBehindUpdated: (data) => {
-        setBehind(data.behind ?? 0);
-        setAhead(data.ahead ?? 0);
+        sync.setAheadBehind(data);
       },
       onDiffLoaded: (data) => {
         selectionRef.current.applyDiff(data);
@@ -197,7 +198,7 @@ export function App() {
         selectionRef.current.refetch();
       },
     });
-  }, []);
+  }, [sync]);
 
   // Keyboard shortcut: Cmd/Ctrl + ,
   useEffect(() => {
@@ -374,17 +375,7 @@ export function App() {
     setConfirmKind(null);
   }, []);
 
-  const handlePull = useCallback(() => {
-    api.pull().catch((err) => {
-      pushToast(err?.title ?? 'Pull Error', err?.message ?? String(err));
-    });
-  }, []);
 
-  const handlePush = useCallback(() => {
-    api.push().catch((err) => {
-      pushToast(err?.title ?? 'Push Error', err?.message ?? String(err));
-    });
-  }, []);
 
   const handlePostComment = useCallback((path, body, line, side) => {
     if (activePR == null) return;
@@ -446,10 +437,7 @@ export function App() {
                   localBranches={branches.local}
                   remoteBranches={branches.remote}
                   onSelectBranch={handleSelectBranch}
-                  behind={behind}
-                  ahead={ahead}
-                  onPull={handlePull}
-                  onPush={handlePush}
+                  sync={sync}
                 />
 
                 <FileTree
