@@ -22,3 +22,6 @@ secrets.yml
 .cursor/
 *.local
 .razor/
+
+# IDE
+.zed

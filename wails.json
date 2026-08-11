@@ -2,13 +2,11 @@
   "$schema": "https://wails.io/schemas/config.v2.json",
   "name": "conflicto",
   "outputfilename": "conflicto",
-  "frontend": {
-    "dir": "./frontend",
-    "install": "pnpm install",
-    "build": "pnpm build",
-    "dev": "pnpm dev",
-    "package": "pnpm"
-  },
+  "frontend:install": "pnpm install",
+  "frontend:build": "pnpm run build",
+  "frontend:dev:watcher": "pnpm run dev",
+  "frontend:dev:serverUrl": "auto",
+  "wailsjsdir": "./frontend/src",
   "author": {
     "name": "Siddharth Gelera",
     "email": "ahoy@barelyhuman.dev"
@@ -16,9 +14,5 @@
   "info": {
     "productVersion": "0.1.0",
     "copyright": "Copyright (c) 2026 Siddharth Gelera"
-  },
-  "wailsjsdir": "./frontend/src",
-  "debounceMS": 100,
-  "devServer": "localhost:34115",
-  "appargs": ""
+  }
 }
