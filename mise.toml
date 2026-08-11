@@ -1,0 +1,83 @@
+[tools]
+go = "1.26.5"
+pnpm = "11.21.0"
+node = "26.7.0"
+gh = "2.97.0"
+
+[env]
+WAILS = "go run github.com/wailsapp/wails/v2/cmd/wails"
+APP_ICON = "resources/app-icon/conflicto.png"
+WAILS_ICON = "build/appicon.png"
+
+[tasks.setup]
+description = "Setup the development environment"
+depends = ["clean", "icon"]
+run = """
+rm -rf frontend/node_modules
+npx --yes pnpm@11.21.0 --dir frontend install
+npx --yes pnpm@11.21.0 --dir frontend run build
+go mod tidy
+"""
+run_windows = """
+if exist frontend\\node_modules rmdir /s /q frontend\\node_modules
+npx --yes pnpm@11.21.0 --dir frontend install
+npx --yes pnpm@11.21.0 --dir frontend run build
+go mod tidy
+"""
+
+[tasks.icon]
+description = "Sync app icon into build/appicon.png for Wails"
+run = """
+mkdir -p build
+cp "$APP_ICON" "$WAILS_ICON"
+"""
+run_windows = """
+if not exist build mkdir build
+copy /Y "%APP_ICON%" "%WAILS_ICON%"
+"""
+
+[tasks.dev]
+description = "Run Wails dev mode (live-reload backend + frontend)"
+depends = ["icon"]
+run = "$WAILS dev"
+
+[tasks.build]
+description = "Build a local debug binary"
+depends = ["icon"]
+run = "$WAILS build"
+
+[tasks.'build:production']
+description = "Build a production binary"
+depends = ["icon"]
+run = "$WAILS build -ldflags=\"-w -s\" -trimpath"
+
+[tasks.'dev:frontend']
+description = "Run frontend dev server only (Vite)"
+dir = "frontend"
+run = "pnpm dev"
+
+[tasks.'build:frontend']
+description = "Build frontend assets for production"
+dir = "frontend"
+run = "pnpm build"
+
+[tasks.'test:frontend']
+description = "Run frontend unit tests (Vitest)"
+dir = "frontend"
+run = "pnpm test"
+
+[tasks.test]
+description = "Run Go + frontend tests"
+depends = ["test:frontend", "build:frontend"]
+run = "go test -v ./..."
+
+[tasks.clean]
+description = "Remove build artifacts"
+run = """
+rm -rf build/bin
+rm -rf frontend/dist
+"""
+run_windows = """
+if exist build\\bin rmdir /s /q build\\bin
+if exist frontend\\dist rmdir /s /q frontend\\dist
+"""
