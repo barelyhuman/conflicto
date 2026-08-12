@@ -582,10 +582,11 @@
 
 .change-tree-chevron {
   display: inline-flex;
+  align-items: center;
+  justify-content: center;
   width: 10px;
+  height: 10px;
   flex-shrink: 0;
-  font-size: 10px;
-  line-height: 1;
   transform: rotate(0deg);
   transition: transform 0.12s ease;
   color: var(--grey);

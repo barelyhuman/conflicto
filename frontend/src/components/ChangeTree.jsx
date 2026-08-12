@@ -1,5 +1,5 @@
 import { useMemo, useState, useCallback } from 'preact/hooks';
-import { IconArrowBackUp } from '@tabler/icons-preact';
+import { IconArrowBackUp, IconChevronRight } from '@tabler/icons-preact';
 
 /**
  * @typedef {{ name: string, path: string, status?: string, children?: TreeNode[] }} TreeNode
@@ -361,7 +361,7 @@ function TreeNodeRow({
           onClick={() => onToggleFolder(node.path)}
         >
           <span class={`change-tree-chevron${isOpen ? ' open' : ''}`} aria-hidden="true">
-            ▸
+            <IconChevronRight size={10} stroke={1.5} />
           </span>
           <span class="change-tree-name">{node.name}</span>
         </button>
