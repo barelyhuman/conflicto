@@ -1,8 +1,7 @@
 [tools]
 go = "1.26.5"
-pnpm = "10.33.0"
+pnpm = "10.33.4"
 node = "26.7.0"
-gh = "2.97.0"
 
 [env]
 WAILS = "go run github.com/wailsapp/wails/v2/cmd/wails"
@@ -14,14 +13,14 @@ description = "Setup the development environment"
 depends = ["clean", "icon"]
 run = """
 rm -rf frontend/node_modules
-npx --yes pnpm@11.21.0 --dir frontend install
-npx --yes pnpm@11.21.0 --dir frontend run build
+npx --yes pnpm@10.33.4 --dir frontend install
+npx --yes pnpm@10.33.4 --dir frontend run build
 go mod tidy
 """
 run_windows = """
 if exist frontend\\node_modules rmdir /s /q frontend\\node_modules
-npx --yes pnpm@11.21.0 --dir frontend install
-npx --yes pnpm@11.21.0 --dir frontend run build
+npx --yes pnpm@10.33.4 --dir frontend install
+npx --yes pnpm@10.33.4 --dir frontend run build
 go mod tidy
 """
 
