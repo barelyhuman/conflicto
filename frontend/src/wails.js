@@ -105,6 +105,9 @@ export const api = {
 
   getDiff: (path, staged = false) => window.go.main.App.GetDiff(path, !!staged),
 
+  getFileContents: (path, staged = false) =>
+    window.go.main.App.GetFileContents(path, !!staged),
+
   pull: () => window.go.main.App.Pull(),
 
   push: () => window.go.main.App.Push(),
