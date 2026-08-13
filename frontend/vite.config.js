@@ -11,6 +11,9 @@ export default defineConfig({
       { find: 'react/jsx-runtime', replacement: 'preact/jsx-runtime' },
     ],
   },
+  watch: {
+    ignored: ['**/wailsjs/**']
+  },
   test: {
     environment: 'node',
     include: ['src/**/*.test.js'],

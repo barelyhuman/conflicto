@@ -2,6 +2,7 @@ import { useMemo } from 'preact/hooks';
 import { FileDiff } from '@pierre/diffs/react';
 import { processFile } from '@pierre/diffs';
 import { useTheme } from '../theme/ThemeProvider.jsx';
+import { api } from '../wails.js';
 
 const diffViewerStyles = `
   .diff-viewer-wrapper {
@@ -79,6 +80,7 @@ const diffViewerStyles = `
  * @param {import('@preact/signals-core').ReadonlySignal<boolean>|boolean} [props.loading]
  * @param {boolean} props.isPRMode
  * @param {import('@preact/signals-core').ReadonlySignal<boolean>|boolean} props.isUnstaged
+ * @param {import('@preact/signals-core').ReadonlySignal<boolean>|boolean} [props.showFullDiff]
  * @param {{ path: string, line: number, body: string, user: { login: string } }[]} props.comments
  * @param {(path: string, body: string, line: number, side: string) => void} [props.onPostComment]
  */
@@ -87,6 +89,7 @@ export function DiffViewer({
   loading = false,
   isPRMode = false,
   isUnstaged = false,
+  showFullDiff = false,
   comments = [],
 }) {
   const { theme, themeType } = useTheme();
@@ -95,6 +98,7 @@ export function DiffViewer({
   const patch = diff?.patch;
   const filename = diff?.path ?? '';
   const unstaged = typeof isUnstaged === 'boolean' ? isUnstaged : isUnstaged.value;
+  const fullDiff = typeof showFullDiff === 'boolean' ? showFullDiff : showFullDiff.value;
 
   const fileDiff = useMemo(() => {
     if (!patch) return null;
@@ -162,6 +166,24 @@ export function DiffViewer({
           diffStyle: 'unified',
           overflow: 'wrap',
           disableFileHeader: true,
+          expandUnchanged: isPRMode || fullDiff,
+          collapsedContextThreshold: 1,
+          loadDiffFiles: isPRMode
+            ? undefined
+            : async (meta) => {
+                const path = meta.name;
+                const staged = !unstaged;
+                const res = await api.getFileContents(path, staged);
+                const oldFile = res.hasOld
+                  ? { name: meta.prevName ?? path, contents: res.oldContent }
+                  : null;
+                const newFile = res.hasNew
+                  ? { name: path, contents: res.newContent }
+                  : null;
+                if (oldFile && newFile) return { oldFile, newFile };
+                if (newFile) return { oldFile: null, newFile };
+                return { oldFile, newFile: null };
+              },
         }}
         lineAnnotations={lineAnnotations}
       />

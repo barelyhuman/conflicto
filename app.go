@@ -350,6 +350,14 @@ func (a *App) GetDiff(path string, staged bool) error {
 	return nil
 }
 
+// GetFileContents returns old and new file contents for diff hydration.
+func (a *App) GetFileContents(path string, staged bool) (*FileContentsResult, error) {
+	if a.git == nil || !a.git.IsRepo() {
+		return nil, fmt.Errorf("no repository open")
+	}
+	return a.git.GetFileContents(path, staged)
+}
+
 // Pull performs git pull
 func (a *App) Pull() error {
 	if a.git == nil {

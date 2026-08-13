@@ -42,6 +42,10 @@ export function GetDiff(arg1, arg2) {
   return window['go']['main']['App']['GetDiff'](arg1, arg2);
 }
 
+export function GetFileContents(arg1, arg2) {
+  return window['go']['main']['App']['GetFileContents'](arg1, arg2);
+}
+
 export function GetPRComments(arg1) {
   return window['go']['main']['App']['GetPRComments'](arg1);
 }
