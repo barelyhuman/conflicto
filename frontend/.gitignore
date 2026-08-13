@@ -25,3 +25,6 @@ dist-ssr
 
 /build
 /dist
+
+# added by wails
+package.json.md5
