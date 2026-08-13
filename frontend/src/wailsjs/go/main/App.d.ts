@@ -22,6 +22,8 @@ export function GetCurrentProject():Promise<Record<string, string>>;
 
 export function GetDiff(arg1:string,arg2:boolean):Promise<void>;
 
+export function GetFileContents(arg1:string,arg2:boolean):Promise<main.FileContentsResult>;
+
 export function GetPRComments(arg1:number):Promise<void>;
 
 export function GetPRFileDiff(arg1:number,arg2:string):Promise<void>;

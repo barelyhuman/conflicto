@@ -16,6 +16,7 @@ export const SelectionModel = createModel(({ workingTree, activePR }) => {
   const activeDiff = signal(/** @type {{ path?: string, patch?: string }|null} */ (null));
   /** True while a diff request is in flight for the current selection. */
   const diffLoading = signal(false);
+  const showFullDiff = signal(false);
 
   const isConflict = computed(
     () => activePR.value == null && activeSection.value === 'conflict'
@@ -54,6 +55,7 @@ export const SelectionModel = createModel(({ workingTree, activePR }) => {
     activeSection,
     activeDiff,
     diffLoading,
+    showFullDiff,
     isConflict,
     isUnstaged,
     workingTree,
@@ -65,6 +67,7 @@ export const SelectionModel = createModel(({ workingTree, activePR }) => {
       // Drop stale viewer content immediately so we never flash the previous file.
       this.activeDiff.value = null;
       this.diffLoading.value = true;
+      this.showFullDiff.value = false;
       if (same) {
         // Same path is a signal no-op — effect won't re-run; fetch explicitly.
         requestDiff(path, section);
@@ -79,6 +82,11 @@ export const SelectionModel = createModel(({ workingTree, activePR }) => {
       this.activeSection.value = null;
       this.activeDiff.value = null;
       this.diffLoading.value = false;
+      this.showFullDiff.value = false;
+    },
+
+    toggleShowFullDiff() {
+      this.showFullDiff.value = !this.showFullDiff.value;
     },
 
     applyDiff(data) {

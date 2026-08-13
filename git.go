@@ -20,6 +20,14 @@ type FileDiff struct {
 	Patch      string      `json:"patch"` // raw unified diff string
 }
 
+// FileContentsResult holds both sides of a file for diff hydration.
+type FileContentsResult struct {
+	OldContent string `json:"oldContent"`
+	NewContent string `json:"newContent"`
+	HasOld     bool   `json:"hasOld"`
+	HasNew     bool   `json:"hasNew"`
+}
+
 // DiffLine represents a single line in a diff
 type DiffLine struct {
 	Type       string `json:"type"`       // context, add, remove
@@ -413,6 +421,60 @@ func (gs *GitService) diffUntracked(path string) []byte {
 		}
 	}
 	return out
+}
+
+// GetFileContents returns the old and new file contents for a diff path.
+// staged=true  -> old=HEAD, new=index (staged)
+// staged=false -> old=index, new=worktree (unstaged / untracked / deleted)
+func (gs *GitService) GetFileContents(path string, staged bool) (*FileContentsResult, error) {
+	if gs.path == "" {
+		return nil, fmt.Errorf("no repository open")
+	}
+
+	res := &FileContentsResult{}
+
+	if staged {
+		// Old = HEAD, New = index
+		if old, err := gs.showRefFile("HEAD", path); err == nil {
+			res.OldContent = old
+			res.HasOld = true
+		}
+		if new, err := gs.showRefFile("", path); err == nil {
+			res.NewContent = new
+			res.HasNew = true
+		}
+	} else {
+		// Old = index
+		if old, err := gs.showRefFile("", path); err == nil {
+			res.OldContent = old
+			res.HasOld = true
+		}
+		// New = worktree (read from disk)
+		data, err := os.ReadFile(filepath.Join(gs.path, path))
+		if err == nil {
+			res.NewContent = string(data)
+			res.HasNew = true
+		}
+	}
+
+	return res, nil
+}
+
+// showRefFile reads a file from a git ref. ref="" reads from the index.
+func (gs *GitService) showRefFile(ref, path string) (string, error) {
+	var spec string
+	if ref != "" {
+		spec = fmt.Sprintf("%s:%s", ref, path)
+	} else {
+		spec = fmt.Sprintf(":%s", path)
+	}
+	cmd := exec.Command("git", "show", spec)
+	cmd.Dir = gs.path
+	out, err := cmd.Output()
+	if err != nil {
+		return "", err
+	}
+	return string(out), nil
 }
 
 // GetAheadBehind returns ahead/behind counts

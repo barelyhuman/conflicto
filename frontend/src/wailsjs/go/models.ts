@@ -1,5 +1,23 @@
 export namespace main {
 	
+	export class FileContentsResult {
+	    oldContent: string;
+	    newContent: string;
+	    hasOld: boolean;
+	    hasNew: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new FileContentsResult(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.oldContent = source["oldContent"];
+	        this.newContent = source["newContent"];
+	        this.hasOld = source["hasOld"];
+	        this.hasNew = source["hasNew"];
+	    }
+	}
 	export class RecentProject {
 	    path: string;
 	    name: string;

@@ -462,6 +462,9 @@ export function App() {
                       sidebarOpen={sidebarOpen}
                       onToggleSidebar={() => setSidebarOpen((open) => !open)}
                       activeFile={selection.activeFile}
+                      isPRMode={isPRMode}
+                      showFullDiff={selection.showFullDiff}
+                      onToggleShowFullDiff={() => selection.toggleShowFullDiff()}
                       selectedPR={activePR}
                       currentPR={currentPR}
                       onSelectPR={handleSelectPR}
@@ -483,6 +486,7 @@ export function App() {
                               loading={selection.diffLoading}
                               isPRMode={isPRMode}
                               isUnstaged={selection.isUnstaged}
+                              showFullDiff={selection.showFullDiff}
                               comments={isPRMode ? prComments : []}
                               onPostComment={handlePostComment}
                             />
