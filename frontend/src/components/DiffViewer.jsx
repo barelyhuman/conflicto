@@ -1,4 +1,4 @@
-import { useMemo } from 'preact/hooks';
+import { useMemo, useRef, useState, useLayoutEffect } from 'preact/hooks';
 import { FileDiff } from '@pierre/diffs/react';
 import { processFile } from '@pierre/diffs';
 import { useTheme } from '../theme/ThemeProvider.jsx';
@@ -100,6 +100,30 @@ export function DiffViewer({
   const unstaged = typeof isUnstaged === 'boolean' ? isUnstaged : isUnstaged.value;
   const fullDiff = typeof showFullDiff === 'boolean' ? showFullDiff : showFullDiff.value;
 
+  const wrapperRef = useRef(null);
+  const prevFullDiff = useRef(fullDiff);
+  const [collapseKey, setCollapseKey] = useState(0);
+  const savedScrollTop = useRef(0);
+
+  // Detect expand -> collapse transition and force a remount so the
+  // third-party diff library drops its stale per-hunk expansion state.
+  useLayoutEffect(() => {
+    if (prevFullDiff.current === true && fullDiff === false) {
+      savedScrollTop.current = wrapperRef.current?.scrollTop ?? 0;
+      setCollapseKey((k) => k + 1);
+    }
+    prevFullDiff.current = fullDiff;
+  }, [fullDiff]);
+
+  // Restore scroll position after the forced remount.
+  useLayoutEffect(() => {
+    const el = wrapperRef.current;
+    if (el && savedScrollTop.current > 0) {
+      el.scrollTop = savedScrollTop.current;
+      savedScrollTop.current = 0;
+    }
+  }, [collapseKey]);
+
   const fileDiff = useMemo(() => {
     if (!patch) return null;
     const meta = processFile(patch, { isGitDiff: true });
@@ -156,8 +180,9 @@ export function DiffViewer({
   }
 
   return (
-    <div class="diff-viewer-wrapper">
+    <div ref={wrapperRef} class="diff-viewer-wrapper">
       <FileDiff
+        key={collapseKey}
         fileDiff={fileDiff}
         edit={unstaged}
         options={{
@@ -171,19 +196,19 @@ export function DiffViewer({
           loadDiffFiles: isPRMode
             ? undefined
             : async (meta) => {
-                const path = meta.name;
-                const staged = !unstaged;
-                const res = await api.getFileContents(path, staged);
-                const oldFile = res.hasOld
-                  ? { name: meta.prevName ?? path, contents: res.oldContent }
-                  : null;
-                const newFile = res.hasNew
-                  ? { name: path, contents: res.newContent }
-                  : null;
-                if (oldFile && newFile) return { oldFile, newFile };
-                if (newFile) return { oldFile: null, newFile };
-                return { oldFile, newFile: null };
-              },
+              const path = meta.name;
+              const staged = !unstaged;
+              const res = await api.getFileContents(path, staged);
+              const oldFile = res.hasOld
+                ? { name: meta.prevName ?? path, contents: res.oldContent }
+                : null;
+              const newFile = res.hasNew
+                ? { name: path, contents: res.newContent }
+                : null;
+              if (oldFile && newFile) return { oldFile, newFile };
+              if (newFile) return { oldFile: null, newFile };
+              return { oldFile, newFile: null };
+            },
         }}
         lineAnnotations={lineAnnotations}
       />
