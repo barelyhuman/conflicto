@@ -70,10 +70,6 @@ export function GetTerminalPrefs() {
   return window['go']['main']['App']['GetTerminalPrefs']();
 }
 
-export function InvalidatePRCache() {
-  return window['go']['main']['App']['InvalidatePRCache']();
-}
-
 export function OpenProject() {
   return window['go']['main']['App']['OpenProject']();
 }
@@ -124,10 +120,6 @@ export function TerminalStart(arg1) {
 
 export function TerminalStop(arg1) {
   return window['go']['main']['App']['TerminalStop'](arg1);
-}
-
-export function TerminalStopAll() {
-  return window['go']['main']['App']['TerminalStopAll']();
 }
 
 export function TerminalWrite(arg1, arg2) {
