@@ -6,6 +6,7 @@ import { setupWailsEvents, api, watchFullscreen } from './wails.js';
 import { WorkingTreeModel } from './models/workingTree.js';
 import { SelectionModel } from './models/selection.js';
 import { SyncModel } from './models/sync.js';
+import { PRReviewModel } from './models/prReview.js';
 import { ThemeProvider } from './theme/ThemeProvider.jsx';
 import { EditProvider } from './components/EditProvider.jsx';
 import { FileTree } from './components/FileTree.jsx';
@@ -93,12 +94,21 @@ export function App() {
     activePR: activePRSignal,
   }));
 
+  const prReview = useModel(() => new PRReviewModel({
+    activePR: activePRSignal,
+    onError: (title, message) => {
+      setToasts((prev) => [...prev, { id: Date.now().toString(), title, message }]);
+    },
+  }));
+
   // Models / PR bridge are stable for App lifetime; keep refs for the mount-once event effect.
   const workingTreeRef = useRef(workingTree);
   const selectionRef = useRef(selection);
+  const prReviewRef = useRef(prReview);
   const activePRSignalRef = useRef(activePRSignal);
   workingTreeRef.current = workingTree;
   selectionRef.current = selection;
+  prReviewRef.current = prReview;
   activePRSignalRef.current = activePRSignal;
 
   const activePRRef = useRef(activePR);
@@ -147,6 +157,12 @@ export function App() {
         ) {
           selectionRef.current.select(files[0].path, 'pr');
         }
+      },
+      onPRReviewStateUpdated: (data) => {
+        prReviewRef.current.applyReviewState(data);
+      },
+      onPRFileViewedStateUpdated: (data) => {
+        prReviewRef.current.applyFileViewedStates(data);
       },
       onPRCommentsUpdated: (data) => {
         try {
