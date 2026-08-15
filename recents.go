@@ -105,18 +105,6 @@ func (rm *RecentsManager) Add(path string) {
 	rm.Save()
 }
 
-// Remove removes a project from recents by path
-func (rm *RecentsManager) Remove(path string) {
-	filtered := make([]RecentProject, 0, len(rm.projects))
-	for _, p := range rm.projects {
-		if p.Path != path {
-			filtered = append(filtered, p)
-		}
-	}
-	rm.projects = filtered
-	rm.Save()
-}
-
 // List returns the current list of recent projects, sorted by most recent first
 func (rm *RecentsManager) List() []RecentProject {
 	// Return a copy
@@ -126,12 +114,4 @@ func (rm *RecentsManager) List() []RecentProject {
 		return result[i].OpenedAt.After(result[j].OpenedAt)
 	})
 	return result
-}
-
-// Current returns the most recent project (the current one)
-func (rm *RecentsManager) Current() *RecentProject {
-	if len(rm.projects) == 0 {
-		return nil
-	}
-	return &rm.projects[0]
 }

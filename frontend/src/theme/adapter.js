@@ -61,14 +61,6 @@ export function resolveThemeMode(mode) {
 }
 
 /**
- * CSS variables are owned by index.css + prefers-color-scheme.
- * Keep this as a no-op injector so callers remain stable.
- */
-export function injectAppTheme() {
-  // Tokens live in index.css; Pierre themes are registered separately.
-}
-
-/**
  * Full Shiki/VS Code theme derived from appTokens — monochrome only.
  * @param {ThemeMode} [mode]
  */

@@ -137,13 +137,6 @@ export function GHSettings({ ghStatus = {}, onRefresh }) {
           transition: background 0.15s, color 0.15s;
           white-space: nowrap;
         }
-        .gh-action-danger {
-          background: transparent;
-          color: var(--removed);
-        }
-        .gh-action-danger:hover {
-          background: var(--removed-bg);
-        }
         .gh-install-link {
           display: inline-flex;
           align-items: center;

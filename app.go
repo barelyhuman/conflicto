@@ -136,13 +136,6 @@ func (a *App) TerminalStop(id string) error {
 	return a.terms.stop(id)
 }
 
-// TerminalStopAll kills all PTY sessions (app shutdown).
-func (a *App) TerminalStopAll() {
-	if a.terms != nil {
-		a.terms.stopAll()
-	}
-}
-
 // GetTerminalPrefs returns persisted terminal UI prefs.
 func (a *App) GetTerminalPrefs() map[string]interface{} {
 	if a.settings == nil {
@@ -666,7 +659,7 @@ func (a *App) GetPRFiles(number int) error {
 	return nil
 }
 
-// GetPRFileDiff returns the parsed diff for a single file in a cached PR
+// GetPRFileDiff returns the diff patch for a single file in a cached PR
 func (a *App) GetPRFileDiff(number int, path string) error {
 	cache, ok := a.prCache[number]
 	if !ok {
@@ -681,41 +674,13 @@ func (a *App) GetPRFileDiff(number int, path string) error {
 
 	for _, f := range cache.Files {
 		if f.Path == path {
-			// Empty patch: GitHub omits it for binary / oversized files. Still emit
-			// so the UI can leave the loading state with a clear empty message.
-			if f.Patch == "" {
-				a.EmitEvent("diffLoaded", &FileDiff{
-					Path:   f.Path,
-					Status: f.Status,
-					Patch:  "",
-				})
-				return nil
+			patch := ""
+			if f.Patch != "" {
+				patch = normalizeGitHubPatch(f.Path, f.Status, f.Patch)
 			}
-
-			patch := normalizeGitHubPatch(f.Path, f.Status, f.Patch)
-
-			parsed, err := ParseUnifiedDiff([]byte(patch))
-			if err != nil {
-				a.EmitEvent("error", map[string]string{
-					"title":   "Diff Parse Error",
-					"message": err.Error(),
-				})
-				a.EmitEvent("diffLoaded", &FileDiff{
-					Path:   f.Path,
-					Status: f.Status,
-					Patch:  "",
-				})
-				return err
-			}
-
 			a.EmitEvent("diffLoaded", &FileDiff{
-				Path:      f.Path,
-				Status:    f.Status,
-				Additions: parsed.Additions,
-				Deletions: parsed.Deletions,
-				Lines:     parsed.Lines,
-				Hunks:     parsed.Hunks,
-				Patch:     patch,
+				Path:  f.Path,
+				Patch: patch,
 			})
 			return nil
 		}
@@ -764,8 +729,8 @@ func normalizeGitHubPatch(path, status, patch string) string {
 	return b.String()
 }
 
-// InvalidatePRCache resets all PR cache timestamps so the next fetch hits the API
-func (a *App) InvalidatePRCache() {
+// invalidatePRCache resets all PR cache timestamps so the next fetch hits the API
+func (a *App) invalidatePRCache() {
 	for n, cache := range a.prCache {
 		cache.FetchedAt = time.Time{}
 		a.prCache[n] = cache
@@ -1111,7 +1076,7 @@ func (a *App) Refresh() {
 	a.emitAheadBehind()
 	a.DetectGH()
 	if a.git != nil && a.git.IsRepo() {
-		a.InvalidatePRCache()
+		a.invalidatePRCache()
 		go a.GetPRList()
 	}
 	a.EmitEvent("refreshCompleted", nil)

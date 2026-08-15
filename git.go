@@ -9,15 +9,10 @@ import (
 	"strings"
 )
 
-// FileDiff represents a file's diff information
+// FileDiff is the minimal diff payload sent to the frontend (Pierre parses the patch).
 type FileDiff struct {
-	Path       string      `json:"path"`
-	Status     string      `json:"status"`
-	Additions  int         `json:"additions"`
-	Deletions  int         `json:"deletions"`
-	Lines      []DiffLine  `json:"lines"`
-	Hunks      []Hunk      `json:"hunks"`
-	Patch      string      `json:"patch"` // raw unified diff string
+	Path  string `json:"path"`
+	Patch string `json:"patch"`
 }
 
 // FileContentsResult holds both sides of a file for diff hydration.
@@ -26,14 +21,6 @@ type FileContentsResult struct {
 	NewContent string `json:"newContent"`
 	HasOld     bool   `json:"hasOld"`
 	HasNew     bool   `json:"hasNew"`
-}
-
-// DiffLine represents a single line in a diff
-type DiffLine struct {
-	Type       string `json:"type"`       // context, add, remove
-	OldLineNo  *int   `json:"oldLineNo"`  // nil for additions
-	NewLineNo  *int   `json:"newLineNo"`  // nil for deletions
-	Content    string `json:"content"`
 }
 
 // GitService wraps git CLI operations
@@ -225,21 +212,7 @@ func isConflict(path string) bool {
 	if err != nil {
 		return false
 	}
-	return contains(string(content), "<<<<<<<")
-}
-
-// contains checks if a string contains a substring
-func contains(s, substr string) bool {
-	return len(s) >= len(substr) && (s == substr || len(s) > 0 && containsHelper(s, substr))
-}
-
-func containsHelper(s, substr string) bool {
-	for i := 0; i <= len(s)-len(substr); i++ {
-		if s[i:i+len(substr)] == substr {
-			return true
-		}
-	}
-	return false
+	return strings.Contains(string(content), "<<<<<<<")
 }
 
 // StageFile stages a file
@@ -383,29 +356,9 @@ func (gs *GitService) GetDiff(path string, staged bool) (*FileDiff, error) {
 		}
 	}
 
-	parsed, err := ParseUnifiedDiff(out)
-	if err != nil {
-		return nil, err
-	}
-
-	// Determine status
-	status := "M"
-	if untracked {
-		status = "U"
-	} else if len(parsed.Lines) > 0 && parsed.Lines[0].Type == "add" && parsed.Hunks != nil && len(parsed.Hunks) > 0 && parsed.Hunks[0].OldStart == 0 && parsed.Hunks[0].OldCount == 0 {
-		status = "A"
-	} else if len(parsed.Lines) > 0 && parsed.Lines[0].Type == "remove" && parsed.Hunks != nil && len(parsed.Hunks) > 0 && parsed.Hunks[0].NewStart == 0 && parsed.Hunks[0].NewCount == 0 {
-		status = "D"
-	}
-
 	return &FileDiff{
-		Path:      path,
-		Status:    status,
-		Additions: parsed.Additions,
-		Deletions: parsed.Deletions,
-		Lines:     parsed.Lines,
-		Hunks:     parsed.Hunks,
-		Patch:     string(out),
+		Path:  path,
+		Patch: string(out),
 	}, nil
 }
 

@@ -32,10 +32,6 @@ export default defineConfig({
               test: /[\\/](?:@pierre[\\/]diffs|@shikijs[\\/]|shiki)([\\/]|$)/,
             },
             {
-              name: 'pierre-trees',
-              test: /[\\/]@pierre[\\/]trees([\\/]|$)/,
-            },
-            {
               name: 'xterm',
               test: /[\\/]@xterm[\\/]/,
             },
