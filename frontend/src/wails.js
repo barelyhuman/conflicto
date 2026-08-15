@@ -47,6 +47,12 @@ export function setupWailsEvents(callbacks) {
   window.runtime.EventsOn('prFilesUpdated', (data) => {
     callbacks.onPRFilesUpdated?.(data);
   });
+  window.runtime.EventsOn('prReviewStateUpdated', (data) => {
+    callbacks.onPRReviewStateUpdated?.(data);
+  });
+  window.runtime.EventsOn('prFileViewedStateUpdated', (data) => {
+    callbacks.onPRFileViewedStateUpdated?.(data);
+  });
   window.runtime.EventsOn('prCommentsUpdated', (data) => {
     callbacks.onPRCommentsUpdated?.(data);
   });
@@ -117,6 +123,16 @@ export const api = {
   searchPRList: (limit, search) => window.go.main.App.SearchPRList(limit, search),
 
   getPRFiles: (number) => window.go.main.App.GetPRFiles(number),
+
+  getPRReviewState: (number) => window.go.main.App.GetPRReviewState(number),
+
+  getPRFileViewedStates: (number) => window.go.main.App.GetPRFileViewedStates(number),
+
+  markPRFileViewed: (number, path) => window.go.main.App.MarkPRFileViewed(number, path),
+
+  unmarkPRFileViewed: (number, path) => window.go.main.App.UnmarkPRFileViewed(number, path),
+
+  submitPRReview: (number, action, body) => window.go.main.App.SubmitPRReview(number, action, body),
 
   getPRFileDiff: (number, path) => window.go.main.App.GetPRFileDiff(number, path),
 

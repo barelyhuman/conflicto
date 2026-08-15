@@ -58,8 +58,16 @@ export function GetPRFiles(arg1) {
   return window['go']['main']['App']['GetPRFiles'](arg1);
 }
 
+export function GetPRFileViewedStates(arg1) {
+  return window['go']['main']['App']['GetPRFileViewedStates'](arg1);
+}
+
 export function GetPRList() {
   return window['go']['main']['App']['GetPRList']();
+}
+
+export function GetPRReviewState(arg1) {
+  return window['go']['main']['App']['GetPRReviewState'](arg1);
 }
 
 export function GetRecentProjects() {
@@ -70,6 +78,9 @@ export function GetTerminalPrefs() {
   return window['go']['main']['App']['GetTerminalPrefs']();
 }
 
+export function MarkPRFileViewed(arg1, arg2) {
+  return window['go']['main']['App']['MarkPRFileViewed'](arg1, arg2);
+}
 export function OpenProject() {
   return window['go']['main']['App']['OpenProject']();
 }
@@ -92,6 +103,10 @@ export function Refresh() {
 
 export function SearchPRList(arg1, arg2) {
   return window['go']['main']['App']['SearchPRList'](arg1, arg2);
+}
+
+export function SubmitPRReview(arg1, arg2, arg3) {
+  return window['go']['main']['App']['SubmitPRReview'](arg1, arg2, arg3);
 }
 
 export function SetTerminalPrefs(arg1, arg2) {
@@ -128,6 +143,10 @@ export function TerminalWrite(arg1, arg2) {
 
 export function ToggleFullscreen() {
   return window['go']['main']['App']['ToggleFullscreen']();
+}
+
+export function UnmarkPRFileViewed(arg1, arg2) {
+  return window['go']['main']['App']['UnmarkPRFileViewed'](arg1, arg2);
 }
 
 export function UnstageFile(arg1) {
