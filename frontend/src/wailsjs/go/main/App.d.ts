@@ -36,8 +36,6 @@ export function GetRecentProjects():Promise<Array<main.RecentProject>>;
 
 export function GetTerminalPrefs():Promise<Record<string, any>>;
 
-export function InvalidatePRCache():Promise<void>;
-
 export function OpenProject():Promise<string>;
 
 export function PostPRComment(arg1:number,arg2:string,arg3:string,arg4:number,arg5:string,arg6:number,arg7:string):Promise<void>;
@@ -63,8 +61,6 @@ export function TerminalResize(arg1:string,arg2:number,arg3:number):Promise<void
 export function TerminalStart(arg1:main.TerminalStartOpts):Promise<main.TerminalStartResult>;
 
 export function TerminalStop(arg1:string):Promise<void>;
-
-export function TerminalStopAll():Promise<void>;
 
 export function TerminalWrite(arg1:string,arg2:string):Promise<void>;
 

@@ -9,10 +9,8 @@ import (
 
 // Settings represents the application settings
 type Settings struct {
-	GitHubToken    string `json:"githubToken,omitempty"`
-	Theme          string `json:"theme,omitempty"`
-	TerminalOpen   bool   `json:"terminalOpen,omitempty"`
-	TerminalHeight int    `json:"terminalHeight,omitempty"`
+	TerminalOpen   bool `json:"terminalOpen,omitempty"`
+	TerminalHeight int  `json:"terminalHeight,omitempty"`
 }
 
 // settingsFilePath returns the path to the settings file
@@ -55,14 +53,4 @@ func (s *Settings) Save() error {
 	}
 
 	return os.WriteFile(path, data, 0644)
-}
-
-// SetGitHubToken sets the GitHub token
-func (s *Settings) SetGitHubToken(token string) {
-	s.GitHubToken = token
-}
-
-// GetGitHubToken returns the GitHub token
-func (s *Settings) GetGitHubToken() string {
-	return s.GitHubToken
 }

@@ -10,7 +10,7 @@ import { IconArrowBackUp, IconChevronRight } from '@tabler/icons-preact';
  * @param {{ path: string, status: string }[]} files
  * @returns {TreeNode[]}
  */
-export function buildFileTree(files) {
+function buildFileTree(files) {
   /** @type {Map<string, TreeNode>} */
   const root = new Map();
 

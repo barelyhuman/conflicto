@@ -11,7 +11,6 @@ export const SyncModel = createModel(({ onError } = {}) => {
   const ahead = signal(0);
   const isPulling = signal(false);
   const isPushing = signal(false);
-  const isFetching = signal(false);
 
   function report(title, err) {
     onError?.(title, err?.message ?? String(err));
@@ -22,7 +21,6 @@ export const SyncModel = createModel(({ onError } = {}) => {
     ahead,
     isPulling,
     isPushing,
-    isFetching,
 
     setAheadBehind(data) {
       this.behind.value = data?.behind ?? 0;
@@ -50,18 +48,6 @@ export const SyncModel = createModel(({ onError } = {}) => {
         report('Push Error', err);
       } finally {
         this.isPushing.value = false;
-      }
-    },
-
-    async fetch() {
-      if (this.isFetching.value) return;
-      this.isFetching.value = true;
-      try {
-        await api.fetch();
-      } catch (err) {
-        report('Fetch Error', err);
-      } finally {
-        this.isFetching.value = false;
       }
     },
   };

@@ -79,11 +79,9 @@ export function setupWailsEvents(callbacks) {
   });
   window.runtime.EventsOn('terminal:data', (data) => {
     emitTerminalData(data);
-    callbacks.onTerminalData?.(data);
   });
   window.runtime.EventsOn('terminal:exit', (data) => {
     emitTerminalExit(data);
-    callbacks.onTerminalExit?.(data);
   });
 
   // Request initial data via the public Refresh method
@@ -115,8 +113,6 @@ export const api = {
   fetch: () => window.go.main.App.Fetch(),
 
   detectGH: () => window.go.main.App.DetectGH(),
-
-  getPRList: () => window.go.main.App.GetPRList(),
 
   searchPRList: (limit, search) => window.go.main.App.SearchPRList(limit, search),
 
@@ -167,15 +163,6 @@ export const api = {
   },
 };
 
-// Window / Environment helpers
-export async function getEnvironment() {
-  return window.runtime.Environment();
-}
-
-export async function isFullscreen() {
-  return window.runtime.WindowIsFullscreen();
-}
-
 export function watchFullscreen(callback, intervalMs = 500) {
   let last = false;
   const id = setInterval(async () => {
@@ -187,5 +174,3 @@ export function watchFullscreen(callback, intervalMs = 500) {
   }, intervalMs);
   return () => clearInterval(id);
 }
-
-export { emitTerminalData, emitTerminalExit };

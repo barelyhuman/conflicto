@@ -180,7 +180,7 @@ export function removeLayout(layoutId) {
  * Remove a single pane (e.g. shell exit). Drops empty layouts.
  * @returns {{ sessionId: string | null, layoutsRemaining: number }}
  */
-export function removePane(localId) {
+function removePane(localId) {
   const pane = panes.find((p) => p.localId === localId);
   const sessionId = pane?.sessionId ?? null;
   panes = panes.filter((p) => p.localId !== localId);
