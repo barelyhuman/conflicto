@@ -5,6 +5,17 @@ FRONTEND := cd frontend && pnpm
 APP_ICON := resources/app-icon/conflicto.png
 WAILS_ICON := build/appicon.png
 
+# Detect OS and define platform-agnostic commands
+ifeq ($(OS),Windows_NT)
+	MKDIR = if not exist $(subst /,\,$(1)) mkdir $(subst /,\,$(1))
+	COPY = copy /Y $(subst /,\,$(1)) $(subst /,\,$(2))
+	RM = if exist $(subst /,\,$(1)) rmdir /s /q $(subst /,\,$(1))
+else
+	MKDIR = mkdir -p $(1)
+	COPY = cp $(1) $(2)
+	RM = rm -rf $(1)
+endif
+
 help:
 	@echo "conflicto — available commands:"
 	@echo "  make icon              Sync app icon into build/appicon.png for Wails"
@@ -18,8 +29,8 @@ help:
 	@echo "  make clean             Remove build artifacts"
 
 icon:
-	@mkdir -p build
-	cp "$(APP_ICON)" "$(WAILS_ICON)"
+	$(call MKDIR,build)
+	$(call COPY,$(APP_ICON),$(WAILS_ICON))
 
 dev: icon
 	$(WAILS) dev
@@ -43,5 +54,5 @@ test: frontend-test frontend-build
 	go test -v ./...
 
 clean:
-	rm -rf build/bin
-	rm -rf frontend/dist
+	$(call RM,build/bin)
+	$(call RM,frontend/dist)
