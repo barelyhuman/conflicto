@@ -62,16 +62,18 @@ run = "pnpm install --frozen-lockfile"
 
 [tasks.'build:frontend']
 description = "Build frontend assets for production"
+depends = ["install:frontend"]
 dir = "frontend"
 run = "pnpm build"
 
 [tasks.'build:production:mac']
 description = "Production macOS binary (set MISE_WAILS_PLATFORM=darwin/arm64 or darwin/amd64)"
-depends = ["install:frontend", "build:frontend", "icon"]
+depends = ["build:frontend", "icon"]
 run = '$WAILS build -platform "${MISE_WAILS_PLATFORM:-darwin/arm64}" -ldflags="-w -s" -trimpath'
 
 [tasks.'test:frontend']
 description = "Run frontend unit tests (Vitest)"
+depends = ["install:frontend"]
 dir = "frontend"
 run = "pnpm test"
 
