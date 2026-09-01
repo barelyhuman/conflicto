@@ -36,6 +36,8 @@ export function GetRecentProjects():Promise<Array<main.RecentProject>>;
 
 export function GetTerminalPrefs():Promise<Record<string, any>>;
 
+export function GetWorktrees():Promise<Array<main.WorktreeInfo>>;
+
 export function OpenProject():Promise<string>;
 
 export function PostPRComment(arg1:number,arg2:string,arg3:string,arg4:number,arg5:string,arg6:number,arg7:string):Promise<void>;
@@ -45,6 +47,8 @@ export function Pull():Promise<void>;
 export function Push():Promise<void>;
 
 export function Refresh():Promise<void>;
+
+export function RemoveWorktree(arg1:string):Promise<void>;
 
 export function SearchPRList(arg1:number,arg2:string):Promise<Array<Record<string, any>>>;
 

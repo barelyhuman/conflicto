@@ -87,6 +87,26 @@ export namespace main {
 	        this.cwd = source["cwd"];
 	    }
 	}
+	export class WorktreeInfo {
+	    path: string;
+	    branch: string;
+	    head: string;
+	    isMain: boolean;
+	    isCurrent: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new WorktreeInfo(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.path = source["path"];
+	        this.branch = source["branch"];
+	        this.head = source["head"];
+	        this.isMain = source["isMain"];
+	        this.isCurrent = source["isCurrent"];
+	    }
+	}
 
 }
 

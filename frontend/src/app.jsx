@@ -20,6 +20,7 @@ import { CreatePRModal } from './components/CreatePRModal.jsx';
 import { TerminalDock, isTerminalFocusTarget } from './components/terminal/TerminalDock.jsx';
 import { SidebarActions } from './components/SidebarActions.jsx';
 import { IslandHeader } from './components/IslandHeader.jsx';
+import { WorktreesPanel } from './components/WorktreesPanel.jsx';
 
 /** Stable empty list so FileTree does not remount on unrelated App re-renders. */
 const EMPTY_FILES = [];
@@ -29,9 +30,10 @@ export function App() {
   const [branches, setBranches] = useState({ current: 'main', local: [], remote: [] });
   // Confirmation dialog state
   const [confirmOpen, setConfirmOpen] = useState(false);
-  /** @type {['stage-conflict' | 'discard' | null, function]} */
+  /** @type {['stage-conflict' | 'discard' | 'remove-worktree' | null, function]} */
   const [confirmKind, setConfirmKind] = useState(null);
   const [pendingConfirmFile, setPendingConfirmFile] = useState(null);
+  const [pendingWorktreePath, setPendingWorktreePath] = useState(null);
 
   // Sync domain model (ahead/behind + push/pull/fetch loading states)
   const sync = useModel(() => new SyncModel({
@@ -48,6 +50,7 @@ export function App() {
   const [projectName, setProjectName] = useState('');
   const [projectPath, setProjectPath] = useState('');
   const [recentProjects, setRecentProjects] = useState([]);
+  const [worktrees, setWorktrees] = useState([]);
 
   // macOS titlebar state
   const [isMacOS, setIsMacOS] = useState(false);
@@ -189,6 +192,9 @@ export function App() {
       onRecentProjectsUpdated: (data) => {
         setRecentProjects(data.projects ?? []);
       },
+      onWorktreesUpdated: (data) => {
+        setWorktrees(data?.worktrees ?? []);
+      },
       onPlatformInfo: (data) => {
         if (data?.platform === 'darwin') {
           setIsMacOS(true);
@@ -261,6 +267,11 @@ export function App() {
     });
     api.getRecentProjects().then((list) => {
       setRecentProjects(list ?? []);
+    });
+    api.getWorktrees().then((list) => {
+      setWorktrees(list ?? []);
+    }).catch(() => {
+      setWorktrees([]);
     });
   }, []);
 
@@ -354,10 +365,20 @@ export function App() {
 
   const handleConfirmDialog = useCallback(() => {
     const path = pendingConfirmFile;
+    const worktreePath = pendingWorktreePath;
     const kind = confirmKind;
     setConfirmOpen(false);
     setPendingConfirmFile(null);
+    setPendingWorktreePath(null);
     setConfirmKind(null);
+
+    if (kind === 'remove-worktree' && worktreePath) {
+      api.removeWorktree(worktreePath).catch((err) => {
+        pushToast('Remove Worktree Error', err.message);
+      });
+      return;
+    }
+
     if (!path) return;
 
     if (kind === 'stage-conflict') {
@@ -367,11 +388,12 @@ export function App() {
     if (kind === 'discard') {
       workingTree.discard(path);
     }
-  }, [pendingConfirmFile, confirmKind, workingTree]);
+  }, [pendingConfirmFile, pendingWorktreePath, confirmKind, workingTree]);
 
   const handleCancelConfirm = useCallback(() => {
     setConfirmOpen(false);
     setPendingConfirmFile(null);
+    setPendingWorktreePath(null);
     setConfirmKind(null);
   }, []);
 
@@ -401,6 +423,12 @@ export function App() {
     api.switchProject(path).catch((err) => {
       pushToast('Switch Project Error', err.message);
     });
+  }, []);
+
+  const handleRemoveWorktree = useCallback((path) => {
+    setPendingWorktreePath(path);
+    setConfirmKind('remove-worktree');
+    setConfirmOpen(true);
   }, []);
 
   const shellClass = [
@@ -438,6 +466,13 @@ export function App() {
                   remoteBranches={branches.remote}
                   onSelectBranch={handleSelectBranch}
                   sync={sync}
+                />
+
+                <WorktreesPanel
+                  worktrees={worktrees}
+                  currentPath={projectPath}
+                  onSwitch={handleSwitchProject}
+                  onRemove={handleRemoveWorktree}
                 />
 
                 <FileTree
@@ -522,14 +557,21 @@ export function App() {
             open={confirmOpen}
             filename={pendingConfirmFile ?? ''}
             title={
-              confirmKind === 'discard'
+              confirmKind === 'remove-worktree'
+                ? 'Remove worktree?'
+                : confirmKind === 'discard'
                 ? (pendingUnstagedStatus === 'U'
                     ? 'Delete untracked file?'
                     : 'Discard changes?')
                 : 'Stage conflicted file?'
             }
             message={
-              confirmKind === 'discard' ? (
+              confirmKind === 'remove-worktree' ? (
+                <>
+                  Remove worktree at <code>{pendingWorktreePath ?? ''}</code>?
+                  Uncommitted changes will be lost.
+                </>
+              ) : confirmKind === 'discard' ? (
                 pendingUnstagedStatus === 'U' ? (
                   <>
                     Permanently delete <code>{pendingConfirmFile ?? ''}</code>?
@@ -544,7 +586,9 @@ export function App() {
               ) : undefined
             }
             confirmLabel={
-              confirmKind === 'discard'
+              confirmKind === 'remove-worktree'
+                ? 'Remove'
+                : confirmKind === 'discard'
                 ? (pendingUnstagedStatus === 'U'
                     ? 'Delete'
                     : 'Discard')
@@ -575,6 +619,7 @@ export function App() {
 
           <PRCheckoutPrompt
             pr={prPrompt}
+            projectPath={projectPath}
             onViewDiff={() => handleViewPRDiff(prPrompt)}
             onCheckoutLocal={() => handleCheckoutPRLocal(prPrompt)}
             onCheckoutWorktree={() => handleCheckoutPRWorktree(prPrompt)}

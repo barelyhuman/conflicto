@@ -4,12 +4,13 @@ import { useState } from 'preact/hooks';
  * Prompt shown when a PR is selected offering checkout options.
  * @param {Object} props
  * @param {{ number: number, title: string, author: string, baseBranch: string } | null} props.pr
+ * @param {string} [props.projectPath]
  * @param {() => void} props.onViewDiff
  * @param {() => void} props.onCheckoutLocal
  * @param {() => void} props.onCheckoutWorktree
  * @param {() => void} props.onClose
  */
-export function PRCheckoutPrompt({ pr, onViewDiff, onCheckoutLocal, onCheckoutWorktree, onClose }) {
+export function PRCheckoutPrompt({ pr, projectPath, onViewDiff, onCheckoutLocal, onCheckoutWorktree, onClose }) {
   const [mode, setMode] = useState(null); // null | 'local' | 'worktree'
 
   if (!pr) return null;
@@ -18,6 +19,14 @@ export function PRCheckoutPrompt({ pr, onViewDiff, onCheckoutLocal, onCheckoutWo
     setMode(null);
     fn();
   }
+
+  const worktreeHint = (() => {
+    if (!projectPath) return '../worktrees/<repo>/<hash>';
+    const parts = projectPath.split('/');
+    const repoName = parts[parts.length - 1] || '<repo>';
+    const parent = parts.slice(0, -1).join('/') || '..';
+    return `${parent}/worktrees/${repoName}/<hash>`;
+  })();
 
   return (
     <div class="pr-prompt-overlay" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
@@ -40,9 +49,9 @@ export function PRCheckoutPrompt({ pr, onViewDiff, onCheckoutLocal, onCheckoutWo
               <button type="button" class="pr-prompt-btn" onClick={() => setMode('local')}>
                 Checkout locally
               </button>
-              {/* <button type="button" class="pr-prompt-btn" onClick={() => setMode('worktree')}>
+              <button type="button" class="pr-prompt-btn" onClick={() => setMode('worktree')}>
                 Checkout in worktree
-              </button> */}
+              </button>
             </div>
           )}
 
@@ -62,7 +71,7 @@ export function PRCheckoutPrompt({ pr, onViewDiff, onCheckoutLocal, onCheckoutWo
 
           {mode === 'worktree' && (
             <div class="pr-prompt-confirm">
-              <p>This will create a new worktree at <code>worktrees/pr-{pr.number}</code>.</p>
+              <p>This will create a new worktree at <code>{worktreeHint}</code> without changing your current branch.</p>
               <div class="pr-prompt-actions">
                 <button type="button" class="pr-prompt-btn pr-prompt-btn-primary" onClick={() => handleAction(onCheckoutWorktree)}>
                   Confirm worktree

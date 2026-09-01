@@ -70,6 +70,10 @@ export function GetTerminalPrefs() {
   return window['go']['main']['App']['GetTerminalPrefs']();
 }
 
+export function GetWorktrees() {
+  return window['go']['main']['App']['GetWorktrees']();
+}
+
 export function OpenProject() {
   return window['go']['main']['App']['OpenProject']();
 }
@@ -88,6 +92,10 @@ export function Push() {
 
 export function Refresh() {
   return window['go']['main']['App']['Refresh']();
+}
+
+export function RemoveWorktree(arg1) {
+  return window['go']['main']['App']['RemoveWorktree'](arg1);
 }
 
 export function SearchPRList(arg1, arg2) {

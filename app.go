@@ -854,58 +854,46 @@ func (a *App) CheckoutPR(number int) error {
 	return nil
 }
 
-// CheckoutPRToWorktree checks out a PR into a new git worktree
+// CheckoutPRToWorktree checks out a PR into a new git worktree outside the repo.
 func (a *App) CheckoutPRToWorktree(number int) error {
 	if a.git == nil || !a.git.IsRepo() {
 		return fmt.Errorf("no git repository")
 	}
 
-	repoPath := a.git.path
-	repoName := filepath.Base(repoPath)
-
-	// First do gh pr checkout locally to fetch the branch
-	checkoutCmd := exec.Command("gh", "pr", "checkout", fmt.Sprintf("%d", number))
-	checkoutCmd.Dir = repoPath
-	checkoutOut, checkoutErr := checkoutCmd.CombinedOutput()
-	if checkoutErr != nil {
-		a.EmitEvent("error", map[string]string{
-			"title":   "PR Checkout Error",
-			"message": string(checkoutOut),
-		})
-		return checkoutErr
+	mainRepo, err := a.git.MainRepoPath()
+	if err != nil {
+		return err
 	}
+	repoName := filepath.Base(mainRepo)
 
-	// Get the branch name of the PR
-	branchCmd := exec.Command("gh", "pr", "view", fmt.Sprintf("%d", number), "--json", "headRefName", "--jq", ".headRefName")
-	branchCmd.Dir = repoPath
-	branchOut, branchErr := branchCmd.Output()
-	if branchErr != nil {
-		a.EmitEvent("error", map[string]string{
-			"title":   "PR Branch Error",
-			"message": "Could not determine PR branch name.",
-		})
-		return branchErr
-	}
-	branch := strings.TrimSpace(string(branchOut))
-
-	// Create worktree path: <repo>/worktrees/pr-<number>
-	worktreePath := filepath.Join(repoPath, "worktrees", fmt.Sprintf("pr-%d", number))
-
-	// Create worktree
-	wtCmd := exec.Command("git", "worktree", "add", worktreePath, branch)
-	wtCmd.Dir = repoPath
-	wtOut, wtErr := wtCmd.CombinedOutput()
-	if wtErr != nil {
+	worktreePath, hash, err := a.git.NewWorktreePath()
+	if err != nil {
 		a.EmitEvent("error", map[string]string{
 			"title":   "Worktree Error",
-			"message": string(wtOut),
+			"message": err.Error(),
 		})
-		return wtErr
+		return err
 	}
 
-	// Switch to the worktree as the active project
-	err := a.switchToProject(worktreePath)
-	if err != nil {
+	localBranch := fmt.Sprintf("pr-wt-%s", hash)
+
+	if err := a.git.FetchPRHead(number, localBranch); err != nil {
+		a.EmitEvent("error", map[string]string{
+			"title":   "PR Fetch Error",
+			"message": err.Error(),
+		})
+		return err
+	}
+
+	if err := a.git.AddWorktree(worktreePath, localBranch); err != nil {
+		a.EmitEvent("error", map[string]string{
+			"title":   "Worktree Error",
+			"message": err.Error(),
+		})
+		return err
+	}
+
+	if err := a.switchToProject(worktreePath); err != nil {
 		return err
 	}
 
@@ -916,6 +904,74 @@ func (a *App) CheckoutPRToWorktree(number int) error {
 		"repoName":     repoName,
 	})
 	return nil
+}
+
+// GetWorktrees returns all worktrees for the current repository.
+func (a *App) GetWorktrees() ([]WorktreeInfo, error) {
+	if a.git == nil || !a.git.IsRepo() {
+		return nil, fmt.Errorf("no git repository")
+	}
+
+	worktrees, err := a.git.ListWorktrees()
+	if err != nil {
+		return nil, err
+	}
+
+	a.EmitEvent("worktreesUpdated", map[string]interface{}{
+		"worktrees": worktrees,
+	})
+	return worktrees, nil
+}
+
+// RemoveWorktree removes a worktree at the given path.
+func (a *App) RemoveWorktree(path string) error {
+	if a.git == nil || !a.git.IsRepo() {
+		return fmt.Errorf("no git repository")
+	}
+
+	// If removing the active project, switch back to the main repo first.
+	if a.git.path == path {
+		mainRepo, err := a.git.MainRepoPath()
+		if err != nil {
+			return err
+		}
+		if err := a.switchToProject(mainRepo); err != nil {
+			return err
+		}
+	}
+
+	if err := a.git.RemoveWorktree(path); err != nil {
+		a.EmitEvent("error", map[string]string{
+			"title":   "Remove Worktree Error",
+			"message": err.Error(),
+		})
+		return err
+	}
+
+	a.emitWorktreesUpdated()
+	return nil
+}
+
+// emitWorktreesUpdated emits the current list of worktrees.
+func (a *App) emitWorktreesUpdated() {
+	if a.git == nil || !a.git.IsRepo() {
+		a.EmitEvent("worktreesUpdated", map[string]interface{}{
+			"worktrees": []WorktreeInfo{},
+		})
+		return
+	}
+
+	worktrees, err := a.git.ListWorktrees()
+	if err != nil {
+		a.EmitEvent("worktreesUpdated", map[string]interface{}{
+			"worktrees": []WorktreeInfo{},
+		})
+		return
+	}
+
+	a.EmitEvent("worktreesUpdated", map[string]interface{}{
+		"worktrees": worktrees,
+	})
 }
 
 // CreatePR creates a new pull request from the current branch
@@ -1002,6 +1058,8 @@ func (a *App) switchToProject(path string) error {
 	a.prCache = make(map[int]PRCache)
 	go a.GetPRList()
 
+	a.emitWorktreesUpdated()
+
 	return nil
 }
 
@@ -1079,5 +1137,6 @@ func (a *App) Refresh() {
 		a.invalidatePRCache()
 		go a.GetPRList()
 	}
+	a.emitWorktreesUpdated()
 	a.EmitEvent("refreshCompleted", nil)
 }
