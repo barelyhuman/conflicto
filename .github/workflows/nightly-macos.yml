@@ -27,7 +27,7 @@ jobs:
       nightly_tag: ${{ steps.check.outputs.nightly_tag }}
       nightly_name: ${{ steps.check.outputs.nightly_name }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           ref: main
           fetch-depth: 0
@@ -85,11 +85,11 @@ jobs:
             arch: amd64
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           ref: main
 
-      - uses: jdx/mise-action@v3
+      - uses: jdx/mise-action@v4
         with:
           install: true
           cache: true
@@ -104,7 +104,7 @@ jobs:
       - name: Package app bundle
         run: cd build/bin && zip -r "conflicto-macos-${{ matrix.arch }}.zip" conflicto.app
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: conflicto-macos-${{ matrix.arch }}
           path: build/bin/conflicto-macos-${{ matrix.arch }}.zip
@@ -116,11 +116,11 @@ jobs:
     if: needs.check-changes.outputs.should_build == 'true'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           path: artifacts
           pattern: conflicto-macos-*
