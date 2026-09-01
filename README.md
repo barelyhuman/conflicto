@@ -15,7 +15,7 @@
 
 ## Prerequisites
 
-- **Go** — [Go 1.26+](https://go.dev/dl/) (see `go.mod`). Needed to compile the Wails backend and run `make` targets.
+- **[mise](https://mise.jdx.dev/)** — Installs and runs the pinned Go, Node, and pnpm versions from `mise.toml`. See [Setup](#setup) below.
 - **GitHub CLI (`gh`)** — [Install gh](https://cli.github.com/), then authenticate:
 
   ```bash
@@ -24,31 +24,50 @@
 
   PR listing, checkout, comments, and related GitHub features call `gh` at runtime. Diff viewing still works without it; GitHub integration does not.
 
-Also required to build: [pnpm](https://pnpm.io/), [Node.js](https://nodejs.org/), and a C/C++ toolchain for [Wails](https://wails.io/) (platform deps vary — see the Wails docs).
+Also required to build: a C/C++ toolchain for [Wails](https://wails.io/) (platform deps vary — see the Wails docs).
+
+## Setup
+
+Install mise, then trust and install the project toolchain:
+
+```bash
+curl https://mise.run | sh          # or: brew install mise
+cd conflicto
+mise trust                            # allow tasks/env from mise.toml
+mise install                          # Go, Node, pnpm (versions pinned in mise.toml)
+mise run setup                        # sync icon, install deps, build frontend
+```
+
+After setup, `mise run dev` starts Wails dev mode with live reload.
 
 ## Build from source
 
 ```bash
 git clone https://github.com/barelyhuman/conflicto.git
 cd conflicto
-make frontend-build
-make build
+mise trust
+mise install
+mise run build:frontend
+mise run build
 ```
 
 That syncs the app icon and runs `wails build`. The binary lands under `build/bin/`.
 
-Useful targets:
+Useful tasks (run with `mise run <task>`):
 
-| Command | Description |
+| Task | Description |
 | --- | --- |
-| `make dev` | Wails dev mode (live reload) |
-| `make build` | Local debug binary |
-| `make build-production` | Production binary (`-ldflags="-w -s" -trimpath`) |
-| `make test` | Go + frontend tests |
-| `make frontend-test` | Frontend unit tests (Vitest) |
-| `make clean` | Remove build artifacts |
+| `dev` | Wails dev mode (live reload) |
+| `build` | Local debug binary |
+| `build:production` | Production binary (`-ldflags="-w -s" -trimpath`) |
+| `test` | Go + frontend tests |
+| `test:frontend` | Frontend unit tests (Vitest) |
+| `clean` | Remove build artifacts |
+| `setup` | First-time setup (clean, icon, deps, frontend build) |
 
-Frontend-only: `make frontend-dev` / `make frontend-build` (runs `pnpm` in `frontend/`). Vite alone has no Go backend — use `make dev` for a working UI.
+Frontend-only: `dev:frontend` / `build:frontend` (runs `pnpm` in `frontend/`). Vite alone has no Go backend — use `dev` for a working UI.
+
+List all tasks: `mise tasks`
 
 ## Keybindings
 

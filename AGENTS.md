@@ -4,25 +4,28 @@ Wails v2 desktop app: Go backend + Preact frontend. Alpha.
 
 ## Build & Dev
 
-- **Entry to all builds**: `Makefile`. Do not call `wails` or `vite` directly unless you know why.
-- `make dev` — Wails dev mode with live reload (builds icon first).
-- `make build` — Local debug binary.
-- `make build-production` — Stripped release binary (`-ldflags="-w -s" -trimpath`).
-- `make icon` — Syncs `resources/app-icon/conflicto.png` → `build/appicon.png`. Called automatically by the three targets above; Wails fails if the icon is missing.
-- `make clean` — Removes `build/bin` and `frontend/dist`.
+- **Entry to all builds**: `mise.toml`. Do not call `wails` or `vite` directly unless you know why.
+- `mise run dev` — Wails dev mode with live reload (builds icon first).
+- `mise run build` — Local debug binary.
+- `mise run build:production` — Stripped release binary (`-ldflags="-w -s" -trimpath`).
+- `mise run icon` — Syncs `resources/app-icon/conflicto.png` → `build/appicon.png`. Called automatically by the three targets above; Wails fails if the icon is missing.
+- `mise run clean` — Removes `build/bin` and `frontend/dist`.
+- `mise run setup` — First-time setup: clean, icon, `pnpm install`, frontend build, `go mod tidy`.
+
+Toolchain: `mise install` (Go, Node, pnpm versions pinned in `mise.toml`).
 
 ## Frontend (Preact, not React)
 
 - **Framework**: Preact 10 + Vite. `vite.config.js` aliases `react` → `preact/compat`.
 - **Package manager**: `pnpm` only. `frontend/package.json` pins `"packageManager": "pnpm@10.33.4"`.
-- **Dev server alone**: `make frontend-dev` (Vite only). **Has no Go backend** — use `make dev` for a working UI.
-- **Build**: `make frontend-build` → `cd frontend && pnpm build`.
+- **Dev server alone**: `mise run dev:frontend` (Vite only). **Has no Go backend** — use `mise run dev` for a working UI.
+- **Build**: `mise run build:frontend` → `cd frontend && pnpm build`.
 
 ### Testing & Lint
 
-- `make frontend-test` → Vitest (`environment: 'node'`, pattern `src/**/*.test.js`).
+- `mise run test:frontend` → Vitest (`environment: 'node'`, pattern `src/**/*.test.js`).
 - `pnpm lint` in `frontend/` runs ESLint on `src`.
-- `make test` runs **frontend-test → frontend-build → go test**. Order matters: Go tests need `frontend/dist` to exist because the binary embeds it (`//go:embed all:frontend/dist`).
+- `mise run test` runs **test:frontend → build:frontend → go test**. Order matters: Go tests need `frontend/dist` to exist because the binary embeds it (`//go:embed all:frontend/dist`).
 
 ### Preact Signals — Critical
 
