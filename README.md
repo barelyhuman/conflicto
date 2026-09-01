@@ -88,8 +88,8 @@ List all tasks: `mise tasks`
 | `Cmd+Ctrl+F` (macOS) / `Ctrl+F` | Full Screen |
 | `Cmd/Ctrl+W` | Close window |
 | `Cmd/Ctrl+Enter` | Commit (from commit message field) |
-| `Ctrl+\`` | Toggle terminal dock |
-| `Ctrl+Shift+\`` | New terminal tab (opens dock if needed) |
+| ``Cmd/Ctrl+` `` | Toggle terminal dock |
+| ``Cmd/Ctrl+Shift+` `` | New terminal tab (opens dock if needed) |
 | `Cmd/Ctrl+\\` | Split terminal right (dock open) |
 
 On macOS, the Edit menu also provides the usual text-editing shortcuts (`Cmd+A/C/V/X/Z`).
