@@ -55,10 +55,20 @@ description = "Run frontend dev server only (Vite)"
 dir = "frontend"
 run = "pnpm dev"
 
+[tasks.'install:frontend']
+description = "Install frontend dependencies (frozen lockfile)"
+dir = "frontend"
+run = "pnpm install --frozen-lockfile"
+
 [tasks.'build:frontend']
 description = "Build frontend assets for production"
 dir = "frontend"
 run = "pnpm build"
+
+[tasks.'build:production:mac']
+description = "Production macOS binary (set MISE_WAILS_PLATFORM=darwin/arm64 or darwin/amd64)"
+depends = ["install:frontend", "build:frontend", "icon"]
+run = '$WAILS build -platform "${MISE_WAILS_PLATFORM:-darwin/arm64}" -ldflags="-w -s" -trimpath'
 
 [tasks.'test:frontend']
 description = "Run frontend unit tests (Vitest)"

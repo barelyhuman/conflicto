@@ -1,0 +1,158 @@
+name: Nightly macOS
+
+on:
+  schedule:
+    - cron: "0 4 * * *"
+  workflow_dispatch:
+    inputs:
+      force:
+        description: Force build even if no new commits
+        required: false
+        type: boolean
+        default: false
+
+concurrency:
+  group: nightly-macos-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+
+jobs:
+  check-changes:
+    name: Check for changes
+    runs-on: ubuntu-latest
+    outputs:
+      should_build: ${{ steps.check.outputs.should_build }}
+      nightly_tag: ${{ steps.check.outputs.nightly_tag }}
+      nightly_name: ${{ steps.check.outputs.nightly_name }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+          fetch-tags: true
+
+      - id: check
+        env:
+          FORCE: ${{ github.event_name == 'workflow_dispatch' && inputs.force || false }}
+        run: |
+          set -euo pipefail
+          NIGHTLY_TAG="nightly-$(date -u +%Y.%m.%d)"
+          NIGHTLY_NAME="Nightly ${NIGHTLY_TAG#nightly-}"
+          echo "nightly_tag=$NIGHTLY_TAG" >> "$GITHUB_OUTPUT"
+          echo "nightly_name=$NIGHTLY_NAME" >> "$GITHUB_OUTPUT"
+
+          if [[ "$FORCE" == "true" ]]; then
+            echo "should_build=true" >> "$GITHUB_OUTPUT"
+            echo "Forced build — skipping commit check"
+            exit 0
+          fi
+
+          git fetch --tags --force --prune
+          LAST_NIGHTLY=$(git tag -l 'nightly-*' --sort=-v:refname | head -1)
+
+          if [[ -z "$LAST_NIGHTLY" ]]; then
+            echo "should_build=true" >> "$GITHUB_OUTPUT"
+            echo "No previous nightly tag — building"
+            exit 0
+          fi
+
+          HEAD_SHA=$(git rev-parse HEAD)
+          LAST_SHA=$(git rev-parse "${LAST_NIGHTLY}^{commit}")
+
+          if [[ "$HEAD_SHA" == "$LAST_SHA" ]]; then
+            echo "should_build=false" >> "$GITHUB_OUTPUT"
+            echo "HEAD ($HEAD_SHA) == last nightly ($LAST_NIGHTLY) — skipping"
+          else
+            echo "should_build=true" >> "$GITHUB_OUTPUT"
+            echo "HEAD ($HEAD_SHA) differs from last nightly ($LAST_NIGHTLY) — building"
+          fi
+
+  build:
+    name: Build (${{ matrix.arch }})
+    needs: check-changes
+    if: needs.check-changes.outputs.should_build == 'true'
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-14
+            platform: darwin/arm64
+            arch: arm64
+          - os: macos-14
+            platform: darwin/amd64
+            arch: amd64
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - uses: jdx/mise-action@v3
+        with:
+          install: true
+          cache: true
+
+      - run: mise trust
+
+      - name: Build production binary
+        env:
+          MISE_WAILS_PLATFORM: ${{ matrix.platform }}
+        run: mise run build:production:mac
+
+      - name: Package app bundle
+        run: cd build/bin && zip -r "conflicto-macos-${{ matrix.arch }}.zip" conflicto.app
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: conflicto-macos-${{ matrix.arch }}
+          path: build/bin/conflicto-macos-${{ matrix.arch }}.zip
+          if-no-files-found: error
+
+  release:
+    name: Publish nightly release
+    needs: [check-changes, build]
+    if: needs.check-changes.outputs.should_build == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          pattern: conflicto-macos-*
+          merge-multiple: true
+
+      - name: Verify release assets
+        run: |
+          set -euo pipefail
+          ls -la artifacts/
+          test -f artifacts/conflicto-macos-arm64.zip
+          test -f artifacts/conflicto-macos-amd64.zip
+
+      - name: Delete existing same-day release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          NIGHTLY_TAG: ${{ needs.check-changes.outputs.nightly_tag }}
+        run: |
+          gh release delete "$NIGHTLY_TAG" --yes 2>/dev/null || true
+          git push origin ":refs/tags/$NIGHTLY_TAG" 2>/dev/null || true
+
+      - uses: softprops/action-gh-release@v3
+        with:
+          tag_name: ${{ needs.check-changes.outputs.nightly_tag }}
+          name: ${{ needs.check-changes.outputs.nightly_name }}
+          target_commitish: main
+          prerelease: true
+          files: artifacts/conflicto-macos-*.zip
+          fail_on_unmatched_files: true
+          body: |
+            Unsigned macOS nightly build (arm64 + amd64).
+
+            - Commit: ${{ github.sha }}
+            - Tag: ${{ needs.check-changes.outputs.nightly_tag }}
+
+            These builds are not code-signed or notarized. See the README for how to run them locally.

@@ -7,7 +7,16 @@
   <span>Small on purpose. Sharp on every diff.</span>
 </p>
 
+## Quick install (macOS)
 
+[Nightly builds](https://github.com/barelyhuman/conflicto/releases) are **unsigned and unnotarized** — macOS will warn on first launch. Download `conflicto-macos-arm64.zip` (Apple Silicon) or `conflicto-macos-amd64.zip` (Intel), unzip to `/Applications`, then:
+
+```bash
+xattr -cr /Applications/conflicto.app   # remove quarantine
+open /Applications/conflicto.app        # first launch: right-click → Open if macOS still blocks
+```
+
+Nightlies are tagged by date (`nightly-2026.09.01`) and only publish when `main` has new commits since the previous nightly. [Build from source](#build-from-source)
 
 > [!WARNING]
 > 

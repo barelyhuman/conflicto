@@ -55,3 +55,7 @@ Signals are the primary state layer. The repo includes local OpenCode skills und
   1. **Go tests**: installs pnpm/Node, runs `pnpm install --frozen-lockfile && pnpm build` in `frontend/`, then `go test ./...`.
   2. **Frontend tests**: `pnpm install --frozen-lockfile && pnpm test`.
 - CI uses pnpm `10.34.5` and Node `22`.
+- `.github/workflows/nightly-macos.yml` — nightly unsigned macOS arm64 + amd64 builds:
+  - Skip-if-unchanged via latest `nightly-YYYY.MM.DD` tag (no macOS runners when `main` is unchanged).
+  - Uses `mise run build:production:mac` (`install:frontend` → `build:frontend` → `icon` → wails).
+  - Publishes date-stamped prereleases (`nightly-2026.09.01`) with both arch zips.
