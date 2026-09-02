@@ -1,5 +1,39 @@
 export namespace main {
 	
+	export class PRFileViewedState {
+	    path: string;
+	    viewerViewedState: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new PRFileViewedState(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.path = source["path"];
+	        this.viewerViewedState = source["viewerViewedState"];
+	    }
+	}
+	export class PRReviewState {
+	    number: number;
+	    pullRequestId: string;
+	    reviewDecision: string;
+	    viewerReviewState: string;
+	    viewerReviewSubmittedAt: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new PRReviewState(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.number = source["number"];
+	        this.pullRequestId = source["pullRequestId"];
+	        this.reviewDecision = source["reviewDecision"];
+	        this.viewerReviewState = source["viewerReviewState"];
+	        this.viewerReviewSubmittedAt = source["viewerReviewSubmittedAt"];
+	    }
+	}
 	export class FileContentsResult {
 	    oldContent: string;
 	    newContent: string;

@@ -30,12 +30,17 @@ export function GetPRFileDiff(arg1:number,arg2:string):Promise<void>;
 
 export function GetPRFiles(arg1:number):Promise<void>;
 
+export function GetPRFileViewedStates(arg1:number):Promise<Array<main.PRFileViewedState>>;
+
 export function GetPRList():Promise<void>;
+
+export function GetPRReviewState(arg1:number):Promise<main.PRReviewState>;
 
 export function GetRecentProjects():Promise<Array<main.RecentProject>>;
 
 export function GetTerminalPrefs():Promise<Record<string, any>>;
 
+export function MarkPRFileViewed(arg1:number,arg2:string):Promise<void>;
 export function OpenProject():Promise<string>;
 
 export function PostPRComment(arg1:number,arg2:string,arg3:string,arg4:number,arg5:string,arg6:number,arg7:string):Promise<void>;
@@ -47,6 +52,8 @@ export function Push():Promise<void>;
 export function Refresh():Promise<void>;
 
 export function SearchPRList(arg1:number,arg2:string):Promise<Array<Record<string, any>>>;
+
+export function SubmitPRReview(arg1:number,arg2:string,arg3:string):Promise<void>;
 
 export function SetTerminalPrefs(arg1:boolean,arg2:number):Promise<void>;
 
@@ -65,5 +72,7 @@ export function TerminalStop(arg1:string):Promise<void>;
 export function TerminalWrite(arg1:string,arg2:string):Promise<void>;
 
 export function ToggleFullscreen():Promise<void>;
+
+export function UnmarkPRFileViewed(arg1:number,arg2:string):Promise<void>;
 
 export function UnstageFile(arg1:string):Promise<void>;
