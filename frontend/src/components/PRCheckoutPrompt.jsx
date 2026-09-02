@@ -1,20 +1,31 @@
 import { useState, useEffect } from 'preact/hooks';
+import { IconRefresh } from '@tabler/icons-preact';
 import { api } from '../wails.js';
 
 /**
  * Prompt shown when a PR is selected offering checkout options.
  * @param {Object} props
  * @param {{ number: number, title: string, author: string, baseBranch: string } | null} props.pr
+ * @param {null | 'local' | 'worktree'} [props.checkoutPending]
  * @param {() => void} props.onViewDiff
  * @param {() => void} props.onCheckoutLocal
  * @param {(hash: string) => void} props.onCheckoutWorktree
  * @param {() => void} props.onClose
  */
-export function PRCheckoutPrompt({ pr, onViewDiff, onCheckoutLocal, onCheckoutWorktree, onClose }) {
+export function PRCheckoutPrompt({
+  pr,
+  checkoutPending = null,
+  onViewDiff,
+  onCheckoutLocal,
+  onCheckoutWorktree,
+  onClose,
+}) {
   const [mode, setMode] = useState(null); // null | 'local' | 'worktree'
   const [worktreePath, setWorktreePath] = useState('');
   const [worktreeHash, setWorktreeHash] = useState('');
   const [worktreePreviewLoading, setWorktreePreviewLoading] = useState(false);
+
+  const isBusy = checkoutPending != null;
 
   useEffect(() => {
     if (mode !== 'worktree') {
@@ -49,17 +60,43 @@ export function PRCheckoutPrompt({ pr, onViewDiff, onCheckoutLocal, onCheckoutWo
 
   if (!pr) return null;
 
-  function handleAction(fn) {
+  function handleViewDiff() {
     setMode(null);
-    fn();
+    onViewDiff();
   }
 
+  function handleOverlayClick(e) {
+    if (isBusy) return;
+    if (e.target === e.currentTarget) onClose();
+  }
+
+  function handleClose() {
+    if (isBusy) return;
+    onClose();
+  }
+
+  const loadingTitle = checkoutPending === 'worktree'
+    ? 'Creating worktree…'
+    : 'Checking out PR…';
+
   return (
-    <div class="pr-prompt-overlay" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
-      <div class="pr-prompt-window">
+    <div class="pr-prompt-overlay" onClick={handleOverlayClick}>
+      <div
+        class="pr-prompt-window"
+        aria-busy={isBusy}
+        aria-live="polite"
+      >
         <div class="pr-prompt-header">
           <span class="pr-prompt-title">PR #{pr.number}</span>
-          <button type="button" class="pr-prompt-close" onClick={onClose}>×</button>
+          <button
+            type="button"
+            class="pr-prompt-close"
+            onClick={handleClose}
+            disabled={isBusy}
+            aria-label="Close"
+          >
+            ×
+          </button>
         </div>
         <div class="pr-prompt-body">
           <div class="pr-prompt-desc">
@@ -67,9 +104,17 @@ export function PRCheckoutPrompt({ pr, onViewDiff, onCheckoutLocal, onCheckoutWo
             <div class="pr-prompt-meta">by {pr.author} → {pr.baseBranch}</div>
           </div>
 
-          {mode === null && (
+          {isBusy ? (
+            <div class="pr-prompt-loading">
+              <IconRefresh size={18} stroke={2} class="spin" aria-hidden="true" />
+              <span class="pr-prompt-loading-title">{loadingTitle}</span>
+              {checkoutPending === 'worktree' && worktreePath && (
+                <code class="pr-prompt-loading-path">{worktreePath}</code>
+              )}
+            </div>
+          ) : mode === null ? (
             <div class="pr-prompt-actions">
-              <button type="button" class="pr-prompt-btn pr-prompt-btn-primary" onClick={() => handleAction(onViewDiff)}>
+              <button type="button" class="pr-prompt-btn pr-prompt-btn-primary" onClick={handleViewDiff}>
                 View diff
               </button>
               <button type="button" class="pr-prompt-btn" onClick={() => setMode('local')}>
@@ -79,13 +124,11 @@ export function PRCheckoutPrompt({ pr, onViewDiff, onCheckoutLocal, onCheckoutWo
                 Checkout in worktree
               </button>
             </div>
-          )}
-
-          {mode === 'local' && (
+          ) : mode === 'local' ? (
             <div class="pr-prompt-confirm">
               <p>This will switch your current branch to the PR branch.</p>
               <div class="pr-prompt-actions">
-                <button type="button" class="pr-prompt-btn pr-prompt-btn-primary" onClick={() => handleAction(onCheckoutLocal)}>
+                <button type="button" class="pr-prompt-btn pr-prompt-btn-primary" onClick={onCheckoutLocal}>
                   Confirm checkout
                 </button>
                 <button type="button" class="pr-prompt-btn" onClick={() => setMode(null)}>
@@ -93,9 +136,7 @@ export function PRCheckoutPrompt({ pr, onViewDiff, onCheckoutLocal, onCheckoutWo
                 </button>
               </div>
             </div>
-          )}
-
-          {mode === 'worktree' && (
+          ) : (
             <div class="pr-prompt-confirm">
               <p>
                 {worktreePreviewLoading
@@ -108,7 +149,7 @@ export function PRCheckoutPrompt({ pr, onViewDiff, onCheckoutLocal, onCheckoutWo
                 <button
                   type="button"
                   class="pr-prompt-btn pr-prompt-btn-primary"
-                  onClick={() => handleAction(() => onCheckoutWorktree(worktreeHash))}
+                  onClick={() => onCheckoutWorktree(worktreeHash)}
                   disabled={worktreePreviewLoading || !worktreeHash}
                 >
                   Confirm worktree
@@ -169,9 +210,13 @@ export function PRCheckoutPrompt({ pr, onViewDiff, onCheckoutLocal, onCheckoutWo
           cursor: pointer;
           transition: background 0.15s, color 0.15s;
         }
-        .pr-prompt-close:hover {
+        .pr-prompt-close:hover:not(:disabled) {
           background: var(--accent-hover);
           color: var(--text);
+        }
+        .pr-prompt-close:disabled {
+          opacity: 0.4;
+          cursor: not-allowed;
         }
         .pr-prompt-body {
           padding: 0 16px 16px;
@@ -192,6 +237,30 @@ export function PRCheckoutPrompt({ pr, onViewDiff, onCheckoutLocal, onCheckoutWo
         .pr-prompt-meta {
           font-size: 12px;
           color: var(--text-muted);
+        }
+        .pr-prompt-loading {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          gap: 10px;
+          padding: 12px 0 4px;
+          text-align: center;
+        }
+        .pr-prompt-loading-title {
+          font-size: 13px;
+          font-weight: 500;
+          color: var(--text-h);
+          font-family: var(--font-sans);
+        }
+        .pr-prompt-loading-path {
+          font-family: var(--font-mono);
+          font-size: 11px;
+          background: var(--accent-bg);
+          padding: 4px 8px;
+          border-radius: 4px;
+          color: var(--text-muted);
+          word-break: break-all;
+          max-width: 100%;
         }
         .pr-prompt-actions {
           display: flex;

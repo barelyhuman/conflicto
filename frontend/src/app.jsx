@@ -61,6 +61,7 @@ export function App() {
   const [prList, setPrList] = useState([]);
   const [prComments, setPrComments] = useState([]);
   const [prPrompt, setPrPrompt] = useState(null);
+  const [prCheckoutPending, setPrCheckoutPending] = useState(/** @type {null | 'local' | 'worktree'} */ (null));
   // Create PR modal
   const [createPROpen, setCreatePROpen] = useState(false);
 
@@ -105,7 +106,9 @@ export function App() {
   activePRSignalRef.current = activePRSignal;
 
   const activePRRef = useRef(activePR);
+  const prCheckoutPendingRef = useRef(prCheckoutPending);
   useEffect(() => { activePRRef.current = activePR; }, [activePR]);
+  useEffect(() => { prCheckoutPendingRef.current = prCheckoutPending; }, [prCheckoutPending]);
 
   const isPRMode = activePR != null;
   const currentPR = isPRMode ? prList.find((p) => p.number === activePR) : null;
@@ -165,6 +168,7 @@ export function App() {
         }
       },
       onPRCheckoutCompleted: () => {
+        setPrCheckoutPending(null);
         setPrPrompt(null);
       },
       onPRCreated: () => {
@@ -172,6 +176,9 @@ export function App() {
       },
       onError: (data) => {
         selectionRef.current.diffLoading.value = false;
+        if (prCheckoutPendingRef.current) {
+          setPrCheckoutPending(null);
+        }
         const toast = {
           id: Date.now().toString(),
           title: data?.title ?? 'Error',
@@ -325,13 +332,17 @@ export function App() {
   }, [selection, setActivePRBoth]);
 
   const handleCheckoutPRLocal = useCallback((pr) => {
+    setPrCheckoutPending('local');
     api.checkoutPR(pr.number).catch((err) => {
+      setPrCheckoutPending(null);
       pushToast('Checkout Error', err.message);
     });
   }, []);
 
   const handleCheckoutPRWorktree = useCallback((pr, hash) => {
+    setPrCheckoutPending('worktree');
     api.checkoutPRToWorktree(pr.number, hash).catch((err) => {
+      setPrCheckoutPending(null);
       pushToast('Worktree Error', err.message);
     });
   }, []);
@@ -618,6 +629,7 @@ export function App() {
 
           <PRCheckoutPrompt
             pr={prPrompt}
+            checkoutPending={prCheckoutPending}
             onViewDiff={() => handleViewPRDiff(prPrompt)}
             onCheckoutLocal={() => handleCheckoutPRLocal(prPrompt)}
             onCheckoutWorktree={(hash) => handleCheckoutPRWorktree(prPrompt, hash)}
