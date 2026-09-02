@@ -20,8 +20,6 @@ var assets embed.FS
 var appIcon []byte
 
 func main() {
-	bootstrapCommandEnvironment()
-
 	app := NewApp()
 
 	AppMenu := menu.NewMenu()

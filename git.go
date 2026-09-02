@@ -58,7 +58,7 @@ func (gs *GitService) OpenRepo(path string) error {
 		gitDir := filepath.Join(path, ".git")
 		if _, err := os.Stat(gitDir); err == nil {
 			// Verify it's actually a git repo by asking git itself
-			cmd := appCommand("git", "rev-parse", "--show-toplevel")
+			cmd := exec.Command("git", "rev-parse", "--show-toplevel")
 			cmd.Dir = path
 			out, err := cmd.Output()
 			if err == nil {
@@ -96,7 +96,7 @@ func (gs *GitService) GetRepoSlug() (string, error) {
 	if gs.path == "" {
 		return "", fmt.Errorf("no repository open")
 	}
-	cmd := appCommand("gh", "repo", "view", "--json", "owner,name")
+	cmd := exec.Command("gh", "repo", "view", "--json", "owner,name")
 	cmd.Dir = gs.path
 	out, err := cmd.Output()
 	if err != nil {
@@ -119,7 +119,7 @@ func (gs *GitService) runGit(args ...string) ([]byte, error) {
 	if gs.path == "" {
 		return nil, fmt.Errorf("no repository open")
 	}
-	cmd := appCommand("git", args...)
+	cmd := exec.Command("git", args...)
 	cmd.Dir = gs.path
 	return cmd.Output()
 }
@@ -223,7 +223,7 @@ func (gs *GitService) StageFile(path string) error {
 
 // UnstageFile unstages a file
 func (gs *GitService) UnstageFile(path string) error {
-	cmd := appCommand("git", "reset", "HEAD", path)
+	cmd := exec.Command("git", "reset", "HEAD", path)
 	cmd.Dir = gs.path
 	return cmd.Run()
 }
@@ -329,13 +329,13 @@ func (gs *GitService) GetDiff(path string, staged bool) (*FileDiff, error) {
 	var out []byte
 	untracked := !staged && gs.isUntracked(path)
 	if staged {
-		cmd := appCommand("git", "diff", "--unified", "--cached", "--", path)
+		cmd := exec.Command("git", "diff", "--unified", "--cached", "--", path)
 		cmd.Dir = gs.path
 		var err error
 		out, err = cmd.Output()
 		if err != nil {
 			if _, statErr := os.Stat(filepath.Join(gs.path, path)); os.IsNotExist(statErr) {
-				cmd = appCommand("git", "diff", "--unified", "--cached", "--", path)
+				cmd = exec.Command("git", "diff", "--unified", "--cached", "--", path)
 				cmd.Dir = gs.path
 				out, _ = cmd.CombinedOutput()
 			}
@@ -343,13 +343,13 @@ func (gs *GitService) GetDiff(path string, staged bool) (*FileDiff, error) {
 	} else if untracked {
 		out = gs.diffUntracked(path)
 	} else {
-		cmd := appCommand("git", "diff", "--unified", "--", path)
+		cmd := exec.Command("git", "diff", "--unified", "--", path)
 		cmd.Dir = gs.path
 		var err error
 		out, err = cmd.Output()
 		if err != nil {
 			if _, statErr := os.Stat(filepath.Join(gs.path, path)); os.IsNotExist(statErr) {
-				cmd = appCommand("git", "diff", "--unified", "--", path)
+				cmd = exec.Command("git", "diff", "--unified", "--", path)
 				cmd.Dir = gs.path
 				out, _ = cmd.CombinedOutput()
 			}
@@ -365,7 +365,7 @@ func (gs *GitService) GetDiff(path string, staged bool) (*FileDiff, error) {
 // diffUntracked returns a unified diff treating path as a new file.
 // git diff --no-index exits 1 when files differ; that is expected.
 func (gs *GitService) diffUntracked(path string) []byte {
-	cmd := appCommand("git", "diff", "--unified", "--no-index", "--", "/dev/null", path)
+	cmd := exec.Command("git", "diff", "--unified", "--no-index", "--", "/dev/null", path)
 	cmd.Dir = gs.path
 	out, err := cmd.CombinedOutput()
 	if err != nil {
@@ -421,7 +421,7 @@ func (gs *GitService) showRefFile(ref, path string) (string, error) {
 	} else {
 		spec = fmt.Sprintf(":%s", path)
 	}
-	cmd := appCommand("git", "show", spec)
+	cmd := exec.Command("git", "show", spec)
 	cmd.Dir = gs.path
 	out, err := cmd.Output()
 	if err != nil {
@@ -436,7 +436,7 @@ func (gs *GitService) GetAheadBehind() (int, int, error) {
 		return 0, 0, fmt.Errorf("no repository open")
 	}
 
-	cmd := appCommand("git", "rev-list", "--left-right", "--count", "HEAD...@{upstream}")
+	cmd := exec.Command("git", "rev-list", "--left-right", "--count", "HEAD...@{upstream}")
 	cmd.Dir = gs.path
 	out, err := cmd.Output()
 	if err != nil {
