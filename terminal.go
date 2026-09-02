@@ -166,9 +166,12 @@ func (m *terminalManager) start(opts TerminalStartOpts, projectPath string) (*Te
 		if opts.Args != nil {
 			args = opts.Args
 		}
+	} else if runtime.GOOS == "darwin" {
+		// A login shell loads the user's normal Homebrew/mise configuration.
+		args = []string{"-l"}
 	}
 
-	cmd := exec.Command(cmdName, args...)
+	cmd := appCommand(cmdName, args...)
 	cmd.Dir = cwd
 	cmd.Env = cleanedEnv()
 

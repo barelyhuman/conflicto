@@ -5,7 +5,6 @@ import (
 	"encoding/hex"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 )
@@ -177,7 +176,7 @@ func (gs *GitService) FetchPRHead(number int, localBranch string) error {
 	}
 
 	refspec := fmt.Sprintf("pull/%d/head:refs/heads/%s", number, localBranch)
-	cmd := exec.Command("git", "fetch", "origin", refspec)
+	cmd := appCommand("git", "fetch", "origin", refspec)
 	cmd.Dir = mainRepo
 	out, err := cmd.CombinedOutput()
 	if err == nil {
@@ -191,7 +190,7 @@ func (gs *GitService) FetchPRHead(number int, localBranch string) error {
 	}
 
 	fallbackSpec := fmt.Sprintf("%s:refs/heads/%s", oid, localBranch)
-	fallbackCmd := exec.Command("git", "fetch", "origin", fallbackSpec)
+	fallbackCmd := appCommand("git", "fetch", "origin", fallbackSpec)
 	fallbackCmd.Dir = mainRepo
 	fallbackOut, fallbackErr := fallbackCmd.CombinedOutput()
 	if fallbackErr != nil {
@@ -201,7 +200,7 @@ func (gs *GitService) FetchPRHead(number int, localBranch string) error {
 }
 
 func (gs *GitService) prHeadOID(repoPath string, number int) (string, error) {
-	cmd := exec.Command("gh", "pr", "view", fmt.Sprintf("%d", number), "--json", "headRefOid", "--jq", ".headRefOid")
+	cmd := appCommand("gh", "pr", "view", fmt.Sprintf("%d", number), "--json", "headRefOid", "--jq", ".headRefOid")
 	cmd.Dir = repoPath
 	out, err := cmd.Output()
 	if err != nil {
@@ -221,7 +220,7 @@ func (gs *GitService) AddWorktree(path, branch string) error {
 		return err
 	}
 
-	cmd := exec.Command("git", "worktree", "add", path, branch)
+	cmd := appCommand("git", "worktree", "add", path, branch)
 	cmd.Dir = mainRepo
 	out, err := cmd.CombinedOutput()
 	if err != nil {
@@ -237,12 +236,12 @@ func (gs *GitService) RemoveWorktree(path string) error {
 		return err
 	}
 
-	cmd := exec.Command("git", "worktree", "remove", path)
+	cmd := appCommand("git", "worktree", "remove", path)
 	cmd.Dir = mainRepo
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		// Try pruning stale administrative entries.
-		prune := exec.Command("git", "worktree", "prune")
+		prune := appCommand("git", "worktree", "prune")
 		prune.Dir = mainRepo
 		_, _ = prune.CombinedOutput()
 		return fmt.Errorf("%s: %w", strings.TrimSpace(string(out)), err)
