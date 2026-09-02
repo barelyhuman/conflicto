@@ -6,6 +6,7 @@ import { setupWailsEvents, api, watchFullscreen } from './wails.js';
 import { WorkingTreeModel } from './models/workingTree.js';
 import { SelectionModel } from './models/selection.js';
 import { SyncModel } from './models/sync.js';
+import { WorktreeModel } from './models/worktree.js';
 import { ThemeProvider } from './theme/ThemeProvider.jsx';
 import { EditProvider } from './components/EditProvider.jsx';
 import { FileTree } from './components/FileTree.jsx';
@@ -50,8 +51,6 @@ export function App() {
   const [projectName, setProjectName] = useState('');
   const [projectPath, setProjectPath] = useState('');
   const [recentProjects, setRecentProjects] = useState([]);
-  const [worktrees, setWorktrees] = useState([]);
-
   // macOS titlebar state
   const [isMacOS, setIsMacOS] = useState(false);
   const [isFullscreenMode, setIsFullscreenMode] = useState(false);
@@ -92,6 +91,12 @@ export function App() {
     },
   }));
 
+  const worktree = useModel(() => new WorktreeModel({
+    onError: (title, message) => {
+      setToasts((prev) => [...prev, { id: Date.now().toString(), title, message }]);
+    },
+  }));
+
   const selection = useModel(() => new SelectionModel({
     workingTree,
     activePR: activePRSignal,
@@ -99,9 +104,11 @@ export function App() {
 
   // Models / PR bridge are stable for App lifetime; keep refs for the mount-once event effect.
   const workingTreeRef = useRef(workingTree);
+  const worktreeRef = useRef(worktree);
   const selectionRef = useRef(selection);
   const activePRSignalRef = useRef(activePRSignal);
   workingTreeRef.current = workingTree;
+  worktreeRef.current = worktree;
   selectionRef.current = selection;
   activePRSignalRef.current = activePRSignal;
 
@@ -192,6 +199,7 @@ export function App() {
       onProjectChanged: (data) => {
         setProjectName(data.name ?? '');
         setProjectPath(data.path ?? '');
+        worktreeRef.current.setCurrentPath(data.path ?? '');
         selectionRef.current.clear();
         activePRSignalRef.current.value = null;
         setActivePR(null);
@@ -200,7 +208,7 @@ export function App() {
         setRecentProjects(data.projects ?? []);
       },
       onWorktreesUpdated: (data) => {
-        setWorktrees(data?.worktrees ?? []);
+        worktreeRef.current.applyWorktrees(data);
       },
       onPlatformInfo: (data) => {
         if (data?.platform === 'darwin') {
@@ -270,6 +278,7 @@ export function App() {
       if (proj) {
         setProjectName(proj.name ?? '');
         setProjectPath(proj.path ?? '');
+        worktreeRef.current.setCurrentPath(proj.path ?? '');
       }
     });
     api.getRecentProjects().then((list) => {
@@ -377,7 +386,7 @@ export function App() {
     setConfirmKind(null);
 
     if (kind === 'remove-worktree' && worktreePath) {
-      api.removeWorktree(worktreePath).catch(() => {});
+      worktree.remove(worktreePath);
       return;
     }
 
@@ -390,7 +399,7 @@ export function App() {
     if (kind === 'discard') {
       workingTree.discard(path);
     }
-  }, [pendingConfirmFile, pendingWorktreePath, confirmKind, workingTree]);
+  }, [pendingConfirmFile, pendingWorktreePath, confirmKind, workingTree, worktree]);
 
   const handleCancelConfirm = useCallback(() => {
     setConfirmOpen(false);
@@ -471,8 +480,7 @@ export function App() {
                 />
 
                 <WorktreesPanel
-                  worktrees={worktrees}
-                  currentPath={projectPath}
+                  worktree={worktree}
                   onSwitch={handleSwitchProject}
                   onRemove={handleRemoveWorktree}
                 />
@@ -620,6 +628,7 @@ export function App() {
 
           <PRCheckoutPrompt
             pr={prPrompt}
+            worktree={worktree}
             checkoutPending={prCheckoutPending}
             onViewDiff={() => handleViewPRDiff(prPrompt)}
             onCheckoutLocal={() => handleCheckoutPRLocal(prPrompt)}
