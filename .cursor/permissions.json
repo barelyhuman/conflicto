@@ -1,0 +1,17 @@
+{
+  "terminalAllowlist": [
+    "apt",
+    "apt-get",
+    "brew",
+    "curl",
+    "dpkg",
+    "gh",
+    "git",
+    "go",
+    "make",
+    "mise",
+    "npm",
+    "pnpm",
+    "sudo"
+  ]
+}

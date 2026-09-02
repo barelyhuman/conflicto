@@ -19,7 +19,11 @@ secrets.yml
 
 # Tooling / local
 .pnpm-store/
-.cursor/
+.cursor/*
+!.cursor/environment.json
+!.cursor/Dockerfile
+!.cursor/permissions.json
+!.cursor/cloud-agent-install.sh
 *.local
 .razor/
 
