@@ -1,6 +1,5 @@
 /build/*
 !/build/darwin/
-!/build/darwin/entitlements.plist
 !/build/darwin/Info.plist
 /dist
 .DS_Store

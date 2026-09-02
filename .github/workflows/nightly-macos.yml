@@ -101,12 +101,6 @@ jobs:
           MISE_WAILS_PLATFORM: ${{ matrix.platform }}
         run: mise run build:production:mac
 
-      - name: Sign app bundle for CLI access
-        run: |
-          codesign --force --deep --sign - \
-            --entitlements build/darwin/entitlements.plist \
-            build/bin/conflicto.app
-
       - name: Package app bundle
         run: cd build/bin && zip -r "conflicto-macos-${{ matrix.arch }}.zip" conflicto.app
 

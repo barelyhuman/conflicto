@@ -24,19 +24,19 @@ func commandPath(name string) (string, error) {
 	}
 
 	if runtime.GOOS == "darwin" {
-		homebrewPaths := []string{
+		// A Finder-launched app does not load shell startup files. Ask the
+		// user's login shell first so custom Homebrew prefixes, mise, and
+		// other package managers work without app-specific path lists.
+		if path := loginShellCommandPath(name); path != "" {
+			return path, nil
+		}
+
+		// These are only the two documented Homebrew defaults, used when the
+		// shell is unavailable or its startup files do not load.
+		for _, path := range []string{
 			"/opt/homebrew/bin/" + name,
-			"/opt/homebrew/sbin/" + name,
 			"/usr/local/bin/" + name,
-			"/usr/local/sbin/" + name,
-		}
-		if home, err := os.UserHomeDir(); err == nil {
-			homebrewPaths = append(homebrewPaths,
-				filepath.Join(home, ".local", "bin", name),
-				filepath.Join(home, ".local", "share", "mise", "shims", name),
-			)
-		}
-		for _, path := range homebrewPaths {
+		} {
 			if info, err := os.Stat(path); err == nil && !info.IsDir() {
 				return path, nil
 			}
@@ -47,6 +47,36 @@ func commandPath(name string) (string, error) {
 		"could not find %q; install it or add its location to PATH",
 		name,
 	)
+}
+
+func loginShellCommandPath(name string) string {
+	shell := os.Getenv("SHELL")
+	if shell == "" {
+		shell = "/bin/zsh"
+	}
+
+	command := "command -v " + shellQuote(name)
+	cmd := exec.Command(shell, "-ilc", command)
+	cmd.Env = os.Environ()
+	out, err := cmd.Output()
+	if err != nil {
+		return ""
+	}
+
+	lines := strings.Split(strings.TrimSpace(string(out)), "\n")
+	for i := len(lines) - 1; i >= 0; i-- {
+		path := strings.TrimSpace(lines[i])
+		if filepath.IsAbs(path) {
+			if info, err := os.Stat(path); err == nil && !info.IsDir() {
+				return path
+			}
+		}
+	}
+	return ""
+}
+
+func shellQuote(value string) string {
+	return "'" + strings.ReplaceAll(value, "'", "'\\''") + "'"
 }
 
 // appCommand creates a subprocess using the resolved executable and current
