@@ -24,9 +24,7 @@ function shortenPath(path) {
  * @param {(path: string) => void} [props.onRemove]
  */
 function WorktreeRow({ wt, worktree, onSwitch, onRemove }) {
-  const isActive = useComputed(
-    () => wt.path === worktree.currentPath.value || wt.isCurrent
-  );
+  const isActive = useComputed(() => wt.path === worktree.currentPath.value || wt.isCurrent);
   const rowClass = useComputed(
     () => `worktree-row${isActive.value ? ' active' : ''}`
   );
@@ -123,6 +121,7 @@ export function WorktreesPanel({ worktree, onSwitch, onRemove }) {
           padding: 0;
         }
         .worktree-row {
+          margin:4px 8px;
           display: flex;
           align-items: stretch;
           border-radius: 6px;
