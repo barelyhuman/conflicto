@@ -3,7 +3,6 @@ package main
 import (
 	"os"
 	"path/filepath"
-	"runtime"
 	"testing"
 )
 
@@ -29,17 +28,4 @@ func TestCommandPathReportsMissingTool(t *testing.T) {
 	if _, err := commandPath("definitely-not-installed"); err == nil {
 		t.Fatal("commandPath() returned nil error for missing tool")
 	}
-}
-
-func TestCommandPathIncludesStandardMacOSLocations(t *testing.T) {
-	if runtime.GOOS != "darwin" {
-		t.Skip("macOS-specific fallback paths")
-	}
-	t.Setenv("PATH", "")
-	for _, name := range []string{"gh", "brew"} {
-		if _, err := commandPath(name); err == nil {
-			return
-		}
-	}
-	t.Log("neither gh nor brew is installed; fallback lookup was exercised")
 }

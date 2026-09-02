@@ -30,17 +30,6 @@ func commandPath(name string) (string, error) {
 		if path := loginShellCommandPath(name); path != "" {
 			return path, nil
 		}
-
-		// These are only the two documented Homebrew defaults, used when the
-		// shell is unavailable or its startup files do not load.
-		for _, path := range []string{
-			"/opt/homebrew/bin/" + name,
-			"/usr/local/bin/" + name,
-		} {
-			if info, err := os.Stat(path); err == nil && !info.IsDir() {
-				return path, nil
-			}
-		}
 	}
 
 	return "", fmt.Errorf(
