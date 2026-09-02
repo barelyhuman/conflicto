@@ -129,7 +129,7 @@ func defaultCwd(cwd string, fallback string) string {
 }
 
 func cleanedEnv() []string {
-	env := os.Environ()
+	env := commandEnv()
 	out := make([]string, 0, len(env)+4)
 	for _, e := range env {
 		switch {
@@ -166,6 +166,9 @@ func (m *terminalManager) start(opts TerminalStartOpts, projectPath string) (*Te
 		if opts.Args != nil {
 			args = opts.Args
 		}
+	} else if runtime.GOOS == "darwin" {
+		// Login shell loads .zprofile/.zshrc where Homebrew and mise set PATH.
+		args = []string{"-l"}
 	}
 
 	cmd := exec.Command(cmdName, args...)

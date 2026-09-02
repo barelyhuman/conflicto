@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	goruntime "runtime"
 	"strconv"
@@ -408,7 +407,7 @@ func (a *App) Fetch() error {
 
 // DetectGH detects gh CLI installation
 func (a *App) DetectGH() {
-	cmd := exec.Command("gh", "--version")
+	cmd := appCommand("gh", "--version")
 	out, err := cmd.Output()
 
 	if err != nil {
@@ -428,7 +427,7 @@ func (a *App) DetectGH() {
 	}
 
 	// Check if logged in
-	userCmd := exec.Command("gh", "api", "user", "-q", ".login")
+	userCmd := appCommand("gh", "api", "user", "-q", ".login")
 	userOut, userErr := userCmd.Output()
 
 	user := ""
@@ -452,7 +451,7 @@ func (a *App) GetPRList() error {
 		return fmt.Errorf("no git repository")
 	}
 
-	cmd := exec.Command("gh", "pr", "list", "--json", "number,title,author,baseRefName", "--limit", "20")
+	cmd := appCommand("gh", "pr", "list", "--json", "number,title,author,baseRefName", "--limit", "20")
 	cmd.Dir = a.git.path
 	out, err := cmd.Output()
 	if err != nil {
@@ -505,7 +504,7 @@ func (a *App) SearchPRList(limit int, search string) ([]map[string]interface{}, 
 	if search != "" {
 		args = append(args, "--search", search)
 	}
-	cmd := exec.Command("gh", args...)
+	cmd := appCommand("gh", args...)
 	cmd.Dir = a.git.path
 	out, err := cmd.Output()
 	if err != nil {
@@ -578,7 +577,7 @@ func (a *App) GetPRFiles(number int) error {
 	// GitHub paginates at 30 by default (max 100); walk pages until exhausted.
 	const perPage = 100
 	for page := 1; ; page++ {
-		cmd := exec.Command(
+		cmd := appCommand(
 			"gh", "api",
 			fmt.Sprintf("repos/%s/pulls/%d/files?per_page=%d&page=%d", slug, number, perPage, page),
 		)
@@ -633,7 +632,7 @@ func (a *App) GetPRFiles(number int) error {
 
 	// Fetch PR head SHA for posting comments
 	headSHA := ""
-	headCmd := exec.Command("gh", "api", fmt.Sprintf("repos/%s/pulls/%d", slug, number), "--jq", ".head.sha")
+	headCmd := appCommand("gh", "api", fmt.Sprintf("repos/%s/pulls/%d", slug, number), "--jq", ".head.sha")
 	headCmd.Dir = a.git.path
 	if headOut, headErr := headCmd.Output(); headErr == nil {
 		headSHA = strings.TrimSpace(string(headOut))
@@ -753,7 +752,7 @@ func (a *App) GetPRComments(number int) error {
 		return err
 	}
 
-	cmd := exec.Command("gh", "api", fmt.Sprintf("repos/%s/pulls/%d/comments", slug, number))
+	cmd := appCommand("gh", "api", fmt.Sprintf("repos/%s/pulls/%d/comments", slug, number))
 	cmd.Dir = a.git.path
 	out, err := cmd.Output()
 	if err != nil {
@@ -808,7 +807,7 @@ func (a *App) PostPRComment(number int, path string, body string, line int, side
 	}
 
 	payloadJSON, _ := json.Marshal(payload)
-	cmd := exec.Command("gh", "api", fmt.Sprintf("repos/%s/pulls/%d/comments", slug, number), "-X", "POST", "--input", "-")
+	cmd := appCommand("gh", "api", fmt.Sprintf("repos/%s/pulls/%d/comments", slug, number), "-X", "POST", "--input", "-")
 	cmd.Dir = a.git.path
 	cmd.Stdin = strings.NewReader(string(payloadJSON))
 	out, err := cmd.CombinedOutput()
@@ -834,7 +833,7 @@ func (a *App) CheckoutPR(number int) error {
 		return fmt.Errorf("no git repository")
 	}
 
-	cmd := exec.Command("gh", "pr", "checkout", fmt.Sprintf("%d", number))
+	cmd := appCommand("gh", "pr", "checkout", fmt.Sprintf("%d", number))
 	cmd.Dir = a.git.path
 	out, err := cmd.CombinedOutput()
 	if err != nil {
@@ -1025,7 +1024,7 @@ func (a *App) CreatePR(title string, body string, baseBranch string, draft bool)
 		args = append(args, "--draft")
 	}
 
-	cmd := exec.Command("gh", args...)
+	cmd := appCommand("gh", args...)
 	cmd.Dir = a.git.path
 	out, err := cmd.CombinedOutput()
 	if err != nil {
