@@ -19,6 +19,7 @@ import { ProjectPicker } from './components/ProjectPicker.jsx';
 import { PRCheckoutPrompt } from './components/PRCheckoutPrompt.jsx';
 import { CreatePRModal } from './components/CreatePRModal.jsx';
 import { TerminalDock, isTerminalFocusTarget } from './components/terminal/TerminalDock.jsx';
+import { setTerminalScope, removeTerminalScope } from './components/terminal/terminalStore.js';
 import { SidebarActions } from './components/SidebarActions.jsx';
 import { IslandHeader } from './components/IslandHeader.jsx';
 import { WorktreesPanel } from './components/WorktreesPanel.jsx';
@@ -203,6 +204,7 @@ export function App() {
         selectionRef.current.clear();
         activePRSignalRef.current.value = null;
         setActivePR(null);
+        setTerminalScope(data.path ?? '');
       },
       onRecentProjectsUpdated: (data) => {
         setRecentProjects(data.projects ?? []);
@@ -279,6 +281,7 @@ export function App() {
         setProjectName(proj.name ?? '');
         setProjectPath(proj.path ?? '');
         worktreeRef.current.setCurrentPath(proj.path ?? '');
+        setTerminalScope(proj.path ?? '');
       }
     });
     api.getRecentProjects().then((list) => {
@@ -386,6 +389,10 @@ export function App() {
     setConfirmKind(null);
 
     if (kind === 'remove-worktree' && worktreePath) {
+      // Kill terminals scoped to the removed worktree before the dir goes away.
+      removeTerminalScope(worktreePath).forEach((sessionId) => {
+        api.terminalStop(sessionId).catch(() => {});
+      });
       worktree.remove(worktreePath);
       return;
     }
@@ -550,7 +557,6 @@ export function App() {
                     open={terminalOpen}
                     height={terminalHeight}
                     onHeightChange={handleTerminalHeight}
-                    projectPath={projectPath}
                     onRequestOpen={() => setTerminalOpen(true)}
                     onTabClosed={(layouts) => {
                       if (layouts.length === 0) {
