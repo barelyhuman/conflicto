@@ -275,11 +275,6 @@ export function App() {
     api.getRecentProjects().then((list) => {
       setRecentProjects(list ?? []);
     });
-    api.getWorktrees().then((list) => {
-      setWorktrees(list ?? []);
-    }).catch(() => {
-      setWorktrees([]);
-    });
   }, []);
 
   // macOS titlebar: watch fullscreen state once we know we're on macOS
@@ -333,17 +328,15 @@ export function App() {
 
   const handleCheckoutPRLocal = useCallback((pr) => {
     setPrCheckoutPending('local');
-    api.checkoutPR(pr.number).catch((err) => {
+    api.checkoutPR(pr.number).catch(() => {
       setPrCheckoutPending(null);
-      pushToast('Checkout Error', err.message);
     });
   }, []);
 
   const handleCheckoutPRWorktree = useCallback((pr, hash) => {
     setPrCheckoutPending('worktree');
-    api.checkoutPRToWorktree(pr.number, hash).catch((err) => {
+    api.checkoutPRToWorktree(pr.number, hash).catch(() => {
       setPrCheckoutPending(null);
-      pushToast('Worktree Error', err.message);
     });
   }, []);
 
@@ -384,9 +377,7 @@ export function App() {
     setConfirmKind(null);
 
     if (kind === 'remove-worktree' && worktreePath) {
-      api.removeWorktree(worktreePath).catch((err) => {
-        pushToast('Remove Worktree Error', err.message);
-      });
+      api.removeWorktree(worktreePath).catch(() => {});
       return;
     }
 
