@@ -216,3 +216,14 @@
   color: var(--text-muted);
   font-size: 12px;
 }
+
+.terminal-empty {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted);
+  font-family: var(--font-sans);
+  font-size: 12px;
+  user-select: none;
+}

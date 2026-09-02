@@ -33,9 +33,10 @@ function useTerminalStore() {
 
 /**
  * Contained bottom terminal dock. When closed, collapses via CSS but keeps
- * pane hosts mounted so PTY + scrollback survive.
+ * pane hosts mounted — across all project scopes — so PTY + scrollback survive.
+ * Tabs/visible panes reflect the current project/worktree scope only.
  */
-export function TerminalDock({ open, height, onHeightChange, projectPath, onRequestOpen, onTabClosed }) {
+export function TerminalDock({ open, height, onHeightChange, onRequestOpen, onTabClosed }) {
   const { panes, layouts, activeLayoutId, activeLocalId, splitLocalIds, splitRatio } = useTerminalStore();
   const [dragging, setDragging] = useState(false);
   const dragRef = useRef(null);
@@ -49,7 +50,7 @@ export function TerminalDock({ open, height, onHeightChange, projectPath, onRequ
     if (!pane || pane.sessionId) return;
     try {
       const result = await api.terminalStart({
-        cwd: projectPath || null,
+        cwd: pane.scopePath || null,
         cols: 80,
         rows: 24,
       });
@@ -59,7 +60,7 @@ export function TerminalDock({ open, height, onHeightChange, projectPath, onRequ
     } catch (err) {
       console.error('terminal start failed', err);
     }
-  }, [projectPath]);
+  }, []);
 
   useEffect(() => {
     if (!open) return;
@@ -242,6 +243,7 @@ export function TerminalDock({ open, height, onHeightChange, projectPath, onRequ
         </div>
       </div>
       <div class={`terminal-dock-body${splitMode ? ' split' : ''}`} ref={bodyRef}>
+        {layouts.length === 0 && <div class="terminal-empty">No terminals in this project</div>}
         {[
           ...splitLocalIds.map((id) => panes.find((p) => p.localId === id)).filter(Boolean),
           ...panes.filter((p) => !splitLocalIds.includes(p.localId)),
