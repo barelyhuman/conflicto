@@ -1,12 +1,14 @@
-import { useComputed, useModel } from '@preact/signals';
+import { useComputed, useSignal } from '@preact/signals';
 import { Show } from '@preact/signals/utils';
 import { IconRefresh } from '@tabler/icons-preact';
-import { PRCheckoutPromptModel } from '../models/prCheckoutPrompt.js';
+
+/** @typedef {null | 'local' | 'worktree'} CheckoutMode */
 
 /**
  * Prompt shown when a PR is selected offering checkout options.
  * @param {Object} props
  * @param {{ number: number, title: string, author: string, baseBranch: string } | null} props.pr
+ * @param {InstanceType<typeof import('../models/worktree.js').WorktreeModel>} props.worktree
  * @param {null | 'local' | 'worktree'} [props.checkoutPending]
  * @param {() => void} props.onViewDiff
  * @param {() => void} props.onCheckoutLocal
@@ -15,13 +17,14 @@ import { PRCheckoutPromptModel } from '../models/prCheckoutPrompt.js';
  */
 export function PRCheckoutPrompt({
   pr,
+  worktree,
   checkoutPending = null,
   onViewDiff,
   onCheckoutLocal,
   onCheckoutWorktree,
   onClose,
 }) {
-  const model = useModel(PRCheckoutPromptModel);
+  const mode = useSignal(/** @type {CheckoutMode} */ (null));
   const isBusy = checkoutPending != null;
 
   const loadingTitle = checkoutPending === 'worktree'
@@ -29,13 +32,18 @@ export function PRCheckoutPrompt({
     : 'Checking out PR…';
 
   const worktreeConfirmDisabled = useComputed(
-    () => model.worktreePreviewLoading.value || !model.worktreeHash.value
+    () => worktree.previewLoading.value || !worktree.previewHash.value
   );
 
   if (!pr) return null;
 
+  function resetMode() {
+    mode.value = null;
+    worktree.stopPreview();
+  }
+
   function handleViewDiff() {
-    model.resetMode();
+    resetMode();
     onViewDiff();
   }
 
@@ -78,22 +86,22 @@ export function PRCheckoutPrompt({
             <div class="pr-prompt-loading">
               <IconRefresh size={18} stroke={2} class="spin" aria-hidden="true" />
               <span class="pr-prompt-loading-title">{loadingTitle}</span>
-              <Show when={() => checkoutPending === 'worktree' && model.worktreePath.value}>
+              <Show when={() => checkoutPending === 'worktree' && worktree.previewPath.value}>
                 {(path) => <code class="pr-prompt-loading-path">{path}</code>}
               </Show>
             </div>
           ) : (
             <Show
-              when={() => model.mode.value === null}
+              when={() => mode.value === null}
               fallback={(
                 <Show
-                  when={() => model.mode.value === 'local'}
+                  when={() => mode.value === 'local'}
                   fallback={(
                     <div class="pr-prompt-confirm">
                       <p>
-                        <Show when={model.worktreePreviewLoading} fallback={(
+                        <Show when={worktree.previewLoading} fallback={(
                           <Show
-                            when={model.worktreePath}
+                            when={worktree.previewPath}
                             fallback="Could not determine worktree path."
                           >
                             {(path) => (
@@ -111,12 +119,12 @@ export function PRCheckoutPrompt({
                         <button
                           type="button"
                           class="pr-prompt-btn pr-prompt-btn-primary"
-                          onClick={() => onCheckoutWorktree(model.worktreeHash.peek())}
+                          onClick={() => onCheckoutWorktree(worktree.previewHash.peek())}
                           disabled={worktreeConfirmDisabled}
                         >
                           Confirm worktree
                         </button>
-                        <button type="button" class="pr-prompt-btn" onClick={() => model.resetMode()}>
+                        <button type="button" class="pr-prompt-btn" onClick={resetMode}>
                           Back
                         </button>
                       </div>
@@ -129,7 +137,7 @@ export function PRCheckoutPrompt({
                       <button type="button" class="pr-prompt-btn pr-prompt-btn-primary" onClick={onCheckoutLocal}>
                         Confirm checkout
                       </button>
-                      <button type="button" class="pr-prompt-btn" onClick={() => model.resetMode()}>
+                      <button type="button" class="pr-prompt-btn" onClick={resetMode}>
                         Back
                       </button>
                     </div>
@@ -141,10 +149,24 @@ export function PRCheckoutPrompt({
                 <button type="button" class="pr-prompt-btn pr-prompt-btn-primary" onClick={handleViewDiff}>
                   View diff
                 </button>
-                <button type="button" class="pr-prompt-btn" onClick={() => model.setMode('local')}>
+                <button
+                  type="button"
+                  class="pr-prompt-btn"
+                  onClick={() => {
+                    worktree.stopPreview();
+                    mode.value = 'local';
+                  }}
+                >
                   Checkout locally
                 </button>
-                <button type="button" class="pr-prompt-btn" onClick={() => model.setMode('worktree')}>
+                <button
+                  type="button"
+                  class="pr-prompt-btn"
+                  onClick={() => {
+                    mode.value = 'worktree';
+                    worktree.startPreview();
+                  }}
+                >
                   Checkout in worktree
                 </button>
               </div>

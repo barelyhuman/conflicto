@@ -1,4 +1,6 @@
 import { useState } from 'preact/hooks';
+import { useComputed } from '@preact/signals';
+import { For, Show } from '@preact/signals/utils';
 import { IconTrash } from '@tabler/icons-preact';
 import { ChangeSection } from './ChangeSection.jsx';
 
@@ -15,70 +17,93 @@ function shortenPath(path) {
 }
 
 /**
+ * @param {Object} props
+ * @param {import('../models/worktree.js').WorktreeEntry} props.wt
+ * @param {InstanceType<typeof import('../models/worktree.js').WorktreeModel>} props.worktree
+ * @param {(path: string) => void} [props.onSwitch]
+ * @param {(path: string) => void} [props.onRemove]
+ */
+function WorktreeRow({ wt, worktree, onSwitch, onRemove }) {
+  const isActive = useComputed(
+    () => wt.path === worktree.currentPath.value || wt.isCurrent
+  );
+  const rowClass = useComputed(
+    () => `worktree-row${isActive.value ? ' active' : ''}`
+  );
+  const label = wt.branch || wt.head || 'detached';
+
+  return (
+    <li class={rowClass}>
+      <button
+        type="button"
+        class="worktree-row-btn"
+        onClick={() => onSwitch?.(wt.path)}
+        title={wt.path}
+      >
+        <span class="worktree-row-label">
+          {label}
+          {wt.isMain && <span class="worktree-badge">main</span>}
+          <Show when={() => isActive.value && !wt.isMain}>
+            <span class="worktree-badge">active</span>
+          </Show>
+        </span>
+        <span class="worktree-row-path">{shortenPath(wt.path)}</span>
+      </button>
+      {!wt.isMain && (
+        <button
+          type="button"
+          class="worktree-remove-btn"
+          title="Remove worktree"
+          aria-label={`Remove worktree at ${wt.path}`}
+          onClick={(e) => {
+            e.stopPropagation();
+            onRemove?.(wt.path);
+          }}
+        >
+          <IconTrash size={12} stroke={1.75} />
+        </button>
+      )}
+    </li>
+  );
+}
+
+/**
  * Sidebar panel listing git worktrees for the current repository.
  *
  * @param {Object} props
- * @param {Array<{ path: string, branch: string, head: string, isMain: boolean, isCurrent: boolean }>} props.worktrees
- * @param {string} props.currentPath
+ * @param {InstanceType<typeof import('../models/worktree.js').WorktreeModel>} props.worktree
  * @param {(path: string) => void} props.onSwitch
  * @param {(path: string) => void} props.onRemove
  */
-export function WorktreesPanel({ worktrees, currentPath, onSwitch, onRemove }) {
+export function WorktreesPanel({ worktree, onSwitch, onRemove }) {
   const [open, setOpen] = useState(true);
-
-  const linkedCount = worktrees.filter((wt) => !wt.isMain).length;
 
   return (
     <div class="worktrees-panel">
       <ChangeSection
         title="Worktrees"
-        count={linkedCount}
+        count={worktree.linkedCount}
         open={open}
         onToggle={() => setOpen((v) => !v)}
         className="worktrees-change-section"
       >
-        {worktrees.length === 0 ? (
-          <div class="change-section-empty">No worktrees</div>
-        ) : (
+        <Show
+          when={() => worktree.entries.value.length > 0}
+          fallback={<div class="change-section-empty">No worktrees</div>}
+        >
           <ul class="worktrees-list">
-            {worktrees.map((wt) => {
-              const label = wt.branch || wt.head || 'detached';
-              const isActive = wt.path === currentPath || wt.isCurrent;
-
-              return (
-                <li key={wt.path} class={`worktree-row${isActive ? ' active' : ''}`}>
-                  <button
-                    type="button"
-                    class="worktree-row-btn"
-                    onClick={() => onSwitch?.(wt.path)}
-                    title={wt.path}
-                  >
-                    <span class="worktree-row-label">
-                      {label}
-                      {wt.isMain && <span class="worktree-badge">main</span>}
-                      {isActive && !wt.isMain && <span class="worktree-badge">active</span>}
-                    </span>
-                    <span class="worktree-row-path">{shortenPath(wt.path)}</span>
-                  </button>
-                  {!wt.isMain && (
-                    <button
-                      type="button"
-                      class="worktree-remove-btn"
-                      title="Remove worktree"
-                      aria-label={`Remove worktree at ${wt.path}`}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onRemove?.(wt.path);
-                      }}
-                    >
-                      <IconTrash size={12} stroke={1.75} />
-                    </button>
-                  )}
-                </li>
-              );
-            })}
+            <For each={worktree.entries}>
+              {(wt) => (
+                <WorktreeRow
+                  wt={wt}
+                  worktree={worktree}
+                  onSwitch={onSwitch}
+                  onRemove={onRemove}
+                />
+              )}
+            </For>
           </ul>
-        )}
+        </Show>
       </ChangeSection>
 
       <style>{`
