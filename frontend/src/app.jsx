@@ -20,6 +20,7 @@ import { CreatePRModal } from './components/CreatePRModal.jsx';
 import { TerminalDock, isTerminalFocusTarget } from './components/terminal/TerminalDock.jsx';
 import { SidebarActions } from './components/SidebarActions.jsx';
 import { IslandHeader } from './components/IslandHeader.jsx';
+import { WorktreesPanel } from './components/WorktreesPanel.jsx';
 
 /** Stable empty list so FileTree does not remount on unrelated App re-renders. */
 const EMPTY_FILES = [];
@@ -29,9 +30,10 @@ export function App() {
   const [branches, setBranches] = useState({ current: 'main', local: [], remote: [] });
   // Confirmation dialog state
   const [confirmOpen, setConfirmOpen] = useState(false);
-  /** @type {['stage-conflict' | 'discard' | null, function]} */
+  /** @type {['stage-conflict' | 'discard' | 'remove-worktree' | null, function]} */
   const [confirmKind, setConfirmKind] = useState(null);
   const [pendingConfirmFile, setPendingConfirmFile] = useState(null);
+  const [pendingWorktreePath, setPendingWorktreePath] = useState(null);
 
   // Sync domain model (ahead/behind + push/pull/fetch loading states)
   const sync = useModel(() => new SyncModel({
@@ -48,6 +50,7 @@ export function App() {
   const [projectName, setProjectName] = useState('');
   const [projectPath, setProjectPath] = useState('');
   const [recentProjects, setRecentProjects] = useState([]);
+  const [worktrees, setWorktrees] = useState([]);
 
   // macOS titlebar state
   const [isMacOS, setIsMacOS] = useState(false);
@@ -58,6 +61,7 @@ export function App() {
   const [prList, setPrList] = useState([]);
   const [prComments, setPrComments] = useState([]);
   const [prPrompt, setPrPrompt] = useState(null);
+  const [prCheckoutPending, setPrCheckoutPending] = useState(/** @type {null | 'local' | 'worktree'} */ (null));
   // Create PR modal
   const [createPROpen, setCreatePROpen] = useState(false);
 
@@ -102,7 +106,9 @@ export function App() {
   activePRSignalRef.current = activePRSignal;
 
   const activePRRef = useRef(activePR);
+  const prCheckoutPendingRef = useRef(prCheckoutPending);
   useEffect(() => { activePRRef.current = activePR; }, [activePR]);
+  useEffect(() => { prCheckoutPendingRef.current = prCheckoutPending; }, [prCheckoutPending]);
 
   const isPRMode = activePR != null;
   const currentPR = isPRMode ? prList.find((p) => p.number === activePR) : null;
@@ -162,6 +168,7 @@ export function App() {
         }
       },
       onPRCheckoutCompleted: () => {
+        setPrCheckoutPending(null);
         setPrPrompt(null);
       },
       onPRCreated: () => {
@@ -169,6 +176,9 @@ export function App() {
       },
       onError: (data) => {
         selectionRef.current.diffLoading.value = false;
+        if (prCheckoutPendingRef.current) {
+          setPrCheckoutPending(null);
+        }
         const toast = {
           id: Date.now().toString(),
           title: data?.title ?? 'Error',
@@ -188,6 +198,9 @@ export function App() {
       },
       onRecentProjectsUpdated: (data) => {
         setRecentProjects(data.projects ?? []);
+      },
+      onWorktreesUpdated: (data) => {
+        setWorktrees(data?.worktrees ?? []);
       },
       onPlatformInfo: (data) => {
         if (data?.platform === 'darwin') {
@@ -314,14 +327,16 @@ export function App() {
   }, [selection, setActivePRBoth]);
 
   const handleCheckoutPRLocal = useCallback((pr) => {
-    api.checkoutPR(pr.number).catch((err) => {
-      pushToast('Checkout Error', err.message);
+    setPrCheckoutPending('local');
+    api.checkoutPR(pr.number).catch(() => {
+      setPrCheckoutPending(null);
     });
   }, []);
 
-  const handleCheckoutPRWorktree = useCallback((pr) => {
-    api.checkoutPRToWorktree(pr.number).catch((err) => {
-      pushToast('Worktree Error', err.message);
+  const handleCheckoutPRWorktree = useCallback((pr, hash) => {
+    setPrCheckoutPending('worktree');
+    api.checkoutPRToWorktree(pr.number, hash).catch(() => {
+      setPrCheckoutPending(null);
     });
   }, []);
 
@@ -354,10 +369,18 @@ export function App() {
 
   const handleConfirmDialog = useCallback(() => {
     const path = pendingConfirmFile;
+    const worktreePath = pendingWorktreePath;
     const kind = confirmKind;
     setConfirmOpen(false);
     setPendingConfirmFile(null);
+    setPendingWorktreePath(null);
     setConfirmKind(null);
+
+    if (kind === 'remove-worktree' && worktreePath) {
+      api.removeWorktree(worktreePath).catch(() => {});
+      return;
+    }
+
     if (!path) return;
 
     if (kind === 'stage-conflict') {
@@ -367,11 +390,12 @@ export function App() {
     if (kind === 'discard') {
       workingTree.discard(path);
     }
-  }, [pendingConfirmFile, confirmKind, workingTree]);
+  }, [pendingConfirmFile, pendingWorktreePath, confirmKind, workingTree]);
 
   const handleCancelConfirm = useCallback(() => {
     setConfirmOpen(false);
     setPendingConfirmFile(null);
+    setPendingWorktreePath(null);
     setConfirmKind(null);
   }, []);
 
@@ -401,6 +425,12 @@ export function App() {
     api.switchProject(path).catch((err) => {
       pushToast('Switch Project Error', err.message);
     });
+  }, []);
+
+  const handleRemoveWorktree = useCallback((path) => {
+    setPendingWorktreePath(path);
+    setConfirmKind('remove-worktree');
+    setConfirmOpen(true);
   }, []);
 
   const shellClass = [
@@ -438,6 +468,13 @@ export function App() {
                   remoteBranches={branches.remote}
                   onSelectBranch={handleSelectBranch}
                   sync={sync}
+                />
+
+                <WorktreesPanel
+                  worktrees={worktrees}
+                  currentPath={projectPath}
+                  onSwitch={handleSwitchProject}
+                  onRemove={handleRemoveWorktree}
                 />
 
                 <FileTree
@@ -522,14 +559,20 @@ export function App() {
             open={confirmOpen}
             filename={pendingConfirmFile ?? ''}
             title={
-              confirmKind === 'discard'
+              confirmKind === 'remove-worktree'
+                ? 'Remove worktree?'
+                : confirmKind === 'discard'
                 ? (pendingUnstagedStatus === 'U'
                     ? 'Delete untracked file?'
                     : 'Discard changes?')
                 : 'Stage conflicted file?'
             }
             message={
-              confirmKind === 'discard' ? (
+              confirmKind === 'remove-worktree' ? (
+                <>
+                  Remove worktree at <code>{pendingWorktreePath ?? ''}</code>?
+                </>
+              ) : confirmKind === 'discard' ? (
                 pendingUnstagedStatus === 'U' ? (
                   <>
                     Permanently delete <code>{pendingConfirmFile ?? ''}</code>?
@@ -544,7 +587,9 @@ export function App() {
               ) : undefined
             }
             confirmLabel={
-              confirmKind === 'discard'
+              confirmKind === 'remove-worktree'
+                ? 'Remove'
+                : confirmKind === 'discard'
                 ? (pendingUnstagedStatus === 'U'
                     ? 'Delete'
                     : 'Discard')
@@ -575,9 +620,10 @@ export function App() {
 
           <PRCheckoutPrompt
             pr={prPrompt}
+            checkoutPending={prCheckoutPending}
             onViewDiff={() => handleViewPRDiff(prPrompt)}
             onCheckoutLocal={() => handleCheckoutPRLocal(prPrompt)}
-            onCheckoutWorktree={() => handleCheckoutPRWorktree(prPrompt)}
+            onCheckoutWorktree={(hash) => handleCheckoutPRWorktree(prPrompt, hash)}
             onClose={() => setPrPrompt(null)}
           />
         </div>

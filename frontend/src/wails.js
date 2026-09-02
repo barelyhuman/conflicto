@@ -71,6 +71,9 @@ export function setupWailsEvents(callbacks) {
   window.runtime.EventsOn('recentProjectsUpdated', (data) => {
     callbacks.onRecentProjectsUpdated?.(data);
   });
+  window.runtime.EventsOn('worktreesUpdated', (data) => {
+    callbacks.onWorktreesUpdated?.(data);
+  });
   window.runtime.EventsOn('platformInfo', (data) => {
     callbacks.onPlatformInfo?.(data);
   });
@@ -127,7 +130,9 @@ export const api = {
 
   checkoutPR: (number) => window.go.main.App.CheckoutPR(number),
 
-  checkoutPRToWorktree: (number) => window.go.main.App.CheckoutPRToWorktree(number),
+  previewWorktreePath: () => window.go.main.App.PreviewWorktreePath(),
+
+  checkoutPRToWorktree: (number, hash) => window.go.main.App.CheckoutPRToWorktree(number, hash ?? ''),
 
   createPR: (title, body, baseBranch, draft) =>
     window.go.main.App.CreatePR(title, body, baseBranch, draft),
@@ -137,6 +142,10 @@ export const api = {
   switchProject: (path) => window.go.main.App.SwitchProject(path),
 
   getRecentProjects: () => window.go.main.App.GetRecentProjects(),
+
+  getWorktrees: () => window.go.main.App.GetWorktrees(),
+
+  removeWorktree: (path) => window.go.main.App.RemoveWorktree(path),
 
   getCurrentProject: () => window.go.main.App.GetCurrentProject(),
 
