@@ -130,7 +130,9 @@ export const api = {
 
   checkoutPR: (number) => window.go.main.App.CheckoutPR(number),
 
-  checkoutPRToWorktree: (number) => window.go.main.App.CheckoutPRToWorktree(number),
+  previewWorktreePath: () => window.go.main.App.PreviewWorktreePath(),
+
+  checkoutPRToWorktree: (number, hash) => window.go.main.App.CheckoutPRToWorktree(number, hash ?? ''),
 
   createPR: (title, body, baseBranch, draft) =>
     window.go.main.App.CreatePR(title, body, baseBranch, draft),

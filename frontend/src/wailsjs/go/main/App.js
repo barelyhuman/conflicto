@@ -6,8 +6,8 @@ export function CheckoutPR(arg1) {
   return window['go']['main']['App']['CheckoutPR'](arg1);
 }
 
-export function CheckoutPRToWorktree(arg1) {
-  return window['go']['main']['App']['CheckoutPRToWorktree'](arg1);
+export function CheckoutPRToWorktree(arg1, arg2) {
+  return window['go']['main']['App']['CheckoutPRToWorktree'](arg1, arg2);
 }
 
 export function Commit(arg1) {
@@ -80,6 +80,10 @@ export function OpenProject() {
 
 export function PostPRComment(arg1, arg2, arg3, arg4, arg5, arg6, arg7) {
   return window['go']['main']['App']['PostPRComment'](arg1, arg2, arg3, arg4, arg5, arg6, arg7);
+}
+
+export function PreviewWorktreePath() {
+  return window['go']['main']['App']['PreviewWorktreePath']();
 }
 
 export function Pull() {

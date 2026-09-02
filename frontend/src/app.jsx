@@ -330,8 +330,8 @@ export function App() {
     });
   }, []);
 
-  const handleCheckoutPRWorktree = useCallback((pr) => {
-    api.checkoutPRToWorktree(pr.number).catch((err) => {
+  const handleCheckoutPRWorktree = useCallback((pr, hash) => {
+    api.checkoutPRToWorktree(pr.number, hash).catch((err) => {
       pushToast('Worktree Error', err.message);
     });
   }, []);
@@ -569,7 +569,6 @@ export function App() {
               confirmKind === 'remove-worktree' ? (
                 <>
                   Remove worktree at <code>{pendingWorktreePath ?? ''}</code>?
-                  Uncommitted changes will be lost.
                 </>
               ) : confirmKind === 'discard' ? (
                 pendingUnstagedStatus === 'U' ? (
@@ -619,10 +618,9 @@ export function App() {
 
           <PRCheckoutPrompt
             pr={prPrompt}
-            projectPath={projectPath}
             onViewDiff={() => handleViewPRDiff(prPrompt)}
             onCheckoutLocal={() => handleCheckoutPRLocal(prPrompt)}
-            onCheckoutWorktree={() => handleCheckoutPRWorktree(prPrompt)}
+            onCheckoutWorktree={(hash) => handleCheckoutPRWorktree(prPrompt, hash)}
             onClose={() => setPrPrompt(null)}
           />
         </div>

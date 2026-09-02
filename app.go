@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"os"
 	"os/exec"
 	"path/filepath"
 	goruntime "runtime"
@@ -854,8 +855,23 @@ func (a *App) CheckoutPR(number int) error {
 	return nil
 }
 
+// PreviewWorktreePath returns a planned worktree path and hash without creating anything.
+func (a *App) PreviewWorktreePath() (WorktreePathPreview, error) {
+	if a.git == nil || !a.git.IsRepo() {
+		return WorktreePathPreview{}, fmt.Errorf("no git repository")
+	}
+
+	path, hash, err := a.git.PreviewWorktreePath()
+	if err != nil {
+		return WorktreePathPreview{}, err
+	}
+
+	return WorktreePathPreview{Path: path, Hash: hash}, nil
+}
+
 // CheckoutPRToWorktree checks out a PR into a new git worktree outside the repo.
-func (a *App) CheckoutPRToWorktree(number int) error {
+// If hash is non-empty, uses the pre-reserved path from PreviewWorktreePath.
+func (a *App) CheckoutPRToWorktree(number int, hash string) error {
 	if a.git == nil || !a.git.IsRepo() {
 		return fmt.Errorf("no git repository")
 	}
@@ -866,13 +882,37 @@ func (a *App) CheckoutPRToWorktree(number int) error {
 	}
 	repoName := filepath.Base(mainRepo)
 
-	worktreePath, hash, err := a.git.NewWorktreePath()
-	if err != nil {
-		a.EmitEvent("error", map[string]string{
-			"title":   "Worktree Error",
-			"message": err.Error(),
-		})
-		return err
+	var worktreePath string
+	if hash != "" {
+		worktreePath, err = a.git.WorktreePathForHash(hash)
+		if err != nil {
+			a.EmitEvent("error", map[string]string{
+				"title":   "Worktree Error",
+				"message": err.Error(),
+			})
+			return err
+		}
+		baseDir, baseErr := a.git.WorktreeBaseDir()
+		if baseErr != nil {
+			return baseErr
+		}
+		if mkdirErr := os.MkdirAll(baseDir, 0o755); mkdirErr != nil {
+			a.EmitEvent("error", map[string]string{
+				"title":   "Worktree Error",
+				"message": mkdirErr.Error(),
+			})
+			return mkdirErr
+		}
+	} else {
+		var pathErr error
+		worktreePath, hash, pathErr = a.git.NewWorktreePath()
+		if pathErr != nil {
+			a.EmitEvent("error", map[string]string{
+				"title":   "Worktree Error",
+				"message": pathErr.Error(),
+			})
+			return pathErr
+		}
 	}
 
 	localBranch := fmt.Sprintf("pr-wt-%s", hash)

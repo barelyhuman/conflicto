@@ -107,6 +107,20 @@ export namespace main {
 	        this.isCurrent = source["isCurrent"];
 	    }
 	}
+	export class WorktreePathPreview {
+	    path: string;
+	    hash: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new WorktreePathPreview(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.path = source["path"];
+	        this.hash = source["hash"];
+	    }
+	}
 
 }
 

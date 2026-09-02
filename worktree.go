@@ -57,14 +57,42 @@ func (gs *GitService) WorktreeBaseDir() (string, error) {
 	return filepath.Join(parent, "worktrees", repoName), nil
 }
 
+// WorktreePathPreview is the planned path/hash for a new worktree (not yet created).
+type WorktreePathPreview struct {
+	Path string `json:"path"`
+	Hash string `json:"hash"`
+}
+
+// WorktreePathForHash returns the filesystem path for a worktree hash without creating it.
+func (gs *GitService) WorktreePathForHash(hash string) (string, error) {
+	baseDir, err := gs.WorktreeBaseDir()
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(baseDir, hash), nil
+}
+
+// PreviewWorktreePath generates a hash and returns the path where a worktree would be created.
+func (gs *GitService) PreviewWorktreePath() (string, string, error) {
+	hash, err := randomHex(8)
+	if err != nil {
+		return "", "", err
+	}
+	path, err := gs.WorktreePathForHash(hash)
+	if err != nil {
+		return "", "", err
+	}
+	return path, hash, nil
+}
+
 // NewWorktreePath generates a unique worktree path under WorktreeBaseDir.
 func (gs *GitService) NewWorktreePath() (string, string, error) {
-	baseDir, err := gs.WorktreeBaseDir()
+	path, hash, err := gs.PreviewWorktreePath()
 	if err != nil {
 		return "", "", err
 	}
 
-	hash, err := randomHex(8)
+	baseDir, err := gs.WorktreeBaseDir()
 	if err != nil {
 		return "", "", err
 	}
@@ -73,7 +101,7 @@ func (gs *GitService) NewWorktreePath() (string, string, error) {
 		return "", "", fmt.Errorf("create worktree base dir: %w", err)
 	}
 
-	return filepath.Join(baseDir, hash), hash, nil
+	return path, hash, nil
 }
 
 // ListWorktrees returns all worktrees for the repository.
@@ -141,36 +169,49 @@ func (gs *GitService) ListWorktrees() ([]WorktreeInfo, error) {
 	return worktrees, nil
 }
 
-// FetchPRHead fetches a PR head into a local branch without leaving the main repo on that branch.
+// FetchPRHead fetches a PR head into a local branch without touching the main working tree.
 func (gs *GitService) FetchPRHead(number int, localBranch string) error {
 	mainRepo, err := gs.MainRepoPath()
 	if err != nil {
 		return err
 	}
 
-	currentBranch, _ := gs.runGitInDir(mainRepo, "branch", "--show-current")
-	current := strings.TrimSpace(string(currentBranch))
-
-	checkoutCmd := exec.Command("gh", "pr", "checkout", fmt.Sprintf("%d", number), "--branch", localBranch)
-	checkoutCmd.Dir = mainRepo
-	checkoutOut, checkoutErr := checkoutCmd.CombinedOutput()
-	if checkoutErr != nil {
-		return fmt.Errorf("%s: %w", strings.TrimSpace(string(checkoutOut)), checkoutErr)
+	refspec := fmt.Sprintf("pull/%d/head:refs/heads/%s", number, localBranch)
+	cmd := exec.Command("git", "fetch", "origin", refspec)
+	cmd.Dir = mainRepo
+	out, err := cmd.CombinedOutput()
+	if err == nil {
+		return nil
 	}
 
-	// Restore the main repo's previous branch.
-	if current != "" && current != localBranch {
-		_, restoreErr := gs.runGitInDir(mainRepo, "checkout", current)
-		if restoreErr != nil {
-			return fmt.Errorf("restore branch %q: %w", current, restoreErr)
-		}
-	} else if current == "" {
-		if _, restoreErr := gs.runGitInDir(mainRepo, "checkout", "-"); restoreErr != nil {
-			return fmt.Errorf("restore previous HEAD: %w", restoreErr)
-		}
+	// Fallback: fetch by OID via gh (handles edge cases where pull/N/head is unavailable).
+	oid, oidErr := gs.prHeadOID(mainRepo, number)
+	if oidErr != nil {
+		return fmt.Errorf("%s: %w", strings.TrimSpace(string(out)), err)
 	}
 
+	fallbackSpec := fmt.Sprintf("%s:refs/heads/%s", oid, localBranch)
+	fallbackCmd := exec.Command("git", "fetch", "origin", fallbackSpec)
+	fallbackCmd.Dir = mainRepo
+	fallbackOut, fallbackErr := fallbackCmd.CombinedOutput()
+	if fallbackErr != nil {
+		return fmt.Errorf("%s: %w", strings.TrimSpace(string(fallbackOut)), fallbackErr)
+	}
 	return nil
+}
+
+func (gs *GitService) prHeadOID(repoPath string, number int) (string, error) {
+	cmd := exec.Command("gh", "pr", "view", fmt.Sprintf("%d", number), "--json", "headRefOid", "--jq", ".headRefOid")
+	cmd.Dir = repoPath
+	out, err := cmd.Output()
+	if err != nil {
+		return "", err
+	}
+	oid := strings.TrimSpace(string(out))
+	if oid == "" {
+		return "", fmt.Errorf("empty PR head OID")
+	}
+	return oid, nil
 }
 
 // AddWorktree creates a new worktree at path checking out branch.
@@ -215,10 +256,4 @@ func randomHex(n int) (string, error) {
 		return "", err
 	}
 	return hex.EncodeToString(buf), nil
-}
-
-func (gs *GitService) runGitInDir(dir string, args ...string) ([]byte, error) {
-	cmd := exec.Command("git", args...)
-	cmd.Dir = dir
-	return cmd.Output()
 }

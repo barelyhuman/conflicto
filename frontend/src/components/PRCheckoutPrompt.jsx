@@ -1,17 +1,51 @@
-import { useState } from 'preact/hooks';
+import { useState, useEffect } from 'preact/hooks';
+import { api } from '../wails.js';
 
 /**
  * Prompt shown when a PR is selected offering checkout options.
  * @param {Object} props
  * @param {{ number: number, title: string, author: string, baseBranch: string } | null} props.pr
- * @param {string} [props.projectPath]
  * @param {() => void} props.onViewDiff
  * @param {() => void} props.onCheckoutLocal
- * @param {() => void} props.onCheckoutWorktree
+ * @param {(hash: string) => void} props.onCheckoutWorktree
  * @param {() => void} props.onClose
  */
-export function PRCheckoutPrompt({ pr, projectPath, onViewDiff, onCheckoutLocal, onCheckoutWorktree, onClose }) {
+export function PRCheckoutPrompt({ pr, onViewDiff, onCheckoutLocal, onCheckoutWorktree, onClose }) {
   const [mode, setMode] = useState(null); // null | 'local' | 'worktree'
+  const [worktreePath, setWorktreePath] = useState('');
+  const [worktreeHash, setWorktreeHash] = useState('');
+  const [worktreePreviewLoading, setWorktreePreviewLoading] = useState(false);
+
+  useEffect(() => {
+    if (mode !== 'worktree') {
+      setWorktreePath('');
+      setWorktreeHash('');
+      setWorktreePreviewLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+    setWorktreePreviewLoading(true);
+
+    api.previewWorktreePath()
+      .then((preview) => {
+        if (cancelled) return;
+        setWorktreePath(preview?.path ?? '');
+        setWorktreeHash(preview?.hash ?? '');
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setWorktreePath('');
+        setWorktreeHash('');
+      })
+      .finally(() => {
+        if (!cancelled) setWorktreePreviewLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [mode]);
 
   if (!pr) return null;
 
@@ -19,14 +53,6 @@ export function PRCheckoutPrompt({ pr, projectPath, onViewDiff, onCheckoutLocal,
     setMode(null);
     fn();
   }
-
-  const worktreeHint = (() => {
-    if (!projectPath) return '../worktrees/<repo>/<hash>';
-    const parts = projectPath.split('/');
-    const repoName = parts[parts.length - 1] || '<repo>';
-    const parent = parts.slice(0, -1).join('/') || '..';
-    return `${parent}/worktrees/${repoName}/<hash>`;
-  })();
 
   return (
     <div class="pr-prompt-overlay" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
@@ -71,9 +97,20 @@ export function PRCheckoutPrompt({ pr, projectPath, onViewDiff, onCheckoutLocal,
 
           {mode === 'worktree' && (
             <div class="pr-prompt-confirm">
-              <p>This will create a new worktree at <code>{worktreeHint}</code> without changing your current branch.</p>
+              <p>
+                {worktreePreviewLoading
+                  ? 'Preparing worktree path…'
+                  : worktreePath
+                    ? <>This will create a new worktree at <code>{worktreePath}</code> without changing your current branch.</>
+                    : 'Could not determine worktree path.'}
+              </p>
               <div class="pr-prompt-actions">
-                <button type="button" class="pr-prompt-btn pr-prompt-btn-primary" onClick={() => handleAction(onCheckoutWorktree)}>
+                <button
+                  type="button"
+                  class="pr-prompt-btn pr-prompt-btn-primary"
+                  onClick={() => handleAction(() => onCheckoutWorktree(worktreeHash))}
+                  disabled={worktreePreviewLoading || !worktreeHash}
+                >
                   Confirm worktree
                 </button>
                 <button type="button" class="pr-prompt-btn" onClick={() => setMode(null)}>
@@ -174,8 +211,12 @@ export function PRCheckoutPrompt({ pr, projectPath, onViewDiff, onCheckoutLocal,
           cursor: pointer;
           transition: background 0.15s;
         }
-        .pr-prompt-btn:hover {
+        .pr-prompt-btn:hover:not(:disabled) {
           background: var(--accent-hover);
+        }
+        .pr-prompt-btn:disabled {
+          opacity: 0.5;
+          cursor: not-allowed;
         }
         .pr-prompt-btn-primary {
           background: var(--accent-bg);
@@ -194,6 +235,7 @@ export function PRCheckoutPrompt({ pr, projectPath, onViewDiff, onCheckoutLocal,
           padding: 1px 4px;
           border-radius: 3px;
           color: var(--text-h);
+          word-break: break-all;
         }
       `}</style>
     </div>
