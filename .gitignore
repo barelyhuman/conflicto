@@ -1,4 +1,6 @@
-/build
+/build/*
+!/build/darwin/
+!/build/darwin/Info.plist
 /dist
 .DS_Store
 
