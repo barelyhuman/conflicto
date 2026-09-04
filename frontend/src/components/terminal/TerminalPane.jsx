@@ -1,7 +1,6 @@
 import { useEffect, useRef } from 'preact/hooks';
 import { Terminal } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
-import { WebglAddon } from '@xterm/addon-webgl';
 import '@xterm/xterm/css/xterm.css';
 import { api } from '../../wails.js';
 import { terminalTheme } from './terminalTheme.js';
@@ -65,6 +64,8 @@ export function TerminalPane({
     disposedRef.current = false;
 
     const term = new Terminal({
+      // Keep xterm's default renderer: the optional WebGL renderer can
+      // composite zsh autosuggestions incorrectly when panes are split.
       // Real PTY already speaks CRLF — convertEol doubles newlines and skews TUIs
       convertEol: false,
       cursorBlink: true,
@@ -78,8 +79,6 @@ export function TerminalPane({
       theme: terminalTheme(),
       // Option/Alt as Meta on macOS — agent TUI shortcuts
       macOptionIsMeta: true,
-      // Pixel-perfect box/block glyphs (WebGL path)
-      customGlyphs: true,
       allowProposedApi: true,
       scrollback: 5000,
       drawBoldTextInBrightColors: true,
@@ -89,23 +88,6 @@ export function TerminalPane({
     const fit = new FitAddon();
     term.loadAddon(fit);
     term.open(host);
-
-    // WebGL gives much cleaner ▀/█ half-block logos (OpenCode etc.). Fall back silently.
-    let webgl = null;
-    try {
-      webgl = new WebglAddon();
-      webgl.onContextLoss(() => {
-        try {
-          webgl.dispose();
-        } catch {
-          // ignore
-        }
-        webgl = null;
-      });
-      term.loadAddon(webgl);
-    } catch {
-      webgl = null;
-    }
 
     fit.fit();
     termRef.current = term;
@@ -202,11 +184,6 @@ export function TerminalPane({
       onDataDisp.dispose();
       osc7Disp.dispose();
       titleDisp.dispose();
-      try {
-        webgl?.dispose();
-      } catch {
-        // ignore
-      }
       // Do NOT call terminalStop — hide must keep PTY alive.
       term.dispose();
       termRef.current = null;
