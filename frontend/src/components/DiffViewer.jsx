@@ -1,6 +1,8 @@
 import { useMemo, useRef, useState, useLayoutEffect, useCallback } from 'preact/hooks';
 import { FileDiff } from '@pierre/diffs/react';
 import { processFile } from '@pierre/diffs';
+import { IconExternalLink } from '@tabler/icons-preact';
+import { BrowserOpenURL } from '../wailsjs/runtime/runtime.js';
 import { useTheme } from '../theme/ThemeProvider.jsx';
 import { api } from '../wails.js';
 import { buildPRLineAnnotations } from './prLineAnnotations.js';
@@ -61,24 +63,53 @@ const diffViewerStyles = `
     line-height: 1.45;
   }
   .diff-comment {
-    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    font-family: var(--font-sans);
     font-size: 12px;
     line-height: 1.45;
     display: flex;
     flex-direction: column;
     gap: 4px;
-    margin: 6px 8px 10px 4px;
-    padding: 8px 10px;
+    margin: 8px 12px 10px;
+    padding: 10px 12px;
     color: var(--text);
-    background: var(--surface);
+    background: var(--surface-raised);
     border: 1px solid var(--border);
     border-left: 3px solid var(--text-muted);
-    border-radius: 0 6px 6px 0;
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.18);
+  }
+  .diff-comment-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
   }
   .diff-comment-author {
     font-size: 11px;
     font-weight: 600;
-    color: var(--text-h);
+    color: var(--text-muted);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .diff-comment-open {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 20px;
+    flex-shrink: 0;
+    border-radius: 5px;
+    border: none;
+    background: transparent;
+    color: var(--text-muted);
+    cursor: pointer;
+    padding: 0;
+    transition: background 0.15s, color 0.15s;
+  }
+  .diff-comment-open:hover {
+    background: var(--accent-hover);
+    color: var(--text);
   }
   .diff-comment-body {
     font-size: 12px;
@@ -95,7 +126,7 @@ const diffViewerStyles = `
  * @param {boolean} props.isPRMode
  * @param {import('@preact/signals-core').ReadonlySignal<boolean>|boolean} props.isUnstaged
  * @param {import('@preact/signals-core').ReadonlySignal<boolean>|boolean} [props.showFullDiff]
- * @param {{ path: string, line: number, side?: string, body: string, user: { login: string } }[]} props.comments
+ * @param {{ path: string, line: number, side?: string, body: string, html_url?: string, user: { login: string } }[]} props.comments
  */
 export function DiffViewer({
   activeDiff,
@@ -147,12 +178,31 @@ export function DiffViewer({
     [comments, filename, isPRMode]
   );
 
-  const renderAnnotation = useCallback((annotation) => (
-    <div class="diff-comment">
-      <span class="diff-comment-author">{annotation.metadata?.user?.login ?? 'unknown'}</span>
-      <span class="diff-comment-body">{annotation.metadata?.body}</span>
-    </div>
-  ), []);
+  const renderAnnotation = useCallback((annotation) => {
+    const htmlUrl = annotation.metadata?.html_url;
+    return (
+      <div class="diff-comment">
+        <div class="diff-comment-header">
+          <span class="diff-comment-author">{annotation.metadata?.user?.login ?? 'unknown'}</span>
+          {htmlUrl ? (
+            <button
+              type="button"
+              class="diff-comment-open"
+              title="Open in browser"
+              aria-label="Open comment in browser"
+              onClick={(e) => {
+                e.stopPropagation();
+                BrowserOpenURL(htmlUrl);
+              }}
+            >
+              <IconExternalLink size={12} stroke={2} />
+            </button>
+          ) : null}
+        </div>
+        <span class="diff-comment-body">{annotation.metadata?.body}</span>
+      </div>
+    );
+  }, []);
 
   if (isLoading) {
     return (

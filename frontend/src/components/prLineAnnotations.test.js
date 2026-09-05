@@ -28,8 +28,41 @@ describe('buildPRLineAnnotations', () => {
     ];
 
     expect(buildPRLineAnnotations({ isPRMode: true, comments, filename: path })).toEqual([
-      { lineNumber: 42, side: 'additions', metadata: { body: 'nits', user: { login: 'alice' } } },
-      { lineNumber: 10, side: 'deletions', metadata: { body: 'on left', user: { login: 'carol' } } },
+      {
+        lineNumber: 42,
+        side: 'additions',
+        metadata: { body: 'nits', user: { login: 'alice' }, html_url: undefined },
+      },
+      {
+        lineNumber: 10,
+        side: 'deletions',
+        metadata: { body: 'on left', user: { login: 'carol' }, html_url: undefined },
+      },
+    ]);
+  });
+
+  it('passes through html_url when present', () => {
+    const comments = [
+      {
+        path,
+        line: 3,
+        side: 'RIGHT',
+        body: 'link me',
+        user: { login: 'alice' },
+        html_url: 'https://github.com/o/r/pull/1#discussion_r1',
+      },
+    ];
+
+    expect(buildPRLineAnnotations({ isPRMode: true, comments, filename: path })).toEqual([
+      {
+        lineNumber: 3,
+        side: 'additions',
+        metadata: {
+          body: 'link me',
+          user: { login: 'alice' },
+          html_url: 'https://github.com/o/r/pull/1#discussion_r1',
+        },
+      },
     ]);
   });
 });

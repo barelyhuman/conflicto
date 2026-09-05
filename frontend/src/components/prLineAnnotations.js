@@ -18,7 +18,7 @@ export function buildPRLineAnnotations({ isPRMode, comments, filename }) {
     mapped.push({
       lineNumber: c.line,
       side: toPierreSide(c.side),
-      metadata: { body: c.body, user: c.user },
+      metadata: { body: c.body, user: c.user, html_url: c.html_url },
     });
   }
   return mapped.length ? mapped : undefined;

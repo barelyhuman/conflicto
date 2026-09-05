@@ -19,7 +19,7 @@ describe('expandUnchangedForDiff', () => {
 
 describe('annotationUnsafeCSS', () => {
   it('returns annotation CSS only in PR mode', () => {
-    expect(annotationUnsafeCSS(true)).toContain('--diffs-annotation-bg');
+    expect(annotationUnsafeCSS(true)).toContain('--diffs-annotation-bg: transparent');
     expect(annotationUnsafeCSS(false)).toBeUndefined();
   });
 });

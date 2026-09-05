@@ -4,7 +4,7 @@ export function expandUnchangedForDiff(isPRMode, fullDiff) {
 
 export function annotationUnsafeCSS(isPRMode) {
   if (!isPRMode) return undefined;
-  return `[data-line-annotation], [data-gutter-buffer="annotation"] { --diffs-annotation-bg: var(--surface); }`;
+  return `[data-line-annotation], [data-gutter-buffer="annotation"] { --diffs-annotation-bg: transparent; }`;
 }
 
 export function loadDiffFilesForDiff(isPRMode, loader) {
