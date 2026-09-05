@@ -149,6 +149,12 @@ export function DiffViewer({
       }));
   }, [comments, filename, isPRMode]);
 
+  // Not passed to FileDiff below. Pierre's setLineAnnotations only accepts
+  // side 'additions' | 'deletions'; side: 'right' (and GitHub's RIGHT/LEFT)
+  // makes map undefined, crashes, and blanks the diff on comment-bearing files.
+  // Re-enable once annotations use lineNumber + mapped sides + renderAnnotation.
+  void lineAnnotations;
+
   if (isLoading) {
     return (
       <div class="diff-viewer-wrapper diff-loading" aria-busy="true" aria-label="Loading diff">
@@ -182,7 +188,7 @@ export function DiffViewer({
   return (
     <div ref={wrapperRef} class="diff-viewer-wrapper">
       <FileDiff
-        key={collapseKey}
+        key={`${filename}:${collapseKey}`}
         fileDiff={fileDiff}
         edit={unstaged}
         options={{
@@ -191,7 +197,9 @@ export function DiffViewer({
           diffStyle: 'unified',
           overflow: 'wrap',
           disableFileHeader: true,
-          expandUnchanged: isPRMode || fullDiff,
+          // GitHub PR patches are partial hunks. expandUnchanged without
+          // loadDiffFiles leaves Pierre with nothing to render.
+          expandUnchanged: isPRMode ? false : fullDiff,
           collapsedContextThreshold: 1,
           loadDiffFiles: isPRMode
             ? undefined
@@ -210,7 +218,6 @@ export function DiffViewer({
               return { oldFile, newFile: null };
             },
         }}
-        lineAnnotations={lineAnnotations}
       />
       <style>{diffViewerStyles}</style>
     </div>

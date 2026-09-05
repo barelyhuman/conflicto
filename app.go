@@ -676,14 +676,21 @@ func (a *App) GetPRFiles(number int) error {
 // GetPRFileDiff returns the diff patch for a single file in a cached PR
 func (a *App) GetPRFileDiff(number int, path string) error {
 	cache, ok := a.prCache[number]
-	if !ok {
-		a.EmitEvent("error", map[string]string{
-			"title":   "PR Diff Error",
-			"message": fmt.Sprintf("PR #%d not loaded. Fetch files first.", number),
-		})
-		// Clear the frontend loading state even on failure.
-		a.EmitEvent("diffLoaded", &FileDiff{Path: path, Patch: ""})
-		return fmt.Errorf("PR #%d not cached", number)
+	if !ok || len(cache.Files) == 0 {
+		// Cache is cleared on project/worktree switch; reload then serve.
+		if err := a.GetPRFiles(number); err != nil {
+			a.EmitEvent("diffLoaded", &FileDiff{Path: path, Patch: ""})
+			return err
+		}
+		cache, ok = a.prCache[number]
+		if !ok {
+			a.EmitEvent("error", map[string]string{
+				"title":   "PR Diff Error",
+				"message": fmt.Sprintf("PR #%d not loaded. Fetch files first.", number),
+			})
+			a.EmitEvent("diffLoaded", &FileDiff{Path: path, Patch: ""})
+			return fmt.Errorf("PR #%d not cached", number)
+		}
 	}
 
 	for _, f := range cache.Files {
