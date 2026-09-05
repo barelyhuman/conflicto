@@ -15,12 +15,13 @@ export const appTokens = {
     accent: '#171717',
     accentBg: 'rgba(127,127,127,0.12)',
     accentHover: 'rgba(127,127,127,0.16)',
-    added: '#171717',
-    addedBg: 'rgba(127,127,127,0.09)',
-    addedBorder: '#171717',
-    removed: '#737373',
-    removedBg: 'rgba(127,127,127,0.05)',
-    removedBorder: '#737373',
+    // Soft GitHub-style diff line hues (Pierre/Shiki only; UI chrome stays mono)
+    added: '#1a7f37',
+    addedBg: 'rgba(26,127,55,0.12)',
+    addedBorder: '#1a7f37',
+    removed: '#cf222e',
+    removedBg: 'rgba(207,34,46,0.10)',
+    removedBorder: '#cf222e',
     conflictAmber: '#737373',
     conflictAmberBg: 'rgba(127,127,127,0.12)',
     conflictAmberBorder: '#e5e5e5',
@@ -37,12 +38,13 @@ export const appTokens = {
     accent: '#fafafa',
     accentBg: 'rgba(127,127,127,0.12)',
     accentHover: 'rgba(127,127,127,0.16)',
-    added: '#fafafa',
-    addedBg: 'rgba(127,127,127,0.09)',
-    addedBorder: '#fafafa',
-    removed: '#a3a3a3',
-    removedBg: 'rgba(127,127,127,0.05)',
-    removedBorder: '#a3a3a3',
+    // Soft GitHub-style diff line hues (Pierre/Shiki only; UI chrome stays mono)
+    added: '#3fb950',
+    addedBg: 'rgba(63,185,80,0.15)',
+    addedBorder: '#3fb950',
+    removed: '#f85149',
+    removedBg: 'rgba(248,81,73,0.15)',
+    removedBorder: '#f85149',
     conflictAmber: '#a3a3a3',
     conflictAmberBg: 'rgba(127,127,127,0.12)',
     conflictAmberBorder: '#262626',
@@ -61,7 +63,8 @@ export function resolveThemeMode(mode) {
 }
 
 /**
- * Full Shiki/VS Code theme derived from appTokens — monochrome only.
+ * Full Shiki/VS Code theme derived from appTokens.
+ * Syntax highlighting stays monochrome; insert/delete line chrome uses added/removed.
  * @param {ThemeMode} [mode]
  */
 export function createAppShikiTheme(mode) {
