@@ -4,6 +4,11 @@ import { processFile } from '@pierre/diffs';
 import { useTheme } from '../theme/ThemeProvider.jsx';
 import { api } from '../wails.js';
 import { buildPRLineAnnotations } from './prLineAnnotations.js';
+import {
+  annotationUnsafeCSS,
+  expandUnchangedForDiff,
+  loadDiffFilesForDiff,
+} from './pierreDiffOptions.js';
 
 const diffViewerStyles = `
   .diff-viewer-wrapper {
@@ -56,9 +61,6 @@ const diffViewerStyles = `
     line-height: 1.45;
   }
   .diff-comment {
-    /* Slotted into Pierre's shadow tree: inheritable props (font) come from
-       the slot parent (code chrome). Force UI chrome so comments do not look
-       like another code line. */
     font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
     font-size: 12px;
     line-height: 1.45;
@@ -94,7 +96,6 @@ const diffViewerStyles = `
  * @param {import('@preact/signals-core').ReadonlySignal<boolean>|boolean} props.isUnstaged
  * @param {import('@preact/signals-core').ReadonlySignal<boolean>|boolean} [props.showFullDiff]
  * @param {{ path: string, line: number, side?: string, body: string, user: { login: string } }[]} props.comments
- * @param {(path: string, body: string, line: number, side: string) => void} [props.onPostComment]
  */
 export function DiffViewer({
   activeDiff,
@@ -117,8 +118,7 @@ export function DiffViewer({
   const [collapseKey, setCollapseKey] = useState(0);
   const savedScrollTop = useRef(0);
 
-  // Detect expand -> collapse transition and force a remount so the
-  // third-party diff library drops its stale per-hunk expansion state.
+  // Remount FileDiff when collapsing so Pierre drops stale hunk expansion.
   useLayoutEffect(() => {
     if (prevFullDiff.current === true && fullDiff === false) {
       savedScrollTop.current = wrapperRef.current?.scrollTop ?? 0;
@@ -127,7 +127,6 @@ export function DiffViewer({
     prevFullDiff.current = fullDiff;
   }, [fullDiff]);
 
-  // Restore scroll position after the forced remount.
   useLayoutEffect(() => {
     const el = wrapperRef.current;
     if (el && savedScrollTop.current > 0) {
@@ -139,9 +138,7 @@ export function DiffViewer({
   const fileDiff = useMemo(() => {
     if (!patch) return null;
     const meta = processFile(patch, { isGitDiff: true });
-    if (!meta) return null;
-    // GitHub hunk-only patches used to parse as empty metadata; treat as missing.
-    if (!meta.hunks?.length) return null;
+    if (!meta?.hunks?.length) return null;
     return meta;
   }, [patch]);
 
@@ -199,30 +196,23 @@ export function DiffViewer({
           diffStyle: 'unified',
           overflow: 'wrap',
           disableFileHeader: true,
-          // GitHub PR patches are partial hunks. expandUnchanged without
-          // loadDiffFiles leaves Pierre with nothing to render.
-          expandUnchanged: isPRMode ? false : fullDiff,
+          expandUnchanged: expandUnchangedForDiff(isPRMode, fullDiff),
           collapsedContextThreshold: 1,
-          // Make Pierre's annotation row bg distinct from context code lines.
-          unsafeCSS: isPRMode
-            ? `[data-line-annotation], [data-gutter-buffer="annotation"] { --diffs-annotation-bg: var(--surface); }`
-            : undefined,
-          loadDiffFiles: isPRMode
-            ? undefined
-            : async (meta) => {
-              const path = meta.name;
-              const staged = !unstaged;
-              const res = await api.getFileContents(path, staged);
-              const oldFile = res.hasOld
-                ? { name: meta.prevName ?? path, contents: res.oldContent }
-                : null;
-              const newFile = res.hasNew
-                ? { name: path, contents: res.newContent }
-                : null;
-              if (oldFile && newFile) return { oldFile, newFile };
-              if (newFile) return { oldFile: null, newFile };
-              return { oldFile, newFile: null };
-            },
+          unsafeCSS: annotationUnsafeCSS(isPRMode),
+          loadDiffFiles: loadDiffFilesForDiff(isPRMode, async (meta) => {
+            const path = meta.name;
+            const staged = !unstaged;
+            const res = await api.getFileContents(path, staged);
+            const oldFile = res.hasOld
+              ? { name: meta.prevName ?? path, contents: res.oldContent }
+              : null;
+            const newFile = res.hasNew
+              ? { name: path, contents: res.newContent }
+              : null;
+            if (oldFile && newFile) return { oldFile, newFile };
+            if (newFile) return { oldFile: null, newFile };
+            return { oldFile, newFile: null };
+          }),
         }}
         lineAnnotations={lineAnnotations}
         renderAnnotation={lineAnnotations ? renderAnnotation : undefined}

@@ -675,44 +675,63 @@ func (a *App) GetPRFiles(number int) error {
 
 // GetPRFileDiff returns the diff patch for a single file in a cached PR
 func (a *App) GetPRFileDiff(number int, path string) error {
-	cache, ok := a.prCache[number]
-	if !ok || len(cache.Files) == 0 {
-		// Cache is cleared on project/worktree switch; reload then serve.
-		if err := a.GetPRFiles(number); err != nil {
-			a.EmitEvent("diffLoaded", &FileDiff{Path: path, Patch: ""})
-			return err
-		}
-		cache, ok = a.prCache[number]
-		if !ok {
+	cache, err := loadPRCacheEntry(a.prCache, number, func() error {
+		return a.GetPRFiles(number)
+	})
+	if err != nil {
+		if strings.Contains(err.Error(), "not cached") {
 			a.EmitEvent("error", map[string]string{
 				"title":   "PR Diff Error",
 				"message": fmt.Sprintf("PR #%d not loaded. Fetch files first.", number),
 			})
-			a.EmitEvent("diffLoaded", &FileDiff{Path: path, Patch: ""})
-			return fmt.Errorf("PR #%d not cached", number)
 		}
+		a.EmitEvent("diffLoaded", &FileDiff{Path: path, Patch: ""})
+		return err
 	}
 
+	diff, err := fileDiffFromPRCache(cache, number, path)
+	if err != nil {
+		a.EmitEvent("error", map[string]string{
+			"title":   "PR Diff Error",
+			"message": fmt.Sprintf("File %s not found in PR #%d", path, number),
+		})
+		a.EmitEvent("diffLoaded", &FileDiff{Path: path, Patch: ""})
+		return err
+	}
+	a.EmitEvent("diffLoaded", diff)
+	return nil
+}
+
+// loadPRCacheEntry returns a populated cache entry, calling reload when missing or empty.
+func loadPRCacheEntry(cache map[int]PRCache, number int, reload func() error) (PRCache, error) {
+	entry, ok := cache[number]
+	if ok && len(entry.Files) > 0 {
+		return entry, nil
+	}
+	if err := reload(); err != nil {
+		return PRCache{}, err
+	}
+	entry, ok = cache[number]
+	if !ok {
+		return PRCache{}, fmt.Errorf("PR #%d not cached", number)
+	}
+	return entry, nil
+}
+
+func fileDiffFromPRCache(cache PRCache, number int, path string) (*FileDiff, error) {
 	for _, f := range cache.Files {
 		if f.Path == path {
 			patch := ""
 			if f.Patch != "" {
 				patch = normalizeGitHubPatch(f.Path, f.Status, f.Patch)
 			}
-			a.EmitEvent("diffLoaded", &FileDiff{
+			return &FileDiff{
 				Path:  f.Path,
 				Patch: patch,
-			})
-			return nil
+			}, nil
 		}
 	}
-
-	a.EmitEvent("error", map[string]string{
-		"title":   "PR Diff Error",
-		"message": fmt.Sprintf("File %s not found in PR #%d", path, number),
-	})
-	a.EmitEvent("diffLoaded", &FileDiff{Path: path, Patch: ""})
-	return fmt.Errorf("file %s not found in PR #%d", path, number)
+	return nil, fmt.Errorf("file %s not found in PR #%d", path, number)
 }
 
 // normalizeGitHubPatch wraps a GitHub pull-files "patch" (often hunk-only) in a
