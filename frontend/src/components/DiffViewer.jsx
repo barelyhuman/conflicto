@@ -1,8 +1,16 @@
-import { useMemo, useRef, useState, useLayoutEffect } from 'preact/hooks';
+import { useMemo, useRef, useState, useLayoutEffect, useCallback } from 'preact/hooks';
 import { FileDiff } from '@pierre/diffs/react';
 import { processFile } from '@pierre/diffs';
+import { IconExternalLink } from '@tabler/icons-preact';
+import { BrowserOpenURL } from '../wailsjs/runtime/runtime.js';
 import { useTheme } from '../theme/ThemeProvider.jsx';
 import { api } from '../wails.js';
+import { buildPRLineAnnotations } from './prLineAnnotations.js';
+import {
+  annotationUnsafeCSS,
+  expandUnchangedForDiff,
+  loadDiffFilesForDiff,
+} from './pierreDiffOptions.js';
 
 const diffViewerStyles = `
   .diff-viewer-wrapper {
@@ -55,20 +63,57 @@ const diffViewerStyles = `
     line-height: 1.45;
   }
   .diff-comment {
+    font-family: var(--font-sans);
+    font-size: 12px;
+    line-height: 1.45;
     display: flex;
     flex-direction: column;
-    gap: 2px;
-    padding: 4px 8px;
+    gap: 4px;
+    margin: 8px 12px 10px;
+    padding: 10px 12px;
+    color: var(--text);
     background: var(--surface-raised);
-    border-left: 2px solid var(--accent-hover);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--text-muted);
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.18);
+  }
+  .diff-comment-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
   }
   .diff-comment-author {
     font-size: 11px;
     font-weight: 600;
-    color: var(--text-h);
+    color: var(--text-muted);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .diff-comment-open {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 20px;
+    flex-shrink: 0;
+    border-radius: 5px;
+    border: none;
+    background: transparent;
+    color: var(--text-muted);
+    cursor: pointer;
+    padding: 0;
+    transition: background 0.15s, color 0.15s;
+  }
+  .diff-comment-open:hover {
+    background: var(--accent-hover);
+    color: var(--text);
   }
   .diff-comment-body {
     font-size: 12px;
+    font-weight: 400;
     color: var(--text);
     white-space: pre-wrap;
   }
@@ -81,8 +126,7 @@ const diffViewerStyles = `
  * @param {boolean} props.isPRMode
  * @param {import('@preact/signals-core').ReadonlySignal<boolean>|boolean} props.isUnstaged
  * @param {import('@preact/signals-core').ReadonlySignal<boolean>|boolean} [props.showFullDiff]
- * @param {{ path: string, line: number, body: string, user: { login: string } }[]} props.comments
- * @param {(path: string, body: string, line: number, side: string) => void} [props.onPostComment]
+ * @param {{ path: string, line: number, side?: string, body: string, html_url?: string, user: { login: string } }[]} props.comments
  */
 export function DiffViewer({
   activeDiff,
@@ -105,8 +149,7 @@ export function DiffViewer({
   const [collapseKey, setCollapseKey] = useState(0);
   const savedScrollTop = useRef(0);
 
-  // Detect expand -> collapse transition and force a remount so the
-  // third-party diff library drops its stale per-hunk expansion state.
+  // Remount FileDiff when collapsing so Pierre drops stale hunk expansion.
   useLayoutEffect(() => {
     if (prevFullDiff.current === true && fullDiff === false) {
       savedScrollTop.current = wrapperRef.current?.scrollTop ?? 0;
@@ -115,7 +158,6 @@ export function DiffViewer({
     prevFullDiff.current = fullDiff;
   }, [fullDiff]);
 
-  // Restore scroll position after the forced remount.
   useLayoutEffect(() => {
     const el = wrapperRef.current;
     if (el && savedScrollTop.current > 0) {
@@ -127,27 +169,40 @@ export function DiffViewer({
   const fileDiff = useMemo(() => {
     if (!patch) return null;
     const meta = processFile(patch, { isGitDiff: true });
-    if (!meta) return null;
-    // GitHub hunk-only patches used to parse as empty metadata — treat as missing.
-    if (!meta.hunks?.length) return null;
+    if (!meta?.hunks?.length) return null;
     return meta;
   }, [patch]);
 
-  const lineAnnotations = useMemo(() => {
-    if (!isPRMode || !comments.length) return [];
-    return comments
-      .filter((c) => c.path === filename && c.line != null)
-      .map((c) => ({
-        line: c.line,
-        side: 'right',
-        render: () => (
-          <div class="diff-comment">
-            <span class="diff-comment-author">{c.user?.login ?? 'unknown'}</span>
-            <span class="diff-comment-body">{c.body}</span>
-          </div>
-        ),
-      }));
-  }, [comments, filename, isPRMode]);
+  const lineAnnotations = useMemo(
+    () => buildPRLineAnnotations({ isPRMode, comments, filename }),
+    [comments, filename, isPRMode]
+  );
+
+  const renderAnnotation = useCallback((annotation) => {
+    const htmlUrl = annotation.metadata?.html_url;
+    return (
+      <div class="diff-comment">
+        <div class="diff-comment-header">
+          <span class="diff-comment-author">{annotation.metadata?.user?.login ?? 'unknown'}</span>
+          {htmlUrl ? (
+            <button
+              type="button"
+              class="diff-comment-open"
+              title="Open in browser"
+              aria-label="Open comment in browser"
+              onClick={(e) => {
+                e.stopPropagation();
+                BrowserOpenURL(htmlUrl);
+              }}
+            >
+              <IconExternalLink size={12} stroke={2} />
+            </button>
+          ) : null}
+        </div>
+        <span class="diff-comment-body">{annotation.metadata?.body}</span>
+      </div>
+    );
+  }, []);
 
   if (isLoading) {
     return (
@@ -182,7 +237,7 @@ export function DiffViewer({
   return (
     <div ref={wrapperRef} class="diff-viewer-wrapper">
       <FileDiff
-        key={collapseKey}
+        key={`${filename}:${collapseKey}`}
         fileDiff={fileDiff}
         edit={unstaged}
         options={{
@@ -191,26 +246,26 @@ export function DiffViewer({
           diffStyle: 'unified',
           overflow: 'wrap',
           disableFileHeader: true,
-          expandUnchanged: isPRMode || fullDiff,
+          expandUnchanged: expandUnchangedForDiff(isPRMode, fullDiff),
           collapsedContextThreshold: 1,
-          loadDiffFiles: isPRMode
-            ? undefined
-            : async (meta) => {
-              const path = meta.name;
-              const staged = !unstaged;
-              const res = await api.getFileContents(path, staged);
-              const oldFile = res.hasOld
-                ? { name: meta.prevName ?? path, contents: res.oldContent }
-                : null;
-              const newFile = res.hasNew
-                ? { name: path, contents: res.newContent }
-                : null;
-              if (oldFile && newFile) return { oldFile, newFile };
-              if (newFile) return { oldFile: null, newFile };
-              return { oldFile, newFile: null };
-            },
+          unsafeCSS: annotationUnsafeCSS(isPRMode),
+          loadDiffFiles: loadDiffFilesForDiff(isPRMode, async (meta) => {
+            const path = meta.name;
+            const staged = !unstaged;
+            const res = await api.getFileContents(path, staged);
+            const oldFile = res.hasOld
+              ? { name: meta.prevName ?? path, contents: res.oldContent }
+              : null;
+            const newFile = res.hasNew
+              ? { name: path, contents: res.newContent }
+              : null;
+            if (oldFile && newFile) return { oldFile, newFile };
+            if (newFile) return { oldFile: null, newFile };
+            return { oldFile, newFile: null };
+          }),
         }}
         lineAnnotations={lineAnnotations}
+        renderAnnotation={lineAnnotations ? renderAnnotation : undefined}
       />
       <style>{diffViewerStyles}</style>
     </div>
