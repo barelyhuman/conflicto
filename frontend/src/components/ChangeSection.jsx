@@ -14,6 +14,7 @@ import { IconChevronRight } from '@tabler/icons-preact';
  * @param {import('preact').ComponentChildren} [props.actionIcon]
  * @param {import('@preact/signals-core').Signal<boolean>|boolean} [props.showAction]
  * @param {() => void} [props.onAction]
+ * @param {{ title: string, icon: import('preact').ComponentChildren, show: import('@preact/signals-core').Signal<boolean>|boolean, onClick: () => void }[]} [props.actions]
  * @param {import('preact').ComponentChildren} props.children
  */
 export function ChangeSection({
@@ -26,8 +27,16 @@ export function ChangeSection({
   actionIcon,
   showAction,
   onAction,
+  actions,
   children,
 }) {
+  const headerActions = actions ?? (actionIcon && showAction != null ? [{
+    title: actionTitle,
+    icon: actionIcon,
+    show: showAction,
+    onClick: onAction,
+  }] : []);
+
   return (
     <section
       class={`change-section${open ? ' change-section-open' : ' change-section-collapsed'}${className ? ` ${className}` : ''}`}
@@ -45,37 +54,25 @@ export function ChangeSection({
           <span class="sg-title change-section-title">{title}</span>
         </button>
         <div class="sg-actions change-section-actions">
-          {actionIcon && showAction != null && (
-            typeof showAction === 'object' && 'value' in showAction ? (
-              <Show when={showAction}>
-                <button
-                  type="button"
-                  class="sg-icon-btn change-section-action"
-                  title={actionTitle}
-                  aria-label={actionTitle}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onAction?.();
-                  }}
-                >
-                  {actionIcon}
-                </button>
-              </Show>
-            ) : showAction ? (
+          {headerActions.map((action) => {
+            const button = (
               <button
                 type="button"
                 class="sg-icon-btn change-section-action"
-                title={actionTitle}
-                aria-label={actionTitle}
+                title={action.title}
+                aria-label={action.title}
                 onClick={(e) => {
                   e.stopPropagation();
-                  onAction?.();
+                  action.onClick?.();
                 }}
               >
-                {actionIcon}
+                {action.icon}
               </button>
-            ) : null
-          )}
+            );
+            return typeof action.show === 'object' && action.show !== null && 'value' in action.show
+              ? <Show key={action.title} when={action.show}>{button}</Show>
+              : action.show ? button : null;
+          })}
           <span class="sg-count change-section-count">{count}</span>
         </div>
       </div>
