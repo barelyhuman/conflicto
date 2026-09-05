@@ -1,8 +1,9 @@
-import { useMemo, useRef, useState, useLayoutEffect } from 'preact/hooks';
+import { useMemo, useRef, useState, useLayoutEffect, useCallback } from 'preact/hooks';
 import { FileDiff } from '@pierre/diffs/react';
 import { processFile } from '@pierre/diffs';
 import { useTheme } from '../theme/ThemeProvider.jsx';
 import { api } from '../wails.js';
+import { buildPRLineAnnotations } from './prLineAnnotations.js';
 
 const diffViewerStyles = `
   .diff-viewer-wrapper {
@@ -55,12 +56,22 @@ const diffViewerStyles = `
     line-height: 1.45;
   }
   .diff-comment {
+    /* Slotted into Pierre's shadow tree: inheritable props (font) come from
+       the slot parent (code chrome). Force UI chrome so comments do not look
+       like another code line. */
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    font-size: 12px;
+    line-height: 1.45;
     display: flex;
     flex-direction: column;
-    gap: 2px;
-    padding: 4px 8px;
-    background: var(--surface-raised);
-    border-left: 2px solid var(--accent-hover);
+    gap: 4px;
+    margin: 6px 8px 10px 4px;
+    padding: 8px 10px;
+    color: var(--text);
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--text-muted);
+    border-radius: 0 6px 6px 0;
   }
   .diff-comment-author {
     font-size: 11px;
@@ -69,6 +80,7 @@ const diffViewerStyles = `
   }
   .diff-comment-body {
     font-size: 12px;
+    font-weight: 400;
     color: var(--text);
     white-space: pre-wrap;
   }
@@ -81,7 +93,7 @@ const diffViewerStyles = `
  * @param {boolean} props.isPRMode
  * @param {import('@preact/signals-core').ReadonlySignal<boolean>|boolean} props.isUnstaged
  * @param {import('@preact/signals-core').ReadonlySignal<boolean>|boolean} [props.showFullDiff]
- * @param {{ path: string, line: number, body: string, user: { login: string } }[]} props.comments
+ * @param {{ path: string, line: number, side?: string, body: string, user: { login: string } }[]} props.comments
  * @param {(path: string, body: string, line: number, side: string) => void} [props.onPostComment]
  */
 export function DiffViewer({
@@ -128,32 +140,22 @@ export function DiffViewer({
     if (!patch) return null;
     const meta = processFile(patch, { isGitDiff: true });
     if (!meta) return null;
-    // GitHub hunk-only patches used to parse as empty metadata — treat as missing.
+    // GitHub hunk-only patches used to parse as empty metadata; treat as missing.
     if (!meta.hunks?.length) return null;
     return meta;
   }, [patch]);
 
-  const lineAnnotations = useMemo(() => {
-    if (!isPRMode || !comments.length) return [];
-    return comments
-      .filter((c) => c.path === filename && c.line != null)
-      .map((c) => ({
-        line: c.line,
-        side: 'right',
-        render: () => (
-          <div class="diff-comment">
-            <span class="diff-comment-author">{c.user?.login ?? 'unknown'}</span>
-            <span class="diff-comment-body">{c.body}</span>
-          </div>
-        ),
-      }));
-  }, [comments, filename, isPRMode]);
+  const lineAnnotations = useMemo(
+    () => buildPRLineAnnotations({ isPRMode, comments, filename }),
+    [comments, filename, isPRMode]
+  );
 
-  // Not passed to FileDiff below. Pierre's setLineAnnotations only accepts
-  // side 'additions' | 'deletions'; side: 'right' (and GitHub's RIGHT/LEFT)
-  // makes map undefined, crashes, and blanks the diff on comment-bearing files.
-  // Re-enable once annotations use lineNumber + mapped sides + renderAnnotation.
-  void lineAnnotations;
+  const renderAnnotation = useCallback((annotation) => (
+    <div class="diff-comment">
+      <span class="diff-comment-author">{annotation.metadata?.user?.login ?? 'unknown'}</span>
+      <span class="diff-comment-body">{annotation.metadata?.body}</span>
+    </div>
+  ), []);
 
   if (isLoading) {
     return (
@@ -201,6 +203,10 @@ export function DiffViewer({
           // loadDiffFiles leaves Pierre with nothing to render.
           expandUnchanged: isPRMode ? false : fullDiff,
           collapsedContextThreshold: 1,
+          // Make Pierre's annotation row bg distinct from context code lines.
+          unsafeCSS: isPRMode
+            ? `[data-line-annotation], [data-gutter-buffer="annotation"] { --diffs-annotation-bg: var(--surface); }`
+            : undefined,
           loadDiffFiles: isPRMode
             ? undefined
             : async (meta) => {
@@ -218,6 +224,8 @@ export function DiffViewer({
               return { oldFile, newFile: null };
             },
         }}
+        lineAnnotations={lineAnnotations}
+        renderAnnotation={lineAnnotations ? renderAnnotation : undefined}
       />
       <style>{diffViewerStyles}</style>
     </div>
