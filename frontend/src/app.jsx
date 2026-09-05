@@ -32,7 +32,7 @@ export function App() {
   const [branches, setBranches] = useState({ current: 'main', local: [], remote: [] });
   // Confirmation dialog state
   const [confirmOpen, setConfirmOpen] = useState(false);
-  /** @type {['stage-conflict' | 'discard' | 'remove-worktree' | null, function]} */
+  /** @type {['stage-conflict' | 'discard' | 'discard-all' | 'remove-worktree' | null, function]} */
   const [confirmKind, setConfirmKind] = useState(null);
   const [pendingConfirmFile, setPendingConfirmFile] = useState(null);
   const [pendingWorktreePath, setPendingWorktreePath] = useState(null);
@@ -379,6 +379,11 @@ export function App() {
     setConfirmOpen(true);
   }, []);
 
+  const handleDiscardAll = useCallback(() => {
+    setConfirmKind('discard-all');
+    setConfirmOpen(true);
+  }, []);
+
   const handleConfirmDialog = useCallback(() => {
     const path = pendingConfirmFile;
     const worktreePath = pendingWorktreePath;
@@ -397,14 +402,18 @@ export function App() {
       return;
     }
 
-    if (!path) return;
-
     if (kind === 'stage-conflict') {
+      if (!path) return;
       workingTree.stage(path);
       return;
     }
     if (kind === 'discard') {
+      if (!path) return;
       workingTree.discard(path);
+      return;
+    }
+    if (kind === 'discard-all') {
+      workingTree.discardAll();
     }
   }, [pendingConfirmFile, pendingWorktreePath, confirmKind, workingTree, worktree]);
 
@@ -503,6 +512,7 @@ export function App() {
                   onDiscard={handleDiscard}
                   onStageAll={() => workingTree.stageAll()}
                   onUnstageAll={() => workingTree.unstageAll()}
+                  onDiscardAll={handleDiscardAll}
                   onCommit={(message) => workingTree.commit(message)}
                 />
               </aside>
@@ -575,6 +585,8 @@ export function App() {
             title={
               confirmKind === 'remove-worktree'
                 ? 'Remove worktree?'
+                : confirmKind === 'discard-all'
+                ? 'Revert all changes?'
                 : confirmKind === 'discard'
                 ? (pendingUnstagedStatus === 'U'
                     ? 'Delete untracked file?'
@@ -598,11 +610,15 @@ export function App() {
                     This cannot be undone.
                   </>
                 )
+              ) : confirmKind === 'discard-all' ? (
+                <>Revert all unstaged changes? Untracked files will be permanently deleted.</>
               ) : undefined
             }
             confirmLabel={
               confirmKind === 'remove-worktree'
                 ? 'Remove'
+                : confirmKind === 'discard-all'
+                ? 'Revert All'
                 : confirmKind === 'discard'
                 ? (pendingUnstagedStatus === 'U'
                     ? 'Delete'

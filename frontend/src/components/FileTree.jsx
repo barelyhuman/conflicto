@@ -4,6 +4,7 @@ import { Show } from '@preact/signals/utils';
 import {
   IconSquarePlus,
   IconSquareMinus,
+  IconArrowBackUp,
 } from '@tabler/icons-preact';
 import { ChangeTree } from './ChangeTree.jsx';
 import { CommitPanel } from './CommitPanel.jsx';
@@ -24,6 +25,7 @@ import { ChangeSection } from './ChangeSection.jsx';
  * @param {(path: string) => void} [props.onDiscard]
  * @param {() => void} [props.onStageAll]
  * @param {() => void} [props.onUnstageAll]
+ * @param {() => void} [props.onDiscardAll]
  * @param {(message: string) => void | Promise<void>} [props.onCommit]
  */
 export function FileTree({
@@ -37,6 +39,7 @@ export function FileTree({
   onDiscard,
   onStageAll,
   onUnstageAll,
+  onDiscardAll,
   onCommit,
 }) {
   const [conflictsOpen, setConflictsOpen] = useState(true);
@@ -144,10 +147,20 @@ export function FileTree({
           count={unstagedCount}
           open={unstagedOpen}
           onToggle={() => setUnstagedOpen((v) => !v)}
-          actionTitle="Stage All"
-          actionIcon={<IconSquarePlus size={13} stroke={2} />}
-          showAction={hasUnstaged}
-          onAction={onStageAll}
+          actions={[
+            {
+              title: 'Stage All',
+              icon: <IconSquarePlus size={13} stroke={2} />,
+              show: hasUnstaged,
+              onClick: onStageAll,
+            },
+            {
+              title: 'Revert All',
+              icon: <IconArrowBackUp size={13} stroke={2} />,
+              show: hasUnstaged,
+              onClick: onDiscardAll,
+            },
+          ]}
         >
           <Show
             when={hasUnstaged}

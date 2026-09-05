@@ -56,6 +56,18 @@ export const WorkingTreeModel = createModel(({ onError } = {}) => {
       });
     },
 
+    async discardAll() {
+      const paths = this.unstaged.value.map((f) => f.path);
+      for (const path of paths) {
+        try {
+          await api.discardFile(path);
+        } catch (err) {
+          report('Discard Error', err);
+          break;
+        }
+      }
+    },
+
     async stageAll() {
       const paths = this.unstaged.value.map((f) => f.path);
       for (const path of paths) {
