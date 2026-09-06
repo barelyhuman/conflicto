@@ -146,7 +146,6 @@ jobs:
           tag_name: ${{ needs.check-changes.outputs.nightly_tag }}
           name: ${{ needs.check-changes.outputs.nightly_name }}
           target_commitish: main
-          prerelease: true
           files: artifacts/conflicto-macos-*.zip
           fail_on_unmatched_files: true
           body: |
