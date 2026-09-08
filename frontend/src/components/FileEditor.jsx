@@ -3,8 +3,6 @@ import { File } from '@pierre/diffs/react';
 import { useTheme } from '../theme/ThemeProvider.jsx';
 import { api } from '../wails.js';
 
-const SAVE_DEBOUNCE_MS = 400;
-
 const fileEditorStyles = `
   .file-editor-wrapper {
     display: flex;
@@ -33,6 +31,7 @@ const fileEditorStyles = `
 
 /**
  * Simple syntax-highlighted file editor for unstaged worktree files.
+ * Saves on Cmd/Ctrl+S.
  *
  * @param {Object} props
  * @param {string} props.path
@@ -42,12 +41,13 @@ export function FileEditor({ path, onError }) {
   const { theme, themeType } = useTheme();
   const [file, setFile] = useState(null);
   const [loadError, setLoadError] = useState(null);
-  const lastSaved = useRef('');
-  const saveTimer = useRef(null);
+  const savedContents = useRef('');
+  const editorRef = useRef(null);
   const pathRef = useRef(path);
 
   useEffect(() => {
     pathRef.current = path;
+    editorRef.current = null;
     let cancelled = false;
     setFile(null);
     setLoadError(null);
@@ -59,7 +59,7 @@ export function FileEditor({ path, onError }) {
         : res.hasOld
           ? res.oldContent
           : '';
-      lastSaved.current = contents;
+      savedContents.current = contents;
       setFile({
         name: path,
         contents,
@@ -76,37 +76,38 @@ export function FileEditor({ path, onError }) {
     };
   }, [path]);
 
-  useEffect(() => () => {
-    if (saveTimer.current) {
-      clearTimeout(saveTimer.current);
-    }
-  }, []);
-
-  const saveContents = useCallback(async (next) => {
+  const save = useCallback(async () => {
+    const editor = editorRef.current;
     const targetPath = pathRef.current;
-    if (!targetPath || next === lastSaved.current) return;
+    if (!editor || !targetPath) return;
+
+    const next = editor.getText();
+    if (next === savedContents.current) return;
+
     try {
       await api.writeFile(targetPath, next);
-      lastSaved.current = next;
+      savedContents.current = next;
     } catch (err) {
       onError?.('Save Error', err?.message ?? String(err));
     }
   }, [onError]);
 
+  useEffect(() => {
+    function onKey(e) {
+      if (!(e.metaKey || e.ctrlKey) || e.altKey || e.key !== 's') return;
+      e.preventDefault();
+      save();
+    }
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [save]);
+
   const editorOptions = useMemo(() => ({
     persistState: true,
-    onChange: (fileContents) => {
-      const next = fileContents.contents;
-      if (next === lastSaved.current) return;
-      if (saveTimer.current) {
-        clearTimeout(saveTimer.current);
-      }
-      saveTimer.current = setTimeout(() => {
-        saveTimer.current = null;
-        saveContents(next);
-      }, SAVE_DEBOUNCE_MS);
+    onAttach: (editor) => {
+      editorRef.current = editor;
     },
-  }), [saveContents]);
+  }), []);
 
   if (loadError) {
     return (
