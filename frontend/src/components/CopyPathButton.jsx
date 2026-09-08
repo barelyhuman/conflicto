@@ -1,11 +1,10 @@
 import { useRef, useState } from 'preact/hooks';
-import { IconCheck, IconChevronDown, IconCopy } from '@tabler/icons-preact';
+import { IconCheck, IconCopy } from '@tabler/icons-preact';
 import { AnchoredMenu } from './AnchoredMenu.jsx';
 import { api } from '../wails.js';
 
 /**
- * Copy a file path to the clipboard, with absolute or relative options.
- * Clicking the copy icon copies the relative path; the chevron opens a menu.
+ * Copy a file path to the clipboard via absolute/relative dropdown options.
  *
  * @param {Object} props
  * @param {string} props.absolutePath
@@ -15,69 +14,53 @@ import { api } from '../wails.js';
 export function CopyPathButton({ absolutePath, relativePath, className = '' }) {
   const [open, setOpen] = useState(false);
   const [copied, setCopied] = useState(false);
-  const groupRef = useRef(null);
-  const menuAnchorRef = useRef(null);
+  const triggerRef = useRef(null);
   const timerRef = useRef(null);
 
-  const cls = ['copy-path-button', className].filter(Boolean).join(' ');
-  const mainCls = ['copy-path-main', copied ? 'copied' : ''].filter(Boolean).join(' ');
+  const cls = ['copy-path-button', copied ? 'copied' : '', className]
+    .filter(Boolean)
+    .join(' ');
 
   async function copyPath(path, label) {
     const copiedToClipboard = await api.copyToClipboard(path);
-    if (!copiedToClipboard || !groupRef.current) return;
+    if (!copiedToClipboard || !triggerRef.current) return;
 
     setOpen(false);
     setCopied(true);
-    groupRef.current.title = `Copied ${label}`;
-    groupRef.current.setAttribute('aria-label', `Copied ${label}`);
+    triggerRef.current.title = `Copied ${label}`;
+    triggerRef.current.setAttribute('aria-label', `Copied ${label}`);
 
     if (timerRef.current) clearTimeout(timerRef.current);
     timerRef.current = setTimeout(() => {
-      if (!groupRef.current) return;
+      if (!triggerRef.current) return;
       setCopied(false);
-      groupRef.current.title = 'Copy relative path';
-      groupRef.current.setAttribute('aria-label', 'Copy relative path');
+      triggerRef.current.title = 'Copy path';
+      triggerRef.current.setAttribute('aria-label', 'Copy path');
     }, 2000);
   }
 
   return (
-    <div
-      ref={groupRef}
-      class="copy-path-picker"
-      title="Copy relative path"
-      aria-label="Copy relative path"
-    >
-      <div class={cls}>
-        <button
-          type="button"
-          class={mainCls}
-          onClick={() => copyPath(relativePath, 'relative path')}
-          title="Copy relative path"
-          aria-label="Copy relative path"
-        >
-          {copied ? (
-            <IconCheck size={13} stroke={2} />
-          ) : (
-            <IconCopy size={13} stroke={1.75} />
-          )}
-        </button>
-        <button
-          ref={menuAnchorRef}
-          type="button"
-          class="copy-path-menu-trigger"
-          onClick={() => setOpen((value) => !value)}
-          aria-expanded={open}
-          title="Copy path options"
-          aria-label="Copy path options"
-        >
-          <IconChevronDown size={10} class={open ? 'open' : ''} stroke={2} />
-        </button>
-      </div>
+    <div class="copy-path-picker">
+      <button
+        ref={triggerRef}
+        type="button"
+        class={cls}
+        onClick={() => setOpen((value) => !value)}
+        aria-expanded={open}
+        title="Copy path"
+        aria-label="Copy path"
+      >
+        {copied ? (
+          <IconCheck size={13} stroke={2} />
+        ) : (
+          <IconCopy size={13} stroke={1.75} />
+        )}
+      </button>
 
       <AnchoredMenu
         open={open}
         onClose={() => setOpen(false)}
-        anchorRef={menuAnchorRef}
+        anchorRef={triggerRef}
         placement="bottom"
         alignment="start"
         offset={4}
@@ -109,9 +92,11 @@ export function CopyPathButton({ absolutePath, relativePath, className = '' }) {
           --wails-draggable: no-drag;
         }
         .copy-path-button {
+          width: 22px;
           height: 22px;
           display: inline-flex;
           align-items: center;
+          justify-content: center;
           border: none;
           border-radius: 5px;
           background: transparent;
@@ -119,52 +104,25 @@ export function CopyPathButton({ absolutePath, relativePath, className = '' }) {
           padding: 0;
           margin-left: 2px;
           flex-shrink: 0;
-          --wails-draggable: no-drag;
-        }
-        .copy-path-main,
-        .copy-path-menu-trigger {
-          display: inline-flex;
-          align-items: center;
-          justify-content: center;
-          border: none;
-          background: transparent;
-          color: var(--grey);
           cursor: pointer;
-          padding: 0;
           --wails-draggable: no-drag;
           transition: background 0.12s ease, color 0.12s ease, transform 0.08s ease;
         }
-        .copy-path-main {
-          width: 18px;
-          height: 22px;
-          border-radius: 5px 0 0 5px;
-        }
-        .copy-path-menu-trigger {
-          width: 14px;
-          height: 22px;
-          border-radius: 0 5px 5px 0;
-        }
-        .copy-path-main:hover,
-        .copy-path-menu-trigger:hover {
+        .copy-path-button:hover {
           background: rgba(127, 127, 127, 0.14);
           color: var(--text);
         }
-        .copy-path-main:active,
-        .copy-path-menu-trigger:active {
+        .copy-path-button:active {
           background: rgba(127, 127, 127, 0.24);
           color: var(--text);
           transform: scale(0.94);
         }
-        .copy-path-main.copied {
+        .copy-path-button.copied {
           background: rgba(127, 127, 127, 0.14);
           color: var(--text);
         }
-        .copy-path-main svg,
-        .copy-path-menu-trigger svg {
+        .copy-path-button svg {
           flex-shrink: 0;
-        }
-        .copy-path-menu-trigger svg.open {
-          transform: rotate(180deg);
         }
         .anchored-menu.copy-path-dropdown {
           min-width: 240px;
@@ -176,6 +134,7 @@ export function CopyPathButton({ absolutePath, relativePath, className = '' }) {
         }
         .copy-path-option {
           width: 100%;
+          min-width: 0;
           text-align: left;
           padding: 6px 10px;
           border-radius: 4px;
@@ -187,6 +146,7 @@ export function CopyPathButton({ absolutePath, relativePath, className = '' }) {
           display: flex;
           flex-direction: column;
           gap: 2px;
+          overflow: hidden;
         }
         .copy-path-option:hover {
           background: rgba(127, 127, 127, 0.12);
@@ -198,6 +158,8 @@ export function CopyPathButton({ absolutePath, relativePath, className = '' }) {
           color: var(--text);
         }
         .copy-path-option-value {
+          display: block;
+          min-width: 0;
           font-family: var(--font-mono);
           font-size: 10px;
           color: var(--grey);
