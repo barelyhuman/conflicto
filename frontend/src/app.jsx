@@ -524,6 +524,7 @@ export function App() {
                       sidebarOpen={sidebarOpen}
                       onToggleSidebar={() => setSidebarOpen((open) => !open)}
                       activeFile={selection.activeFile}
+                      projectPath={projectPath}
                       isPRMode={isPRMode}
                       showFullDiff={selection.showFullDiff}
                       onToggleShowFullDiff={() => selection.toggleShowFullDiff()}
