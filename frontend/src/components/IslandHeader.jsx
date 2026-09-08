@@ -2,6 +2,7 @@ import { Show } from '@preact/signals/utils';
 import { SidebarToggle } from './SidebarToggle.jsx';
 import { DiffExpandToggle } from './DiffExpandToggle.jsx';
 import { CopyPathButton } from './CopyPathButton.jsx';
+import { ViewModeToggle } from './ViewModeToggle.jsx';
 import { PRPicker } from './PRPicker.jsx';
 import { splitPath } from './ChangeTree.jsx';
 
@@ -22,6 +23,9 @@ function absoluteFilePath(projectRoot, relativePath) {
  * @param {boolean} props.isPRMode
  * @param {import('@preact/signals-core').ReadonlySignal<boolean>|boolean} props.showFullDiff
  * @param {() => void} props.onToggleShowFullDiff
+ * @param {import('@preact/signals-core').ReadonlySignal<boolean>|boolean} [props.canEdit]
+ * @param {import('@preact/signals-core').Signal<'diff' | 'edit'>} [props.viewMode]
+ * @param {() => void} [props.onToggleViewMode]
  * @param {number|null} props.selectedPR
  * @param {{ number: number, title: string, author: string, baseBranch: string }|null} props.currentPR
  * @param {(pr: { number: number, title: string, author: string, baseBranch: string } | null) => void} props.onSelectPR
@@ -36,6 +40,9 @@ export function IslandHeader({
   isPRMode,
   showFullDiff,
   onToggleShowFullDiff,
+  canEdit = false,
+  viewMode,
+  onToggleViewMode,
   selectedPR,
   currentPR,
   onSelectPR,
@@ -43,6 +50,8 @@ export function IslandHeader({
   onCreatePR,
 }) {
   const fullDiff = typeof showFullDiff === 'boolean' ? showFullDiff : showFullDiff.value;
+  const editable = typeof canEdit === 'boolean' ? canEdit : canEdit.value;
+  const mode = viewMode?.value ?? 'diff';
   return (
     <div class="island-header">
       <SidebarToggle open={sidebarOpen} onToggle={onToggleSidebar} />
@@ -58,6 +67,9 @@ export function IslandHeader({
             <div class="island-header-file" title={fullPath}>
               <span class="island-header-filename">{name}</span>
               {dir !== './' && <span class="island-header-dir">{dir}</span>}
+              {!isPRMode && editable ? (
+                <ViewModeToggle mode={mode} onToggle={onToggleViewMode} />
+              ) : null}
               {!isPRMode ? (
                 <DiffExpandToggle
                   expanded={fullDiff}
