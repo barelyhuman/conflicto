@@ -1,5 +1,5 @@
 import { useRef, useState } from 'preact/hooks';
-import { IconChevronDown, IconCopy } from '@tabler/icons-preact';
+import { IconCheck, IconChevronDown, IconCopy } from '@tabler/icons-preact';
 import { AnchoredMenu } from './AnchoredMenu.jsx';
 import { api } from '../wails.js';
 
@@ -14,23 +14,27 @@ import { api } from '../wails.js';
  */
 export function CopyPathButton({ absolutePath, relativePath, className = '' }) {
   const [open, setOpen] = useState(false);
+  const [copied, setCopied] = useState(false);
   const groupRef = useRef(null);
   const menuAnchorRef = useRef(null);
   const timerRef = useRef(null);
 
   const cls = ['copy-path-button', className].filter(Boolean).join(' ');
+  const mainCls = ['copy-path-main', copied ? 'copied' : ''].filter(Boolean).join(' ');
 
   async function copyPath(path, label) {
-    const copied = await api.copyToClipboard(path);
-    if (!copied || !groupRef.current) return;
+    const copiedToClipboard = await api.copyToClipboard(path);
+    if (!copiedToClipboard || !groupRef.current) return;
 
     setOpen(false);
+    setCopied(true);
     groupRef.current.title = `Copied ${label}`;
     groupRef.current.setAttribute('aria-label', `Copied ${label}`);
 
     if (timerRef.current) clearTimeout(timerRef.current);
     timerRef.current = setTimeout(() => {
       if (!groupRef.current) return;
+      setCopied(false);
       groupRef.current.title = 'Copy relative path';
       groupRef.current.setAttribute('aria-label', 'Copy relative path');
     }, 2000);
@@ -46,12 +50,16 @@ export function CopyPathButton({ absolutePath, relativePath, className = '' }) {
       <div class={cls}>
         <button
           type="button"
-          class="copy-path-main"
+          class={mainCls}
           onClick={() => copyPath(relativePath, 'relative path')}
           title="Copy relative path"
           aria-label="Copy relative path"
         >
-          <IconCopy size={13} stroke={1.75} />
+          {copied ? (
+            <IconCheck size={13} stroke={2} />
+          ) : (
+            <IconCopy size={13} stroke={1.75} />
+          )}
         </button>
         <button
           ref={menuAnchorRef}
@@ -112,11 +120,6 @@ export function CopyPathButton({ absolutePath, relativePath, className = '' }) {
           margin-left: 2px;
           flex-shrink: 0;
           --wails-draggable: no-drag;
-          transition: background 0.12s ease, color 0.12s ease;
-        }
-        .copy-path-button:hover {
-          background: rgba(127, 127, 127, 0.14);
-          color: var(--text);
         }
         .copy-path-main,
         .copy-path-menu-trigger {
@@ -125,18 +128,36 @@ export function CopyPathButton({ absolutePath, relativePath, className = '' }) {
           justify-content: center;
           border: none;
           background: transparent;
-          color: inherit;
+          color: var(--grey);
           cursor: pointer;
           padding: 0;
           --wails-draggable: no-drag;
+          transition: background 0.12s ease, color 0.12s ease, transform 0.08s ease;
         }
         .copy-path-main {
           width: 18px;
           height: 22px;
+          border-radius: 5px 0 0 5px;
         }
         .copy-path-menu-trigger {
           width: 14px;
           height: 22px;
+          border-radius: 0 5px 5px 0;
+        }
+        .copy-path-main:hover,
+        .copy-path-menu-trigger:hover {
+          background: rgba(127, 127, 127, 0.14);
+          color: var(--text);
+        }
+        .copy-path-main:active,
+        .copy-path-menu-trigger:active {
+          background: rgba(127, 127, 127, 0.24);
+          color: var(--text);
+          transform: scale(0.94);
+        }
+        .copy-path-main.copied {
+          background: rgba(127, 127, 127, 0.14);
+          color: var(--text);
         }
         .copy-path-main svg,
         .copy-path-menu-trigger svg {
