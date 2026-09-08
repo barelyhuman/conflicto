@@ -5,6 +5,7 @@ import { api } from '../wails.js';
 
 /**
  * Copy a file path to the clipboard, with absolute or relative options.
+ * Clicking the copy icon copies the relative path; the chevron opens a menu.
  *
  * @param {Object} props
  * @param {string} props.absolutePath
@@ -13,46 +14,62 @@ import { api } from '../wails.js';
  */
 export function CopyPathButton({ absolutePath, relativePath, className = '' }) {
   const [open, setOpen] = useState(false);
-  const triggerRef = useRef(null);
+  const groupRef = useRef(null);
+  const menuAnchorRef = useRef(null);
   const timerRef = useRef(null);
 
   const cls = ['copy-path-button', className].filter(Boolean).join(' ');
 
   async function copyPath(path, label) {
     const copied = await api.copyToClipboard(path);
-    if (!copied || !triggerRef.current) return;
+    if (!copied || !groupRef.current) return;
 
     setOpen(false);
-    triggerRef.current.title = `Copied ${label}`;
-    triggerRef.current.setAttribute('aria-label', `Copied ${label}`);
+    groupRef.current.title = `Copied ${label}`;
+    groupRef.current.setAttribute('aria-label', `Copied ${label}`);
 
     if (timerRef.current) clearTimeout(timerRef.current);
     timerRef.current = setTimeout(() => {
-      if (!triggerRef.current) return;
-      triggerRef.current.title = 'Copy path';
-      triggerRef.current.setAttribute('aria-label', 'Copy path');
+      if (!groupRef.current) return;
+      groupRef.current.title = 'Copy relative path';
+      groupRef.current.setAttribute('aria-label', 'Copy relative path');
     }, 2000);
   }
 
   return (
-    <div class="copy-path-picker">
-      <button
-        ref={triggerRef}
-        type="button"
-        class={cls}
-        onClick={() => setOpen((value) => !value)}
-        aria-expanded={open}
-        title="Copy path"
-        aria-label="Copy path"
-      >
-        <IconCopy size={13} stroke={1.75} />
-        <IconChevronDown size={10} class={open ? 'open' : ''} stroke={2} />
-      </button>
+    <div
+      ref={groupRef}
+      class="copy-path-picker"
+      title="Copy relative path"
+      aria-label="Copy relative path"
+    >
+      <div class={cls}>
+        <button
+          type="button"
+          class="copy-path-main"
+          onClick={() => copyPath(relativePath, 'relative path')}
+          title="Copy relative path"
+          aria-label="Copy relative path"
+        >
+          <IconCopy size={13} stroke={1.75} />
+        </button>
+        <button
+          ref={menuAnchorRef}
+          type="button"
+          class="copy-path-menu-trigger"
+          onClick={() => setOpen((value) => !value)}
+          aria-expanded={open}
+          title="Copy path options"
+          aria-label="Copy path options"
+        >
+          <IconChevronDown size={10} class={open ? 'open' : ''} stroke={2} />
+        </button>
+      </div>
 
       <AnchoredMenu
         open={open}
         onClose={() => setOpen(false)}
-        anchorRef={triggerRef}
+        anchorRef={menuAnchorRef}
         placement="bottom"
         alignment="start"
         offset={4}
@@ -61,18 +78,18 @@ export function CopyPathButton({ absolutePath, relativePath, className = '' }) {
         <button
           type="button"
           class="copy-path-option"
-          onClick={() => copyPath(absolutePath, 'absolute path')}
-        >
-          <span class="copy-path-option-label">Absolute path</span>
-          <span class="copy-path-option-value">{absolutePath}</span>
-        </button>
-        <button
-          type="button"
-          class="copy-path-option"
           onClick={() => copyPath(relativePath, 'relative path')}
         >
           <span class="copy-path-option-label">Relative path</span>
           <span class="copy-path-option-value">{relativePath}</span>
+        </button>
+        <button
+          type="button"
+          class="copy-path-option"
+          onClick={() => copyPath(absolutePath, 'absolute path')}
+        >
+          <span class="copy-path-option-label">Absolute path</span>
+          <span class="copy-path-option-value">{absolutePath}</span>
         </button>
       </AnchoredMenu>
 
@@ -87,14 +104,11 @@ export function CopyPathButton({ absolutePath, relativePath, className = '' }) {
           height: 22px;
           display: inline-flex;
           align-items: center;
-          justify-content: center;
-          gap: 1px;
           border: none;
           border-radius: 5px;
           background: transparent;
           color: var(--grey);
-          cursor: pointer;
-          padding: 0 3px;
+          padding: 0;
           margin-left: 2px;
           flex-shrink: 0;
           --wails-draggable: no-drag;
@@ -104,10 +118,31 @@ export function CopyPathButton({ absolutePath, relativePath, className = '' }) {
           background: rgba(127, 127, 127, 0.14);
           color: var(--text);
         }
-        .copy-path-button svg {
+        .copy-path-main,
+        .copy-path-menu-trigger {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          border: none;
+          background: transparent;
+          color: inherit;
+          cursor: pointer;
+          padding: 0;
+          --wails-draggable: no-drag;
+        }
+        .copy-path-main {
+          width: 18px;
+          height: 22px;
+        }
+        .copy-path-menu-trigger {
+          width: 14px;
+          height: 22px;
+        }
+        .copy-path-main svg,
+        .copy-path-menu-trigger svg {
           flex-shrink: 0;
         }
-        .copy-path-button svg.open {
+        .copy-path-menu-trigger svg.open {
           transform: rotate(180deg);
         }
         .anchored-menu.copy-path-dropdown {
