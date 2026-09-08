@@ -58,7 +58,7 @@ export function IslandHeader({
             <div class="island-header-file" title={fullPath}>
               <span class="island-header-filename">{name}</span>
               {dir !== './' && <span class="island-header-dir">{dir}</span>}
-              <CopyPathButton path={fullPath} />
+              <CopyPathButton absolutePath={fullPath} relativePath={path} />
               {!isPRMode ? (
                 <DiffExpandToggle
                   expanded={fullDiff}
