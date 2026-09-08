@@ -1,8 +1,15 @@
 import { Show } from '@preact/signals/utils';
 import { SidebarToggle } from './SidebarToggle.jsx';
 import { DiffExpandToggle } from './DiffExpandToggle.jsx';
+import { CopyPathButton } from './CopyPathButton.jsx';
 import { PRPicker } from './PRPicker.jsx';
 import { splitPath } from './ChangeTree.jsx';
+
+function absoluteFilePath(projectRoot, relativePath) {
+  if (!projectRoot) return relativePath;
+  const base = projectRoot.replace(/\/$/, '');
+  return `${base}/${relativePath}`;
+}
 
 /**
  * Shared content-island header: sidebar toggle, file path, PR controls.
@@ -11,6 +18,7 @@ import { splitPath } from './ChangeTree.jsx';
  * @param {boolean} props.sidebarOpen
  * @param {() => void} props.onToggleSidebar
  * @param {import('@preact/signals-core').Signal<string|null>} props.activeFile
+ * @param {string} props.projectPath
  * @param {boolean} props.isPRMode
  * @param {import('@preact/signals-core').ReadonlySignal<boolean>|boolean} props.showFullDiff
  * @param {() => void} props.onToggleShowFullDiff
@@ -24,6 +32,7 @@ export function IslandHeader({
   sidebarOpen,
   onToggleSidebar,
   activeFile,
+  projectPath,
   isPRMode,
   showFullDiff,
   onToggleShowFullDiff,
@@ -44,8 +53,9 @@ export function IslandHeader({
       >
         {(path) => {
           const { name, dir } = splitPath(path);
+          const fullPath = absoluteFilePath(projectPath, path);
           return (
-            <div class="island-header-file" title={path}>
+            <div class="island-header-file" title={fullPath}>
               <span class="island-header-filename">{name}</span>
               {dir !== './' && <span class="island-header-dir">{dir}</span>}
               {!isPRMode ? (
@@ -54,6 +64,7 @@ export function IslandHeader({
                   onToggle={onToggleShowFullDiff}
                 />
               ) : null}
+              <CopyPathButton absolutePath={fullPath} relativePath={path} />
             </div>
           );
         }}

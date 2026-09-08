@@ -1,4 +1,5 @@
 // Wails runtime wrapper
+import { ClipboardSetText } from './wailsjs/runtime/runtime.js';
 
 // Terminal event fan-out (panes subscribe via api.onTerminalData/Exit)
 const terminalDataListeners = new Set();
@@ -94,6 +95,7 @@ export function setupWailsEvents(callbacks) {
 
 // API methods
 export const api = {
+  copyToClipboard: (text) => ClipboardSetText(text),
   stageFile: (path) => window.go.main.App.StageFile(path),
 
   unstageFile: (path) => window.go.main.App.UnstageFile(path),
