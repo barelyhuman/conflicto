@@ -111,6 +111,8 @@ export const api = {
   getFileContents: (path, staged = false) =>
     window.go.main.App.GetFileContents(path, !!staged),
 
+  writeFile: (path, content) => window.go.main.App.WriteFile(path, content),
+
   pull: () => window.go.main.App.Pull(),
 
   push: () => window.go.main.App.Push(),

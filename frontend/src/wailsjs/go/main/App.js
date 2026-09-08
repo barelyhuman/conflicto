@@ -145,3 +145,7 @@ export function ToggleFullscreen() {
 export function UnstageFile(arg1) {
   return window['go']['main']['App']['UnstageFile'](arg1);
 }
+
+export function WriteFile(arg1, arg2) {
+  return window['go']['main']['App']['WriteFile'](arg1, arg2);
+}

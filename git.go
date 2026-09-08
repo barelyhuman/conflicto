@@ -413,6 +413,24 @@ func (gs *GitService) GetFileContents(path string, staged bool) (*FileContentsRe
 	return res, nil
 }
 
+// WriteFile writes content to a worktree path relative to the repo root.
+func (gs *GitService) WriteFile(path string, content string) error {
+	if gs.path == "" {
+		return fmt.Errorf("no repository open")
+	}
+	full := filepath.Clean(filepath.Join(gs.path, path))
+	root := filepath.Clean(gs.path)
+	sep := string(os.PathSeparator)
+	if full != root && !strings.HasPrefix(full, root+sep) {
+		return fmt.Errorf("path outside repository")
+	}
+	dir := filepath.Dir(full)
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return err
+	}
+	return os.WriteFile(full, []byte(content), 0o644)
+}
+
 // showRefFile reads a file from a git ref. ref="" reads from the index.
 func (gs *GitService) showRefFile(ref, path string) (string, error) {
 	var spec string

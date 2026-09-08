@@ -811,6 +811,45 @@
 
 }
 
+.view-mode-toggle {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 6px;
+  background: rgba(127, 127, 127, 0.08);
+  padding: 1px;
+  margin-left: 2px;
+  flex-shrink: 0;
+  --wails-draggable: no-drag;
+}
+
+.view-mode-btn {
+  width: 22px;
+  height: 20px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--grey);
+  cursor: pointer;
+  padding: 0;
+  transition: background 0.12s ease, color 0.12s ease;
+}
+
+.view-mode-btn:hover:not(:disabled) {
+  color: var(--text);
+}
+
+.view-mode-btn.active {
+  background: rgba(127, 127, 127, 0.16);
+  color: var(--text);
+}
+
+.view-mode-btn:disabled {
+  cursor: default;
+}
+
 .sidebar-toggle {
   width: 28px;
   height: 28px;

@@ -73,3 +73,5 @@ export function TerminalWrite(arg1:string,arg2:string):Promise<void>;
 export function ToggleFullscreen():Promise<void>;
 
 export function UnstageFile(arg1:string):Promise<void>;
+
+export function WriteFile(arg1:string,arg2:string):Promise<void>;

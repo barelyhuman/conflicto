@@ -92,4 +92,28 @@ describe('SelectionModel diffLoading', () => {
     expect(selection.activeFile.value).toBeNull();
     expect(selection.diffLoading.value).toBe(false);
   });
+
+  it('toggleViewMode switches between diff and edit for unstaged files', () => {
+    selection.select('src/a.js', 'unstaged');
+    expect(selection.viewMode.value).toBe('diff');
+    expect(selection.canEdit.value).toBe(true);
+
+    selection.toggleViewMode();
+    expect(selection.viewMode.value).toBe('edit');
+    expect(selection.isEditView.value).toBe(true);
+
+    getDiff.mockClear();
+    selection.toggleViewMode();
+    expect(selection.viewMode.value).toBe('diff');
+    expect(getDiff).toHaveBeenCalledWith('src/a.js', false);
+  });
+
+  it('select resets view mode to diff', () => {
+    selection.select('src/a.js', 'unstaged');
+    selection.toggleViewMode();
+    expect(selection.viewMode.value).toBe('edit');
+
+    selection.select('src/b.js', 'unstaged');
+    expect(selection.viewMode.value).toBe('diff');
+  });
 });

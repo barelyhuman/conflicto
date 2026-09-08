@@ -11,6 +11,7 @@ import { ThemeProvider } from './theme/ThemeProvider.jsx';
 import { EditProvider } from './components/EditProvider.jsx';
 import { FileTree } from './components/FileTree.jsx';
 import { DiffViewer } from './components/DiffViewer.jsx';
+import { FileEditor } from './components/FileEditor.jsx';
 import { ConflictViewer } from './components/ConflictViewer.jsx';
 import { ConfirmDialog } from './components/ConfirmDialog.jsx';
 import { ToastContainer } from './components/ToastContainer.jsx';
@@ -528,6 +529,9 @@ export function App() {
                       isPRMode={isPRMode}
                       showFullDiff={selection.showFullDiff}
                       onToggleShowFullDiff={() => selection.toggleShowFullDiff()}
+                      canEdit={selection.canEdit}
+                      viewMode={selection.viewMode}
+                      onToggleViewMode={() => selection.toggleViewMode()}
                       selectedPR={activePR}
                       currentPR={currentPR}
                       onSelectPR={handleSelectPR}
@@ -540,19 +544,26 @@ export function App() {
                         <div class="diff-empty">Select a file to view changes</div>
                       }
                     >
-                      {() => (
+                      {(path) => (
                         <Show
                           when={selection.isConflict}
                           fallback={
-                            <DiffViewer
-                              activeDiff={selection.activeDiff}
-                              loading={selection.diffLoading}
-                              isPRMode={isPRMode}
-                              isUnstaged={selection.isUnstaged}
-                              showFullDiff={selection.showFullDiff}
-                              comments={isPRMode ? prComments : []}
-                              onPostComment={handlePostComment}
-                            />
+                            <Show
+                              when={selection.isEditView}
+                              fallback={
+                                <DiffViewer
+                                  activeDiff={selection.activeDiff}
+                                  loading={selection.diffLoading}
+                                  isPRMode={isPRMode}
+                                  isUnstaged={selection.isUnstaged}
+                                  showFullDiff={selection.showFullDiff}
+                                  comments={isPRMode ? prComments : []}
+                                  onPostComment={handlePostComment}
+                                />
+                              }
+                            >
+                              <FileEditor path={path} onError={pushToast} />
+                            </Show>
                           }
                         >
                           <ConflictViewer
