@@ -17,11 +17,19 @@ export const SelectionModel = createModel(({ workingTree, activePR }) => {
   /** True while a diff request is in flight for the current selection. */
   const diffLoading = signal(false);
   const showFullDiff = signal(false);
+  /** @type {import('@preact/signals-core').Signal<'diff' | 'edit'>} */
+  const viewMode = signal('diff');
 
   const isConflict = computed(
     () => activePR.value == null && activeSection.value === 'conflict'
   );
   const isUnstaged = computed(() => activeSection.value === 'unstaged');
+  const canEdit = computed(
+    () => activePR.value == null && activeSection.value === 'unstaged'
+  );
+  const isEditView = computed(
+    () => viewMode.value === 'edit' && canEdit.value
+  );
 
   function requestDiff(file, section) {
     if (!file) {
@@ -56,8 +64,11 @@ export const SelectionModel = createModel(({ workingTree, activePR }) => {
     activeDiff,
     diffLoading,
     showFullDiff,
+    viewMode,
     isConflict,
     isUnstaged,
+    canEdit,
+    isEditView,
     workingTree,
     activePR,
 
@@ -68,6 +79,7 @@ export const SelectionModel = createModel(({ workingTree, activePR }) => {
       this.activeDiff.value = null;
       this.diffLoading.value = true;
       this.showFullDiff.value = false;
+      this.viewMode.value = 'diff';
       if (same) {
         // Same path is a signal no-op — effect won't re-run; fetch explicitly.
         requestDiff(path, section);
@@ -83,10 +95,20 @@ export const SelectionModel = createModel(({ workingTree, activePR }) => {
       this.activeDiff.value = null;
       this.diffLoading.value = false;
       this.showFullDiff.value = false;
+      this.viewMode.value = 'diff';
     },
 
     toggleShowFullDiff() {
       this.showFullDiff.value = !this.showFullDiff.value;
+    },
+
+    toggleViewMode() {
+      if (!this.canEdit.value) return;
+      const next = this.viewMode.value === 'diff' ? 'edit' : 'diff';
+      this.viewMode.value = next;
+      if (next === 'diff') {
+        this.refetch();
+      }
     },
 
     applyDiff(data) {

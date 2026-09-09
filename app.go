@@ -352,6 +352,18 @@ func (a *App) GetFileContents(path string, staged bool) (*FileContentsResult, er
 	return a.git.GetFileContents(path, staged)
 }
 
+// WriteFile writes content to a worktree file and refreshes git status.
+func (a *App) WriteFile(path string, content string) error {
+	if a.git == nil || !a.git.IsRepo() {
+		return fmt.Errorf("no repository open")
+	}
+	if err := a.git.WriteFile(path, content); err != nil {
+		return err
+	}
+	a.emitFileStatus()
+	return nil
+}
+
 // Pull performs git pull
 func (a *App) Pull() error {
 	if a.git == nil {
