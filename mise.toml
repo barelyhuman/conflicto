@@ -38,17 +38,20 @@ copy /Y "%APP_ICON%" "%WAILS_ICON%"
 [tasks.dev]
 description = "Run Wails dev mode (live-reload backend + frontend)"
 depends = ["icon"]
-run = "$WAILS dev"
+run = '$WAILS dev $(uname -s | grep -qi linux && printf "%s" "-tags webkit2_41")'
+run_windows = "$WAILS dev"
 
 [tasks.build]
 description = "Build a local debug binary"
 depends = ["icon"]
-run = "$WAILS build"
+run = '$WAILS build $(uname -s | grep -qi linux && printf "%s" "-tags webkit2_41")'
+run_windows = "$WAILS build"
 
 [tasks.'build:production']
 description = "Build a production binary"
 depends = ["icon"]
-run = "$WAILS build -ldflags=\"-w -s\" -trimpath"
+run = '$WAILS build $(uname -s | grep -qi linux && printf "%s" "-tags webkit2_41") -ldflags="-w -s" -trimpath'
+run_windows = "$WAILS build -ldflags=\"-w -s\" -trimpath"
 
 [tasks.'dev:frontend']
 description = "Run frontend dev server only (Vite)"
