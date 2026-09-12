@@ -1,6 +1,9 @@
-import { useMemo } from 'preact/hooks';
+import { useComputed, useSignal, useSignalEffect } from '@preact/signals';
+import { useRef } from 'preact/hooks';
+import { Show } from '@preact/signals/utils';
 import { UnresolvedFile } from '@pierre/diffs/react';
-import { processFile } from '@pierre/diffs';
+import { api } from '../wails.js';
+import { conflictViewFromContents } from './conflictView.js';
 import { useTheme } from '../theme/ThemeProvider.jsx';
 
 const conflictStyles = `
@@ -54,59 +57,89 @@ const conflictStyles = `
 `;
 
 /**
+ * Renders a file with merge conflict markers. UnresolvedFile takes the raw
+ * worktree contents and derives ours/theirs regions itself, so the fetch
+ * goes through GetFileContents rather than the combined-diff patch that
+ * `git diff` produces for unmerged paths.
+ *
  * @param {Object} props
- * @param {import('@preact/signals-core').Signal<{ path?: string, patch?: string }|null>} props.activeDiff
+ * @param {import('@preact/signals-core').Signal<string|null>} props.file
  * @param {import('@preact/signals-core').ReadonlySignal<boolean>|boolean} [props.loading]
  */
-export function ConflictViewer({ activeDiff, loading = false }) {
+export function ConflictViewer({ file, loading = false }) {
   const { theme, themeType } = useTheme();
-  const isLoading = typeof loading === 'boolean' ? loading : loading.value;
-  const patch = activeDiff.value?.patch;
+  const requestId = useRef(0);
+  const status = useSignal({ loading: false, view: null });
 
-  const fileDiff = useMemo(() => {
-    if (!patch) return null;
-    const meta = processFile(patch, { isGitDiff: true });
-    if (!meta) return null;
-    return meta;
-  }, [patch]);
+  const busy = useComputed(() => {
+    const propLoading = Boolean(loading.value);
+    const s = status.value;
+    return propLoading || s.loading;
+  });
+  const view = useComputed(() => {
+    const s = status.value;
+    return s.loading ? null : s.view;
+  });
 
-  if (isLoading) {
-    return (
-      <div class="conflict-viewer-wrapper diff-loading" aria-busy="true" aria-label="Loading conflict">
-        <div class="diff-skeleton">
-          <div class="diff-skeleton-line wide" />
-          <div class="diff-skeleton-line" />
-          <div class="diff-skeleton-line mid" />
-          <div class="diff-skeleton-line" />
-          <div class="diff-skeleton-line short" />
-          <div class="diff-skeleton-line mid" />
-        </div>
-        <style>{conflictStyles}</style>
-      </div>
+  useSignalEffect(() => {
+    const path = file.value;
+    if (!path) {
+      status.value = { loading: false, view: null };
+      return;
+    }
+    status.value = { loading: true, view: null };
+    const request = ++requestId.current;
+    api.getFileContents(path, false).then(
+      (res) => {
+        if (requestId.current !== request) return;
+        status.value = conflictViewFromContents(path, res);
+      },
+      () => {
+        if (requestId.current !== request) return;
+        status.value = { loading: false, view: null };
+      }
     );
-  }
-
-  if (!fileDiff) {
-    return (
-      <div class="diff-empty">
-        No conflict data available
-        <style>{conflictStyles}</style>
-      </div>
-    );
-  }
+  });
 
   return (
     <div class="conflict-viewer-wrapper">
-      <UnresolvedFile
-        fileDiff={fileDiff}
-        options={{
-          theme,
-          themeType: themeType === 'light' ? 'light' : 'dark',
-          diffStyle: 'unified',
-          overflow: 'wrap',
-          disableFileHeader: true,
-        }}
-      />
+      <Show
+        when={busy}
+        fallback={
+          <Show
+            when={view}
+            fallback={<div class="diff-empty">No conflict data available</div>}
+          >
+            {(data) => (
+              <UnresolvedFile
+                key={data.path}
+                file={{ name: data.path, contents: data.contents }}
+                options={{
+                  theme,
+                  themeType: themeType === 'light' ? 'light' : 'dark',
+                  overflow: 'wrap',
+                  disableFileHeader: true,
+                }}
+              />
+            )}
+          </Show>
+        }
+      >
+        <div
+          class="diff-loading"
+          aria-busy="true"
+          aria-label="Loading conflict"
+        >
+          <div class="diff-skeleton">
+            <div class="diff-skeleton-line wide" />
+            <div class="diff-skeleton-line" />
+            <div class="diff-skeleton-line mid" />
+            <div class="diff-skeleton-line" />
+            <div class="diff-skeleton-line short" />
+            <div class="diff-skeleton-line mid" />
+          </div>
+        </div>
+      </Show>
       <style>{conflictStyles}</style>
     </div>
   );
