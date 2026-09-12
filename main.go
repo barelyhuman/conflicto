@@ -20,7 +20,12 @@ var assets embed.FS
 var appIcon []byte
 
 func main() {
+	normalizeLaunchArgs()
+
 	app := NewApp()
+	if launchPath, ok := launchPathFromArgs(); ok {
+		app.setPendingLaunchPath(launchPath)
+	}
 
 	AppMenu := menu.NewMenu()
 	if goruntime.GOOS == "darwin" {
@@ -89,6 +94,10 @@ func main() {
 		OnDomReady:    app.domReady,
 		OnShutdown:    app.shutdown,
 		OnBeforeClose: app.beforeClose,
+		SingleInstanceLock: &options.SingleInstanceLock{
+			UniqueId:               singleInstanceID,
+			OnSecondInstanceLaunch: app.onSecondInstanceLaunch,
+		},
 		Bind: []interface{}{
 			app,
 		},
