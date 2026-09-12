@@ -36,12 +36,14 @@ const prCacheTTL = 1 * time.Minute
 
 // App struct
 type App struct {
-	ctx      context.Context
-	settings *Settings
-	git      *GitService
-	recents  *RecentsManager
-	prCache  map[int]PRCache
-	terms    *terminalManager
+	ctx                 context.Context
+	settings            *Settings
+	git                 *GitService
+	recents             *RecentsManager
+	prCache             map[int]PRCache
+	terms               *terminalManager
+	pendingLaunchPath   string
+	pendingLaunchOpened bool
 }
 
 // NewApp creates a new App application struct
@@ -1203,6 +1205,8 @@ func (a *App) ToggleFullscreen() {
 
 // Refresh re-fetches and re-emits all application state
 func (a *App) Refresh() {
+	a.openPendingLaunchPathOnce()
+
 	a.EmitEvent("platformInfo", map[string]string{
 		"platform": goruntime.GOOS,
 	})
