@@ -309,6 +309,19 @@ export function App() {
     }
   }, [isPRMode, activePR]);
 
+  useEffect(() => {
+    const handler = (e) => {
+      if (e.key !== 'Escape') return;
+      e.preventDefault();
+      e.stopPropagation();
+    }
+    window.addEventListener('keydown', handler, true)
+
+    return () => {
+      window.removeEventListener('keydown', handler, true)
+    }
+  }, [])
+
   const handleSelectPR = useCallback((pr) => {
     if (pr) {
       setPrList((prev) =>
