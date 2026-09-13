@@ -75,9 +75,6 @@ export function setupWailsEvents(callbacks) {
   window.runtime.EventsOn('worktreesUpdated', (data) => {
     callbacks.onWorktreesUpdated?.(data);
   });
-  window.runtime.EventsOn('platformInfo', (data) => {
-    callbacks.onPlatformInfo?.(data);
-  });
   window.runtime.EventsOn('refreshCompleted', () => {
     callbacks.onRefreshCompleted?.();
   });
@@ -116,6 +113,8 @@ export const api = {
   push: () => window.go.main.App.Push(),
 
   fetch: () => window.go.main.App.Fetch(),
+
+  refresh: () => window.go.main.App.Refresh(),
 
   detectGH: () => window.go.main.App.DetectGH(),
 
@@ -173,6 +172,11 @@ export const api = {
     return () => terminalExitListeners.delete(fn);
   },
 };
+
+// Resolve the host platform via the Wails runtime (GOOS: darwin/linux/windows)
+export function getPlatform() {
+  return window.runtime.Environment().then((env) => env?.platform ?? 'unknown');
+}
 
 export function watchFullscreen(callback, intervalMs = 500) {
   let last = false;

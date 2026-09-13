@@ -24,6 +24,8 @@ secrets.yml
 .cursor/
 *.local
 .razor/
+# `go build` in the module root writes a binary named after the module
+/conflicto
 
 # IDE
 .zed

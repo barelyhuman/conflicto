@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState, useLayoutEffect, useCallback } from 'preact/hooks';
+import { useMemo, useRef, useState, useLayoutEffect, useCallback, useEffect } from 'preact/hooks';
 import { FileDiff } from '@pierre/diffs/react';
 import { processFile } from '@pierre/diffs';
 import { IconExternalLink } from '@tabler/icons-preact';
@@ -136,6 +136,17 @@ export function DiffViewer({
   showFullDiff = false,
   comments = [],
 }) {
+  // Temporary diagnostic for unhandled rejections from Pierre
+  useEffect(() => {
+    const handler = (event) => {
+      const err = event.reason;
+      console.error('[DiffViewer] Unhandled rejection:', err);
+      if (err && typeof err.stack === 'string') console.error(err.stack);
+    };
+    window.addEventListener('unhandledrejection', handler);
+    return () => window.removeEventListener('unhandledrejection', handler);
+  }, []);
+
   const { theme, themeType } = useTheme();
   const isLoading = typeof loading === 'boolean' ? loading : loading.value;
   const diff = activeDiff.value;
@@ -250,18 +261,29 @@ export function DiffViewer({
           collapsedContextThreshold: 1,
           unsafeCSS: annotationUnsafeCSS(isPRMode),
           loadDiffFiles: loadDiffFilesForDiff(isPRMode, async (meta) => {
-            const path = meta.name;
-            const staged = !unstaged;
-            const res = await api.getFileContents(path, staged);
-            const oldFile = res.hasOld
-              ? { name: meta.prevName ?? path, contents: res.oldContent }
-              : null;
-            const newFile = res.hasNew
-              ? { name: path, contents: res.newContent }
-              : null;
-            if (oldFile && newFile) return { oldFile, newFile };
-            if (newFile) return { oldFile: null, newFile };
-            return { oldFile, newFile: null };
+            try {
+              const path = meta.name;
+              const staged = !unstaged;
+              console.log('[loadDiffFiles] path=', path, 'staged=', staged, 'meta=', meta);
+              const res = await api.getFileContents(path, staged);
+              console.log('[loadDiffFiles] res=', res);
+              const oldFile = res.hasOld
+                ? { name: meta.prevName ?? path, contents: res.oldContent }
+                : null;
+              const newFile = res.hasNew
+                ? { name: path, contents: res.newContent }
+                : null;
+              const result = oldFile && newFile
+                ? { oldFile, newFile }
+                : newFile
+                  ? { oldFile: null, newFile }
+                  : { oldFile, newFile: null };
+              console.log('[loadDiffFiles] returning', result);
+              return result;
+            } catch (err) {
+              console.error('[loadDiffFiles] error:', err);
+              throw err;
+            }
           }),
         }}
         lineAnnotations={lineAnnotations}

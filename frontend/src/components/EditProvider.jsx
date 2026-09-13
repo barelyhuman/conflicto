@@ -1,5 +1,18 @@
 import { EditProvider as PierreEditProvider } from '@pierre/diffs/react';
 
+/** No-op DiffsEditor — conflicto does not wire inline editing yet. */
+function createNoopEditor() {
+  return {
+    __postponeBgTokenizeToNextFrame() {},
+    __captureFocusForDOMReplacement() {},
+    __syncRenderView() {},
+    edit() {
+      return () => {};
+    },
+    cleanUp() {},
+  };
+}
+
 /**
  * Wraps children with @pierre/diffs edit capability.
  *
@@ -8,7 +21,7 @@ import { EditProvider as PierreEditProvider } from '@pierre/diffs/react';
  */
 export function EditProvider({ children }) {
   return (
-    <PierreEditProvider>
+    <PierreEditProvider createEditor={createNoopEditor}>
       {children}
     </PierreEditProvider>
   );

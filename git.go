@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -206,13 +207,33 @@ func (gs *GitService) GetFileStatus() ([]FileStatus, []FileStatus, []FileStatus,
 	return staged, unstaged, conflicts, nil
 }
 
-// isConflict checks if a file has conflict markers
+// maxWorktreeContentSize caps worktree file reads sent to the frontend.
+// The diff UI can't meaningfully render more than a few MB, and oversized
+// reads (e.g. compiled binaries selected as untracked files) block the
+// webview with multi-MB IPC payloads.
+const maxWorktreeContentSize = 4 << 20 // 4 MiB
+
+// maxConflictScanSize bounds the conflict-marker scan: it runs on every
+// status emit for each untracked file, and binaries/oversized files are
+// both pointless to scan and false-positive prone (arbitrary bytes can
+// contain marker-like sequences, e.g. compiled ELF binaries).
+const maxConflictScanSize = 1 << 20 // 1 MiB
+
+// isConflict checks if a file has conflict markers.
+// Binary files (NUL byte, git's heuristic) and files over maxConflictScanSize
+// are never treated as conflicts.
 func isConflict(path string) bool {
+	if st, err := os.Stat(path); err != nil || !st.Mode().IsRegular() || st.Size() > maxConflictScanSize {
+		return false
+	}
 	content, err := os.ReadFile(path)
 	if err != nil {
 		return false
 	}
-	return strings.Contains(string(content), "<<<<<<<")
+	if bytes.IndexByte(content, 0) != -1 {
+		return false
+	}
+	return bytes.Contains(content, []byte("<<<<<<<"))
 }
 
 // StageFile stages a file
@@ -402,11 +423,15 @@ func (gs *GitService) GetFileContents(path string, staged bool) (*FileContentsRe
 			res.OldContent = old
 			res.HasOld = true
 		}
-		// New = worktree (read from disk)
-		data, err := os.ReadFile(filepath.Join(gs.path, path))
-		if err == nil {
-			res.NewContent = string(data)
-			res.HasNew = true
+		// New = worktree (read from disk). Oversized files (likely binaries)
+		// are skipped — shipping megabytes over IPC wedges the webview.
+		fullPath := filepath.Join(gs.path, path)
+		if st, statErr := os.Stat(fullPath); statErr == nil && st.Size() <= maxWorktreeContentSize {
+			data, err := os.ReadFile(fullPath)
+			if err == nil {
+				res.NewContent = string(data)
+				res.HasNew = true
+			}
 		}
 	}
 

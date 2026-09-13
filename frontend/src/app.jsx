@@ -2,7 +2,7 @@ import { useState, useCallback, useEffect, useRef } from 'preact/hooks';
 import { useModel, useSignal } from '@preact/signals';
 import { Show } from '@preact/signals/utils';
 import './app.css';
-import { setupWailsEvents, api, watchFullscreen } from './wails.js';
+import { setupWailsEvents, api, watchFullscreen, getPlatform } from './wails.js';
 import { WorkingTreeModel } from './models/workingTree.js';
 import { SelectionModel } from './models/selection.js';
 import { SyncModel } from './models/sync.js';
@@ -52,9 +52,11 @@ export function App() {
   const [projectName, setProjectName] = useState('');
   const [projectPath, setProjectPath] = useState('');
   const [recentProjects, setRecentProjects] = useState([]);
-  // macOS titlebar state
-  const [isMacOS, setIsMacOS] = useState(false);
+  // Platform state — resolved via the Wails runtime API (GOOS: darwin/linux/windows)
+  const [platform, setPlatform] = useState('unknown');
   const [isFullscreenMode, setIsFullscreenMode] = useState(false);
+  const isMacOS = platform === 'darwin';
+  const isLinux = platform === 'linux';
 
   // GitHub / PR state
   const [ghStatus, setGhStatus] = useState({ installed: false, version: '', user: '' });
@@ -212,16 +214,22 @@ export function App() {
       onWorktreesUpdated: (data) => {
         worktreeRef.current.applyWorktrees(data);
       },
-      onPlatformInfo: (data) => {
-        if (data?.platform === 'darwin') {
-          setIsMacOS(true);
-        }
-      },
       onRefreshCompleted: () => {
         selectionRef.current.refetch();
       },
     });
   }, [sync]);
+
+  // Resolve platform via the Wails runtime (GOOS)
+  useEffect(() => {
+    let cancelled = false;
+    getPlatform().then((platform) => {
+      if (!cancelled) setPlatform(platform);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   // Keyboard shortcut: Cmd/Ctrl + ,
   useEffect(() => {
@@ -235,6 +243,22 @@ export function App() {
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);
   }, []);
+
+  // Ctrl+R refresh on Linux/Windows. macOS keeps the View → Reload menu accel
+  // (Cmd+R). Skip the terminal so readline reverse-i-search still works.
+  useEffect(() => {
+    if (platform !== 'linux' && platform !== 'windows') return;
+    function onKey(e) {
+      if (e.key !== 'r' && e.key !== 'R') return;
+      if (!e.ctrlKey || e.metaKey || e.altKey || e.shiftKey) return;
+      if (isTerminalFocusTarget(e.target)) return;
+      e.preventDefault();
+      e.stopPropagation();
+      api.refresh();
+    }
+    document.addEventListener('keydown', onKey, true);
+    return () => document.removeEventListener('keydown', onKey, true);
+  }, [platform]);
 
   // Toggle terminal with Ctrl+` (works even when terminal is focused)
   useEffect(() => {
@@ -462,6 +486,7 @@ export function App() {
     'app-shell',
     isMacOS ? 'macos' : '',
     isMacOS && isFullscreenMode ? 'macos-fullscreen' : '',
+    isLinux ? 'linux' : '',
   ]
     .filter(Boolean)
     .join(' ');
