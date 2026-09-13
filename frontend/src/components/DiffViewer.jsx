@@ -1,6 +1,5 @@
-import { useMemo, useRef, useState, useLayoutEffect, useCallback, useEffect } from 'preact/hooks';
+import { useMemo, useRef, useState, useLayoutEffect, useCallback } from 'preact/hooks';
 import { FileDiff } from '@pierre/diffs/react';
-import { processFile } from '@pierre/diffs';
 import { IconExternalLink } from '@tabler/icons-preact';
 import { BrowserOpenURL } from '../wailsjs/runtime/runtime.js';
 import { useTheme } from '../theme/ThemeProvider.jsx';
@@ -9,7 +8,9 @@ import { buildPRLineAnnotations } from './prLineAnnotations.js';
 import {
   annotationUnsafeCSS,
   expandUnchangedForDiff,
+  fileDiffFromPatch,
   loadDiffFilesForDiff,
+  mapFileContentsToDiffFiles,
 } from './pierreDiffOptions.js';
 
 const diffViewerStyles = `
@@ -136,17 +137,6 @@ export function DiffViewer({
   showFullDiff = false,
   comments = [],
 }) {
-  // Temporary diagnostic for unhandled rejections from Pierre
-  useEffect(() => {
-    const handler = (event) => {
-      const err = event.reason;
-      console.error('[DiffViewer] Unhandled rejection:', err);
-      if (err && typeof err.stack === 'string') console.error(err.stack);
-    };
-    window.addEventListener('unhandledrejection', handler);
-    return () => window.removeEventListener('unhandledrejection', handler);
-  }, []);
-
   const { theme, themeType } = useTheme();
   const isLoading = typeof loading === 'boolean' ? loading : loading.value;
   const diff = activeDiff.value;
@@ -177,12 +167,7 @@ export function DiffViewer({
     }
   }, [collapseKey]);
 
-  const fileDiff = useMemo(() => {
-    if (!patch) return null;
-    const meta = processFile(patch, { isGitDiff: true });
-    if (!meta?.hunks?.length) return null;
-    return meta;
-  }, [patch]);
+  const fileDiff = useMemo(() => fileDiffFromPatch(patch), [patch]);
 
   const lineAnnotations = useMemo(
     () => buildPRLineAnnotations({ isPRMode, comments, filename }),
@@ -250,7 +235,7 @@ export function DiffViewer({
       <FileDiff
         key={`${filename}:${collapseKey}`}
         fileDiff={fileDiff}
-        edit={unstaged}
+        edit={false}
         options={{
           theme,
           themeType: themeType === 'light' ? 'light' : 'dark',
@@ -261,29 +246,9 @@ export function DiffViewer({
           collapsedContextThreshold: 1,
           unsafeCSS: annotationUnsafeCSS(isPRMode),
           loadDiffFiles: loadDiffFilesForDiff(isPRMode, async (meta) => {
-            try {
-              const path = meta.name;
-              const staged = !unstaged;
-              console.log('[loadDiffFiles] path=', path, 'staged=', staged, 'meta=', meta);
-              const res = await api.getFileContents(path, staged);
-              console.log('[loadDiffFiles] res=', res);
-              const oldFile = res.hasOld
-                ? { name: meta.prevName ?? path, contents: res.oldContent }
-                : null;
-              const newFile = res.hasNew
-                ? { name: path, contents: res.newContent }
-                : null;
-              const result = oldFile && newFile
-                ? { oldFile, newFile }
-                : newFile
-                  ? { oldFile: null, newFile }
-                  : { oldFile, newFile: null };
-              console.log('[loadDiffFiles] returning', result);
-              return result;
-            } catch (err) {
-              console.error('[loadDiffFiles] error:', err);
-              throw err;
-            }
+            const staged = !unstaged;
+            const res = await api.getFileContents(meta.name, staged);
+            return mapFileContentsToDiffFiles(meta, res);
           }),
         }}
         lineAnnotations={lineAnnotations}

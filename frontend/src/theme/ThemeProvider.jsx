@@ -1,5 +1,5 @@
 import { useState, useEffect, createContext, useContext } from 'preact/compat';
-import { registerAppTheme, resolveThemeMode } from './adapter.js';
+import { resolveThemeMode } from './adapter.js';
 
 const ThemeContext = createContext(null);
 
@@ -11,8 +11,6 @@ export function ThemeProvider({ children }) {
   const [themeType, setThemeType] = useState(() => resolveThemeMode());
 
   useEffect(() => {
-    registerAppTheme();
-
     const mq = window.matchMedia('(prefers-color-scheme: dark)');
     const onChange = () => setThemeType(resolveThemeMode());
     mq.addEventListener('change', onChange);

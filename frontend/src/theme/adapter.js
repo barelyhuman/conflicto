@@ -183,7 +183,15 @@ export function createAppShikiTheme(mode) {
   };
 }
 
+let appThemeRegistered = false;
+
 export function registerAppTheme() {
+  if (appThemeRegistered) return;
   registerCustomTheme('conflicto-dark', () => Promise.resolve(createAppShikiTheme('dark')));
   registerCustomTheme('conflicto-light', () => Promise.resolve(createAppShikiTheme('light')));
+  appThemeRegistered = true;
 }
+
+// Register before any DiffViewer/FileDiff paint. Calling this only from
+// useEffect raced the first paint ("No valid theme loader registered").
+registerAppTheme();
