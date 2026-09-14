@@ -1,6 +1,5 @@
 import { useMemo, useRef, useState, useLayoutEffect, useCallback } from 'preact/hooks';
 import { FileDiff } from '@pierre/diffs/react';
-import { processFile } from '@pierre/diffs';
 import { IconExternalLink } from '@tabler/icons-preact';
 import { BrowserOpenURL } from '../wailsjs/runtime/runtime.js';
 import { useTheme } from '../theme/ThemeProvider.jsx';
@@ -9,7 +8,9 @@ import { buildPRLineAnnotations } from './prLineAnnotations.js';
 import {
   annotationUnsafeCSS,
   expandUnchangedForDiff,
+  fileDiffFromPatch,
   loadDiffFilesForDiff,
+  mapFileContentsToDiffFiles,
 } from './pierreDiffOptions.js';
 
 const diffViewerStyles = `
@@ -166,12 +167,7 @@ export function DiffViewer({
     }
   }, [collapseKey]);
 
-  const fileDiff = useMemo(() => {
-    if (!patch) return null;
-    const meta = processFile(patch, { isGitDiff: true });
-    if (!meta?.hunks?.length) return null;
-    return meta;
-  }, [patch]);
+  const fileDiff = useMemo(() => fileDiffFromPatch(patch), [patch]);
 
   const lineAnnotations = useMemo(
     () => buildPRLineAnnotations({ isPRMode, comments, filename }),
@@ -239,7 +235,7 @@ export function DiffViewer({
       <FileDiff
         key={`${filename}:${collapseKey}`}
         fileDiff={fileDiff}
-        edit={unstaged}
+        edit={false}
         options={{
           theme,
           themeType: themeType === 'light' ? 'light' : 'dark',
@@ -250,18 +246,9 @@ export function DiffViewer({
           collapsedContextThreshold: 1,
           unsafeCSS: annotationUnsafeCSS(isPRMode),
           loadDiffFiles: loadDiffFilesForDiff(isPRMode, async (meta) => {
-            const path = meta.name;
             const staged = !unstaged;
-            const res = await api.getFileContents(path, staged);
-            const oldFile = res.hasOld
-              ? { name: meta.prevName ?? path, contents: res.oldContent }
-              : null;
-            const newFile = res.hasNew
-              ? { name: path, contents: res.newContent }
-              : null;
-            if (oldFile && newFile) return { oldFile, newFile };
-            if (newFile) return { oldFile: null, newFile };
-            return { oldFile, newFile: null };
+            const res = await api.getFileContents(meta.name, staged);
+            return mapFileContentsToDiffFiles(meta, res);
           }),
         }}
         lineAnnotations={lineAnnotations}

@@ -18,6 +18,17 @@ open /Applications/conflicto.app        # first launch: right-click → Open if 
 
 Nightlies are tagged by date (`nightly-2026.09.01`) and only publish when `main` has new commits since the previous nightly. [Build from source](#build-from-source)
 
+## Quick install (Linux)
+
+Nightly Linux builds are unsigned AppImages: `conflicto-linux-x86_64.AppImage` (Intel/AMD) or `conflicto-linux-aarch64.AppImage` (ARM64). Download one, then:
+
+```bash
+chmod +x conflicto-linux-x86_64.AppImage
+./conflicto-linux-x86_64.AppImage   # needs FUSE (fuse2); if unavailable: ./conflicto-linux-x86_64.AppImage --appimage-extract && ./squashfs-root/AppRun
+```
+
+Requires glibc 2.39+ (Ubuntu 24.04+, Debian 13+, Fedora 40+) and `webkit2gtk 4.1` at runtime — installed by default on those distros' desktop editions; on Debian/Ubuntu install it with `sudo apt install libwebkit2gtk-4.1-0`.
+
 > [!WARNING]
 > 
 > Alpha software, expects bugs 

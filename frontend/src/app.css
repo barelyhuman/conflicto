@@ -39,6 +39,20 @@
   }
 }
 
+/* Linux: no native vibrancy behind the webview — render the frost as an
+   opaque, window-tinted base (same tint math as macOS, minus transparency). */
+.app-shell.linux .window-body {
+  background: color-mix(in srgb, var(--card-bg) 35%, var(--window-bg));
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+@media (prefers-color-scheme: light) {
+  .app-shell.linux .window-body {
+    background: color-mix(in srgb, var(--card-bg) 55%, var(--window-bg));
+  }
+}
+
 /* ── Sidebar: sits on shared window-body frost (no second tint layer) ── */
 
 .sidebar {
@@ -46,14 +60,14 @@
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
-  /* Clear native macOS traffic lights (TitleBarHidden) */
+  /* macOS: clear native traffic lights (TitleBarHidden); Linux clears this via .app-shell.linux below */
   padding-top: 52px;
   min-height: 0;
   position: relative;
   --wails-draggable: drag;
   background: transparent;
   border-right: none;
-  transition: width 0.18s ease, opacity 0.18s ease, padding 0.18s ease;
+  transition: width 0.18s ease, opacity 0.18s ease;
   overflow: hidden;
 }
 
@@ -83,6 +97,22 @@
 
 .app-shell.macos.macos-fullscreen .window-body.sidebar-collapsed .island-header {
   padding-left: 0;
+}
+
+/* Linux is frameless with no traffic lights — a normal 12px clearance */
+.app-shell.linux .sidebar {
+  padding-top: 12px;
+}
+
+/* Linux: flat content panel — nothing to float the island over */
+.app-shell.linux .content {
+  border-radius: 0;
+  border: none;
+  box-shadow: none;
+}
+
+.app-shell.linux .window-body.sidebar-collapsed .content {
+  box-shadow: none;
 }
 
 .sidebar-project {

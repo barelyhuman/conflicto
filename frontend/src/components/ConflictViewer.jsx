@@ -1,7 +1,7 @@
-import { useMemo } from 'preact/hooks';
+import { useEffect, useState } from 'preact/hooks';
 import { UnresolvedFile } from '@pierre/diffs/react';
-import { processFile } from '@pierre/diffs';
 import { useTheme } from '../theme/ThemeProvider.jsx';
+import { api } from '../wails.js';
 
 const conflictStyles = `
   .conflict-viewer-wrapper {
@@ -61,16 +61,45 @@ const conflictStyles = `
 export function ConflictViewer({ activeDiff, loading = false }) {
   const { theme, themeType } = useTheme();
   const isLoading = typeof loading === 'boolean' ? loading : loading.value;
-  const patch = activeDiff.value?.patch;
+  const path = activeDiff.value?.path ?? '';
 
-  const fileDiff = useMemo(() => {
-    if (!patch) return null;
-    const meta = processFile(patch, { isGitDiff: true });
-    if (!meta) return null;
-    return meta;
-  }, [patch]);
+  /** @type {[import('@pierre/diffs').FileContents|null, function]} */
+  const [file, setFile] = useState(null);
+  const [fileLoading, setFileLoading] = useState(false);
 
-  if (isLoading) {
+  useEffect(() => {
+    if (!path) {
+      setFile(null);
+      setFileLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+    setFile(null);
+    setFileLoading(true);
+
+    api.getFileContents(path, false)
+      .then((res) => {
+        if (cancelled) return;
+        if (!res?.hasNew) {
+          setFile(null);
+          return;
+        }
+        setFile({ name: path, contents: res.newContent ?? '' });
+      })
+      .catch(() => {
+        if (!cancelled) setFile(null);
+      })
+      .finally(() => {
+        if (!cancelled) setFileLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [path]);
+
+  if (isLoading || fileLoading) {
     return (
       <div class="conflict-viewer-wrapper diff-loading" aria-busy="true" aria-label="Loading conflict">
         <div class="diff-skeleton">
@@ -86,7 +115,7 @@ export function ConflictViewer({ activeDiff, loading = false }) {
     );
   }
 
-  if (!fileDiff) {
+  if (!file) {
     return (
       <div class="diff-empty">
         No conflict data available
@@ -98,11 +127,10 @@ export function ConflictViewer({ activeDiff, loading = false }) {
   return (
     <div class="conflict-viewer-wrapper">
       <UnresolvedFile
-        fileDiff={fileDiff}
+        file={file}
         options={{
           theme,
           themeType: themeType === 'light' ? 'light' : 'dark',
-          diffStyle: 'unified',
           overflow: 'wrap',
           disableFileHeader: true,
         }}

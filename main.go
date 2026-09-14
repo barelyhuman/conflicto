@@ -57,6 +57,13 @@ func main() {
 	HelpMenu.AddSeparator()
 	HelpMenu.AddText("About conflicto", nil, nil)
 
+	// Linux: skip the GTK menubar — it renders as a visible row inside the
+	// frameless window, above the island chrome. SetApplicationMenu(nil) no-ops.
+	menuOption := AppMenu
+	if goruntime.GOOS == "linux" {
+		menuOption = nil
+	}
+
 	err := wails.Run(&options.App{
 		Title:         "conflicto",
 		Width:         1126,
@@ -65,13 +72,15 @@ func main() {
 		MinHeight:     600,
 		DisableResize: false,
 		Fullscreen:    false,
-		Frameless:     false,
-		Menu:          AppMenu,
+		Frameless:     goruntime.GOOS == "linux",
+		Menu:          menuOption,
 		AssetServer: &assetserver.Options{
 			Assets: assets,
 		},
-		// Transparent webview + native vibrancy for sidebar frost.
+		// macOS: transparent webview + native vibrancy for sidebar frost.
 		// TitleBarHidden keeps system traffic lights over full-size content.
+		// Linux: frameless — the page renders its own opaque chrome; see the
+		// .app-shell.linux rules in frontend/src/app.css.
 		BackgroundColour: &options.RGBA{R: 0, G: 0, B: 0, A: 0},
 		Mac: &mac.Options{
 			TitleBar:             mac.TitleBarHidden(),

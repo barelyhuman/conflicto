@@ -7,7 +7,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	goruntime "runtime"
 	"strconv"
 	"strings"
 	"time"
@@ -1203,9 +1202,6 @@ func (a *App) ToggleFullscreen() {
 
 // Refresh re-fetches and re-emits all application state
 func (a *App) Refresh() {
-	a.EmitEvent("platformInfo", map[string]string{
-		"platform": goruntime.GOOS,
-	})
 	a.emitProjectChanged()
 	a.emitRecentProjectsUpdated()
 	a.emitFileStatus()

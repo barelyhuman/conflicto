@@ -2,7 +2,9 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   annotationUnsafeCSS,
   expandUnchangedForDiff,
+  fileDiffFromPatch,
   loadDiffFilesForDiff,
+  mapFileContentsToDiffFiles,
 } from './pierreDiffOptions.js';
 
 describe('expandUnchangedForDiff', () => {
@@ -33,5 +35,90 @@ describe('loadDiffFilesForDiff', () => {
   it('passes the loader through in working-tree mode', () => {
     const loader = vi.fn();
     expect(loadDiffFilesForDiff(false, loader)).toBe(loader);
+  });
+});
+
+describe('fileDiffFromPatch', () => {
+  it('returns null for empty patch', () => {
+    expect(fileDiffFromPatch('')).toBeNull();
+    expect(fileDiffFromPatch(null)).toBeNull();
+  });
+
+  it('returns metadata when the patch has hunks', () => {
+    const meta = fileDiffFromPatch(`diff --git a/a.js b/a.js
+index 111..222 100644
+--- a/a.js
++++ b/a.js
+@@ -1 +1 @@
+-old
++new
+`);
+    expect(meta?.hunks?.length).toBe(1);
+  });
+});
+
+describe('mapFileContentsToDiffFiles', () => {
+  const meta = { name: 'src/a.js', prevName: 'src/old.js' };
+
+  it('returns both sides when hasOld and hasNew', () => {
+    expect(
+      mapFileContentsToDiffFiles(meta, {
+        hasOld: true,
+        hasNew: true,
+        oldContent: 'old',
+        newContent: 'new',
+      })
+    ).toEqual({
+      oldFile: { name: 'src/old.js', contents: 'old' },
+      newFile: { name: 'src/a.js', contents: 'new' },
+    });
+  });
+
+  it('uses empty newFile contents when hasNew is false (deletion-heavy)', () => {
+    expect(
+      mapFileContentsToDiffFiles(meta, {
+        hasOld: true,
+        hasNew: false,
+        oldContent: 'gone',
+      })
+    ).toEqual({
+      oldFile: { name: 'src/old.js', contents: 'gone' },
+      newFile: { name: 'src/a.js', contents: '' },
+    });
+  });
+
+  it('returns rename-pure shape when only new exists', () => {
+    expect(
+      mapFileContentsToDiffFiles(
+        { name: 'src/a.js' },
+        { hasOld: false, hasNew: true, newContent: 'fresh' }
+      )
+    ).toEqual({
+      oldFile: null,
+      newFile: { name: 'src/a.js', contents: 'fresh' },
+    });
+  });
+
+  it('treats empty-string contents as present when hasNew/hasOld', () => {
+    expect(
+      mapFileContentsToDiffFiles(meta, {
+        hasOld: true,
+        hasNew: true,
+        oldContent: '',
+        newContent: '',
+      })
+    ).toEqual({
+      oldFile: { name: 'src/old.js', contents: '' },
+      newFile: { name: 'src/a.js', contents: '' },
+    });
+  });
+
+  it('falls back to path name when prevName is missing', () => {
+    expect(
+      mapFileContentsToDiffFiles(
+        { name: 'src/a.js' },
+        { hasOld: true, hasNew: true, oldContent: 'a', newContent: 'b' }
+      ).oldFile.name
+    ).toBe('src/a.js');
   });
 });
