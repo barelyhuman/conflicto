@@ -1,0 +1,216 @@
+name: Nightly Linux
+
+on:
+  schedule:
+    - cron: "30 23 * * *"
+  workflow_dispatch:
+    inputs:
+      force:
+        description: Force build even if no new commits
+        required: false
+        type: boolean
+        default: false
+
+concurrency:
+  group: nightly-linux-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+
+jobs:
+  check-changes:
+    name: Check for changes
+    runs-on: ubuntu-latest
+    outputs:
+      should_build: ${{ steps.check.outputs.should_build }}
+      nightly_tag: ${{ steps.check.outputs.nightly_tag }}
+      nightly_name: ${{ steps.check.outputs.nightly_name }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: main
+          fetch-depth: 0
+          fetch-tags: true
+
+      - id: check
+        env:
+          FORCE: ${{ github.event_name == 'workflow_dispatch' && inputs.force || false }}
+        run: |
+          set -euo pipefail
+          NIGHTLY_TAG="nightly-$(date -u +%Y.%m.%d)"
+          NIGHTLY_NAME="Nightly ${NIGHTLY_TAG#nightly-}"
+          echo "nightly_tag=$NIGHTLY_TAG" >> "$GITHUB_OUTPUT"
+          echo "nightly_name=$NIGHTLY_NAME" >> "$GITHUB_OUTPUT"
+
+          if [[ "$FORCE" == "true" ]]; then
+            echo "should_build=true" >> "$GITHUB_OUTPUT"
+            echo "Forced build — skipping commit check"
+            exit 0
+          fi
+
+          git fetch --tags --force --prune
+          LAST_NIGHTLY=$(git tag -l 'nightly-*' --sort=-v:refname | head -1)
+
+          if [[ -z "$LAST_NIGHTLY" ]]; then
+            echo "should_build=true" >> "$GITHUB_OUTPUT"
+            echo "No previous nightly tag — building"
+            exit 0
+          fi
+
+          HEAD_SHA=$(git rev-parse HEAD)
+          LAST_SHA=$(git rev-parse "${LAST_NIGHTLY}^{commit}")
+
+          if [[ "$HEAD_SHA" == "$LAST_SHA" ]]; then
+            echo "should_build=false" >> "$GITHUB_OUTPUT"
+            echo "HEAD ($HEAD_SHA) == last nightly ($LAST_NIGHTLY) — skipping"
+          else
+            echo "should_build=true" >> "$GITHUB_OUTPUT"
+            echo "HEAD ($HEAD_SHA) differs from last nightly ($LAST_NIGHTLY) — building"
+          fi
+
+  build:
+    name: Build (${{ matrix.arch }})
+    needs: check-changes
+    if: needs.check-changes.outputs.should_build == 'true'
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x86_64
+            runner: ubuntu-24.04
+            linuxdeploy_asset: linuxdeploy-x86_64.AppImage
+          - arch: aarch64
+            runner: ubuntu-24.04-arm
+            linuxdeploy_asset: linuxdeploy-aarch64.AppImage
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: main
+
+      - name: Install Linux build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libgtk-3-dev \
+            libwebkit2gtk-4.1-dev \
+            librsvg2-dev \
+            libgirepository1.0-dev \
+            imagemagick
+
+      - uses: jdx/mise-action@v4
+        with:
+          install: true
+          cache: true
+
+      - run: mise trust
+
+      - name: Build production binary
+        run: mise run build:production
+
+      - name: Assemble AppDir
+        run: |
+          set -euo pipefail
+          mkdir -p AppDir/usr/bin
+          cp build/bin/conflicto AppDir/usr/bin/conflicto
+          convert resources/app-icon/conflicto.png -resize 256x256 AppDir/conflicto.png
+          ln -s conflicto.png AppDir/.DirIcon
+          cat > AppDir/conflicto.desktop <<'EOF'
+          [Desktop Entry]
+          Type=Application
+          Name=conflicto
+          Exec=conflicto
+          Icon=conflicto
+          Categories=Development;
+          StartupWMClass=conflicto
+          Terminal=false
+          EOF
+
+      - name: Download linuxdeploy
+        run: |
+          set -euo pipefail
+          curl -fsSL -o "${{ matrix.linuxdeploy_asset }}" \
+            "https://github.com/linuxdeploy/linuxdeploy/releases/download/1-alpha-20250213-2/${{ matrix.linuxdeploy_asset }}"
+          chmod +x "${{ matrix.linuxdeploy_asset }}"
+          curl -fsSL -o linuxdeploy-plugin-gtk.sh \
+            "https://raw.githubusercontent.com/linuxdeploy/linuxdeploy-plugin-gtk/7a3fbc31a9e5075073ff8790f26effbac5f84453/linuxdeploy-plugin-gtk.sh"
+          chmod +x linuxdeploy-plugin-gtk.sh
+
+      - name: Package AppImage
+        env:
+          APPIMAGE_EXTRACT_AND_RUN: "1"
+          VERSION: nightly
+        run: |
+          set -euo pipefail
+          ARCH=${{ matrix.arch }} ./${{ matrix.linuxdeploy_asset }} \
+            --appimage-extract-and-run \
+            --appdir AppDir \
+            --desktop-file AppDir/conflicto.desktop \
+            --icon-file AppDir/conflicto.png \
+            --plugin gtk \
+            --output appimage
+
+          shopt -s nullglob
+          candidates=(conflicto*.AppImage)
+          if (( ${#candidates[@]} != 1 )); then
+            echo "Expected exactly one built AppImage, found ${#candidates[@]}" >&2
+            ls -la >&2
+            exit 1
+          fi
+          mv "${candidates[0]}" "conflicto-linux-${{ matrix.arch }}.AppImage"
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: conflicto-linux-${{ matrix.arch }}
+          path: conflicto-linux-${{ matrix.arch }}.AppImage
+          if-no-files-found: error
+
+  release:
+    name: Publish nightly release
+    needs: [check-changes, build]
+    if: needs.check-changes.outputs.should_build == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - uses: actions/download-artifact@v8
+        with:
+          path: artifacts
+          pattern: conflicto-linux-*
+          merge-multiple: true
+
+      - name: Verify release assets
+        run: |
+          set -euo pipefail
+          ls -la artifacts/
+          test -f artifacts/conflicto-linux-x86_64.AppImage
+          test -f artifacts/conflicto-linux-aarch64.AppImage
+
+      - name: Upload assets to nightly release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          NIGHTLY_TAG: ${{ needs.check-changes.outputs.nightly_tag }}
+          NIGHTLY_NAME: ${{ needs.check-changes.outputs.nightly_name }}
+        run: |
+          set -euo pipefail
+          cat > /tmp/linux-notes.md <<EOF
+          Unsigned Linux nightly build (x86_64 + aarch64).
+
+          - Commit: ${GITHUB_SHA}
+          - Tag: ${NIGHTLY_TAG}
+
+          These builds are unsigned. Requires glibc 2.39+ (Ubuntu 24.04+, Fedora 40+, Debian 13+) and webkit2gtk 4.1 at runtime (installed by default on those distros' desktop editions). Run with \`chmod +x conflicto-linux-*.AppImage && ./conflicto-linux-*.AppImage\` (needs FUSE, or extract with \`--appimage-extract\`).
+          EOF
+
+          if gh release view "$NIGHTLY_TAG" > /dev/null 2>&1; then
+            gh release upload "$NIGHTLY_TAG" artifacts/conflicto-linux-*.AppImage --clobber
+          else
+            gh release create "$NIGHTLY_TAG" \
+              artifacts/conflicto-linux-*.AppImage \
+              --title "$NIGHTLY_NAME" \
+              --prerelease \
+              --notes-file /tmp/linux-notes.md
+          fi

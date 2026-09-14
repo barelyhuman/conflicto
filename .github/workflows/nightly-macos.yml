@@ -133,14 +133,6 @@ jobs:
           test -f artifacts/conflicto-macos-arm64.zip
           test -f artifacts/conflicto-macos-amd64.zip
 
-      - name: Delete existing same-day release
-        env:
-          GH_TOKEN: ${{ github.token }}
-          NIGHTLY_TAG: ${{ needs.check-changes.outputs.nightly_tag }}
-        run: |
-          gh release delete "$NIGHTLY_TAG" --yes 2>/dev/null || true
-          git push origin ":refs/tags/$NIGHTLY_TAG" 2>/dev/null || true
-
       - uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ needs.check-changes.outputs.nightly_tag }}

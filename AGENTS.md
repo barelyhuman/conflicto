@@ -59,3 +59,7 @@ Signals are the primary state layer. The repo includes local OpenCode skills und
   - Skip-if-unchanged via latest `nightly-YYYY.MM.DD` tag (no macOS runners when `main` is unchanged).
   - Uses `mise run build:production:mac` (`install:frontend` → `build:frontend` → `icon` → wails).
   - Publishes date-stamped prereleases (`nightly-2026.09.01`) with both arch zips.
+- `.github/workflows/nightly-linux.yml` — nightly unsigned Linux AppImages (x86_64 + aarch64):
+  - Shares the same `nightly-YYYY.MM.DD` release as `nightly-macos.yml` (cron offset 23:30 UTC; both workflows upload to it, neither deletes it).
+  - Runs `mise run build:production` on `ubuntu-24.04` / `ubuntu-24.04-arm`, then packages via pinned linuxdeploy + `linuxdeploy-plugin-gtk` (both pinned; `--appimage-extract-and-run`, no FUSE needed on the runner).
+  - AppImage assets: `conflicto-linux-x86_64.AppImage` / `conflicto-linux-aarch64.AppImage`; require glibc ≥ 2.39 and `webkit2gtk 4.1` at runtime (helpers resolve from the system's `PKGLIBEXECDIR`, so webkit is not fully bundleable).
