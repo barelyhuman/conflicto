@@ -92,4 +92,14 @@ describe('SelectionModel diffLoading', () => {
     expect(selection.activeFile.value).toBeNull();
     expect(selection.diffLoading.value).toBe(false);
   });
+
+  it('conflict selection skips getDiff', () => {
+    selection.select('conflicted.js', 'conflict');
+
+    expect(getDiff).not.toHaveBeenCalled();
+    expect(getPRFileDiff).not.toHaveBeenCalled();
+    expect(selection.diffLoading.value).toBe(false);
+    expect(selection.activeFile.value).toBe('conflicted.js');
+    expect(selection.activeSection.value).toBe('conflict');
+  });
 });

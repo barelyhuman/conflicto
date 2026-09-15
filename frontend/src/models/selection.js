@@ -28,6 +28,11 @@ export const SelectionModel = createModel(({ workingTree, activePR }) => {
       diffLoading.value = false;
       return;
     }
+    // ConflictViewer fetches stages via GetConflictFile; skip the unused patch.
+    if (section === 'conflict') {
+      diffLoading.value = false;
+      return;
+    }
     diffLoading.value = true;
     const pr = activePR.peek();
     if (pr != null) {

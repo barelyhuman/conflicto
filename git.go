@@ -32,8 +32,20 @@ type GitService struct {
 // FileStatus represents a file's git status
 type FileStatus struct {
 	Path    string `json:"path"`
-	Status  string `json:"status"` // M, A, D, R, C, U (untracked)
+	Status  string `json:"status"` // M, A, D, R, C (conflict-marked untracked), or two-char unmerged code (UU, AA, DU, UD, AU, UA, DD)
 	OldPath string `json:"oldPath"`
+}
+
+// ConflictFile holds the worktree file (with inline markers for
+// modify/modify conflicts) and the ours/theirs index stages (2/3).
+// Modify/delete conflicts leave no markers, so those stages drive the viewer.
+type ConflictFile struct {
+	Worktree    string `json:"worktree"`
+	HasWorktree bool   `json:"hasWorktree"`
+	Ours        string `json:"ours"`
+	HasOurs     bool   `json:"hasOurs"`
+	Theirs      string `json:"theirs"`
+	HasTheirs   bool   `json:"hasTheirs"`
 }
 
 // NewGitService creates a new GitService and attempts to open the current repo
@@ -137,11 +149,21 @@ func (gs *GitService) GetFileStatus() ([]FileStatus, []FileStatus, []FileStatus,
 		return nil, nil, nil, err
 	}
 
+	staged, unstaged, conflicts := parseFileStatus(string(out), gs.path)
+	return staged, unstaged, conflicts, nil
+}
+
+// parseFileStatus splits `git status --porcelain -uall` output into staged,
+// unstaged, and conflicts lists. repoDir is used to scan untracked files for
+// conflict markers. Conflict entries carry the raw two-char unmerged code
+// (UU, AA, DU, UD, AU, UA, DD); X describes our side vs the base and Y the
+// other side (e.g. UD = we kept our change, they deleted the file).
+func parseFileStatus(out string, repoDir string) ([]FileStatus, []FileStatus, []FileStatus) {
 	var staged []FileStatus
 	var unstaged []FileStatus
 	var conflicts []FileStatus
 
-	lines := strings.Split(string(out), "\n")
+	lines := strings.Split(out, "\n")
 	for _, line := range lines {
 		if len(line) < 3 {
 			continue
@@ -162,7 +184,7 @@ func (gs *GitService) GetFileStatus() ([]FileStatus, []FileStatus, []FileStatus,
 		// Untracked
 		if x == '?' && y == '?' {
 			fs := FileStatus{Path: path, Status: "U", OldPath: path}
-			if isConflict(filepath.Join(gs.path, path)) {
+			if isConflict(filepath.Join(repoDir, path)) {
 				fs.Status = "C"
 				conflicts = append(conflicts, fs)
 			} else {
@@ -171,15 +193,11 @@ func (gs *GitService) GetFileStatus() ([]FileStatus, []FileStatus, []FileStatus,
 			continue
 		}
 
-		// Conflicts (unmerged)
-		if x == 'U' || y == 'U' {
-			status := string(x)
-			if y != ' ' && y != 'U' {
-				status = string(y)
-			}
+		// Conflicts (unmerged): the seven two-char codes git can emit.
+		if isUnmergedCode(x, y) {
 			conflicts = append(conflicts, FileStatus{
 				Path:    path,
-				Status:  status,
+				Status:  string(x) + string(y),
 				OldPath: oldPath,
 			})
 			continue
@@ -204,7 +222,23 @@ func (gs *GitService) GetFileStatus() ([]FileStatus, []FileStatus, []FileStatus,
 		}
 	}
 
-	return staged, unstaged, conflicts, nil
+	return staged, unstaged, conflicts
+}
+
+// isUnmergedCode reports whether the porcelain XY pair is one of the
+// unmerged codes: UU, AA, DD, AU, UA, DU, UD.
+func isUnmergedCode(x, y byte) bool {
+	switch {
+	case x == 'U' && y == 'U', // both modified
+		x == 'A' && y == 'A', // both added
+		x == 'D' && y == 'D', // both deleted
+		x == 'A' && y == 'U', // added by us
+		x == 'U' && y == 'A', // added by them
+		x == 'D' && y == 'U', // deleted by them
+		x == 'U' && y == 'D': // deleted by us
+		return true
+	}
+	return false
 }
 
 // maxWorktreeContentSize caps worktree file reads sent to the frontend.
@@ -219,9 +253,11 @@ const maxWorktreeContentSize = 4 << 20 // 4 MiB
 // contain marker-like sequences, e.g. compiled ELF binaries).
 const maxConflictScanSize = 1 << 20 // 1 MiB
 
-// isConflict checks if a file has conflict markers.
+// isConflict checks if a file has merge conflict markers at line start.
 // Binary files (NUL byte, git's heuristic) and files over maxConflictScanSize
-// are never treated as conflicts.
+// are never treated as conflicts. A substring match would false-positive on
+// files that merely mention markers (e.g. Go sources with "<<<<<<<" in
+// string literals).
 func isConflict(path string) bool {
 	if st, err := os.Stat(path); err != nil || !st.Mode().IsRegular() || st.Size() > maxConflictScanSize {
 		return false
@@ -233,7 +269,22 @@ func isConflict(path string) bool {
 	if bytes.IndexByte(content, 0) != -1 {
 		return false
 	}
-	return bytes.Contains(content, []byte("<<<<<<<"))
+	return hasConflictMarker(content)
+}
+
+// hasConflictMarker reports whether any line starts with a `<<<<<<<`
+// merge-conflict start marker, optionally followed by a label.
+func hasConflictMarker(content []byte) bool {
+	for _, line := range strings.Split(string(content), "\n") {
+		if !strings.HasPrefix(line, "<<<<<<<") {
+			continue
+		}
+		rest := line[7:]
+		if rest == "" || rest[0] == ' ' || rest[0] == '\t' || rest[0] == '\r' {
+			return true
+		}
+	}
+	return false
 }
 
 // StageFile stages a file
@@ -438,12 +489,17 @@ func (gs *GitService) GetFileContents(path string, staged bool) (*FileContentsRe
 	return res, nil
 }
 
-// showRefFile reads a file from a git ref. ref="" reads from the index.
-func (gs *GitService) showRefFile(ref, path string) (string, error) {
+// showRefFile reads a file from a git ref. ref="" reads from the index
+// (stage 0). stage > 0 reads that unmerged index stage instead (1=base,
+// 2=ours, 3=theirs).
+func (gs *GitService) showRefFile(ref, path string, stage ...int) (string, error) {
 	var spec string
-	if ref != "" {
+	switch {
+	case ref != "":
 		spec = fmt.Sprintf("%s:%s", ref, path)
-	} else {
+	case len(stage) > 0 && stage[0] > 0:
+		spec = fmt.Sprintf(":%d:%s", stage[0], path)
+	default:
 		spec = fmt.Sprintf(":%s", path)
 	}
 	cmd := appCommand("git", "show", spec)
@@ -453,6 +509,35 @@ func (gs *GitService) showRefFile(ref, path string) (string, error) {
 		return "", err
 	}
 	return string(out), nil
+}
+
+// GetConflictFile returns the worktree contents and unmerged index stages
+// for a conflicted path. Stages that git does not record for this conflict
+// kind (e.g. theirs for a modify/delete conflict) come back with has*=false.
+func (gs *GitService) GetConflictFile(path string) (*ConflictFile, error) {
+	if gs.path == "" {
+		return nil, fmt.Errorf("no repository open")
+	}
+
+	res := &ConflictFile{}
+
+	if out, err := gs.showRefFile("", path, 2); err == nil {
+		res.Ours = out
+		res.HasOurs = true
+	}
+	if out, err := gs.showRefFile("", path, 3); err == nil {
+		res.Theirs = out
+		res.HasTheirs = true
+	}
+
+	if st, err := os.Stat(filepath.Join(gs.path, path)); err == nil && st.Size() <= maxWorktreeContentSize {
+		if data, err := os.ReadFile(filepath.Join(gs.path, path)); err == nil {
+			res.Worktree = string(data)
+			res.HasWorktree = true
+		}
+	}
+
+	return res, nil
 }
 
 // GetAheadBehind returns ahead/behind counts

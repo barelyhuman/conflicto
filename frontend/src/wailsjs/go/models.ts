@@ -1,5 +1,27 @@
 export namespace main {
 	
+	export class ConflictFile {
+	    worktree: string;
+	    hasWorktree: boolean;
+	    ours: string;
+	    hasOurs: boolean;
+	    theirs: string;
+	    hasTheirs: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new ConflictFile(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.worktree = source["worktree"];
+	        this.hasWorktree = source["hasWorktree"];
+	        this.ours = source["ours"];
+	        this.hasOurs = source["hasOurs"];
+	        this.theirs = source["theirs"];
+	        this.hasTheirs = source["hasTheirs"];
+	    }
+	}
 	export class FileContentsResult {
 	    oldContent: string;
 	    newContent: string;

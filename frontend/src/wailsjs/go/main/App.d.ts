@@ -18,6 +18,8 @@ export function EmitEvent(arg1:string,arg2:any):Promise<void>;
 
 export function Fetch():Promise<void>;
 
+export function GetConflictFile(arg1:string):Promise<main.ConflictFile>;
+
 export function GetCurrentProject():Promise<Record<string, string>>;
 
 export function GetDiff(arg1:string,arg2:boolean):Promise<void>;

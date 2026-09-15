@@ -108,6 +108,8 @@ export const api = {
   getFileContents: (path, staged = false) =>
     window.go.main.App.GetFileContents(path, !!staged),
 
+  getConflictFile: (path) => window.go.main.App.GetConflictFile(path),
+
   pull: () => window.go.main.App.Pull(),
 
   push: () => window.go.main.App.Push(),

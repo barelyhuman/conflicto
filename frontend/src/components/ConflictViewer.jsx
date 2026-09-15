@@ -1,7 +1,11 @@
-import { useEffect, useState } from 'preact/hooks';
-import { UnresolvedFile } from '@pierre/diffs/react';
-import { useTheme } from '../theme/ThemeProvider.jsx';
+import { useComputed, useSignal, useSignalEffect } from '@preact/signals';
+import { useMemo, useRef } from 'preact/hooks';
+import { Show } from '@preact/signals/utils';
+import { parseDiffFromFile } from '@pierre/diffs';
+import { File, FileDiff, UnresolvedFile } from '@pierre/diffs/react';
 import { api } from '../wails.js';
+import { conflictViewFromStages } from './conflictView.js';
+import { useTheme } from '../theme/ThemeProvider.jsx';
 
 const conflictStyles = `
   .conflict-viewer-wrapper {
@@ -54,87 +58,163 @@ const conflictStyles = `
 `;
 
 /**
+ * Ours vs theirs comparison for conflicts without inline markers
+ * (modify/delete). Missing sides render as pure additions/deletions.
+ *
  * @param {Object} props
- * @param {import('@preact/signals-core').Signal<{ path?: string, patch?: string }|null>} props.activeDiff
- * @param {import('@preact/signals-core').ReadonlySignal<boolean>|boolean} [props.loading]
+ * @param {string} props.path
+ * @param {string|null} props.ours
+ * @param {string|null} props.theirs
+ * @param {import('@pierre/diffs').ThemeTypes} props.theme
+ * @param {'light'|'dark'} props.themeType
  */
-export function ConflictViewer({ activeDiff, loading = false }) {
+function ConflictSideDiff({ path, ours, theirs, theme, themeType }) {
+  const oursFile = useMemo(
+    () => (ours != null ? { name: `${path} (ours)`, contents: ours } : null),
+    [path, ours]
+  );
+  const theirsFile = useMemo(
+    () =>
+      theirs != null ? { name: `${path} (theirs)`, contents: theirs } : null,
+    [path, theirs]
+  );
+  const fileDiff = useMemo(
+    () => parseDiffFromFile(oursFile, theirsFile),
+    [oursFile, theirsFile]
+  );
+
+  return (
+    <FileDiff
+      key={path}
+      fileDiff={fileDiff}
+      options={{
+        theme,
+        themeType,
+        overflow: 'wrap',
+        loadDiffFiles: () => ({ oldFile: oursFile, newFile: theirsFile }),
+      }}
+    />
+  );
+}
+
+/**
+ * Renders a file with merge conflicts. Marker conflicts (both modified or
+ * both added) render through UnresolvedFile from the worktree contents;
+ * marker-free conflicts (modify/delete) compare the ours/theirs index
+ * stages instead; marker-free content without stages falls back to a plain
+ * file view, since UnresolvedFile draws nothing without hunks. The fetch
+ * goes through GetConflictFile rather than the combined-diff patch that
+ * `git diff` produces for unmerged paths.
+ *
+ * @param {Object} props
+ * @param {import('@preact/signals-core').Signal<string|null>} props.file
+ */
+export function ConflictViewer({ file }) {
   const { theme, themeType } = useTheme();
-  const isLoading = typeof loading === 'boolean' ? loading : loading.value;
-  const path = activeDiff.value?.path ?? '';
+  const requestId = useRef(0);
+  const status = useSignal({ loading: false, view: null });
 
-  /** @type {[import('@pierre/diffs').FileContents|null, function]} */
-  const [file, setFile] = useState(null);
-  const [fileLoading, setFileLoading] = useState(false);
+  const busy = useComputed(() => status.value.loading);
+  const view = useComputed(() => {
+    const s = status.value;
+    return s.loading ? null : s.view;
+  });
 
-  useEffect(() => {
+  useSignalEffect(() => {
+    const path = file.value;
     if (!path) {
-      setFile(null);
-      setFileLoading(false);
+      status.value = { loading: false, view: null };
       return;
     }
-
-    let cancelled = false;
-    setFile(null);
-    setFileLoading(true);
-
-    api.getFileContents(path, false)
-      .then((res) => {
-        if (cancelled) return;
-        if (!res?.hasNew) {
-          setFile(null);
-          return;
-        }
-        setFile({ name: path, contents: res.newContent ?? '' });
-      })
-      .catch(() => {
-        if (!cancelled) setFile(null);
-      })
-      .finally(() => {
-        if (!cancelled) setFileLoading(false);
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [path]);
-
-  if (isLoading || fileLoading) {
-    return (
-      <div class="conflict-viewer-wrapper diff-loading" aria-busy="true" aria-label="Loading conflict">
-        <div class="diff-skeleton">
-          <div class="diff-skeleton-line wide" />
-          <div class="diff-skeleton-line" />
-          <div class="diff-skeleton-line mid" />
-          <div class="diff-skeleton-line" />
-          <div class="diff-skeleton-line short" />
-          <div class="diff-skeleton-line mid" />
-        </div>
-        <style>{conflictStyles}</style>
-      </div>
+    status.value = { loading: true, view: null };
+    const request = ++requestId.current;
+    api.getConflictFile(path).then(
+      (res) => {
+        if (requestId.current !== request) return;
+        status.value = conflictViewFromStages(path, res);
+      },
+      () => {
+        if (requestId.current !== request) return;
+        status.value = { loading: false, view: null };
+      }
     );
-  }
+  });
 
-  if (!file) {
-    return (
-      <div class="diff-empty">
-        No conflict data available
-        <style>{conflictStyles}</style>
-      </div>
-    );
-  }
+  const themeTypeOption = themeType === 'light' ? 'light' : 'dark';
 
   return (
     <div class="conflict-viewer-wrapper">
-      <UnresolvedFile
-        file={file}
-        options={{
-          theme,
-          themeType: themeType === 'light' ? 'light' : 'dark',
-          overflow: 'wrap',
-          disableFileHeader: true,
-        }}
-      />
+      <Show
+        when={busy}
+        fallback={
+          <Show
+            when={view}
+            fallback={<div class="diff-empty">No conflict data available</div>}
+          >
+            {(data) => {
+              if (data.kind === 'deleted') {
+                return <div class="diff-empty">Both sides deleted this file</div>;
+              }
+              if (data.kind === 'sides') {
+                return (
+                  <ConflictSideDiff
+                    key={data.path}
+                    path={data.path}
+                    ours={data.ours}
+                    theirs={data.theirs}
+                    theme={theme}
+                    themeType={themeTypeOption}
+                  />
+                );
+              }
+              if (data.kind === 'plain') {
+                // Marker-free with no stages (e.g. the conflict was just
+                // resolved): UnresolvedFile draws nothing without hunks, so
+                // show the current contents as a plain file instead.
+                return (
+                  <File
+                    key={data.path}
+                    file={{ name: data.path, contents: data.contents }}
+                    options={{
+                      theme,
+                      themeType: themeTypeOption,
+                      overflow: 'wrap',
+                      disableFileHeader: true,
+                    }}
+                  />
+                );
+              }
+              return (
+                <UnresolvedFile
+                  key={data.path}
+                  file={{ name: data.path, contents: data.contents }}
+                  options={{
+                    theme,
+                    themeType: themeTypeOption,
+                    overflow: 'wrap',
+                    disableFileHeader: true,
+                  }}
+                />
+              );
+            }}
+          </Show>
+        }
+      >
+        <div
+          class="diff-loading"
+          aria-busy="true"
+          aria-label="Loading conflict"
+        >
+          <div class="diff-skeleton">
+            <div class="diff-skeleton-line wide" />
+            <div class="diff-skeleton-line" />
+            <div class="diff-skeleton-line mid" />
+            <div class="diff-skeleton-line" />
+            <div class="diff-skeleton-line short" />
+            <div class="diff-skeleton-line mid" />
+          </div>
+        </div>
+      </Show>
       <style>{conflictStyles}</style>
     </div>
   );

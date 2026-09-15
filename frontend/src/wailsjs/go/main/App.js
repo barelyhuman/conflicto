@@ -34,6 +34,10 @@ export function Fetch() {
   return window['go']['main']['App']['Fetch']();
 }
 
+export function GetConflictFile(arg1) {
+  return window['go']['main']['App']['GetConflictFile'](arg1);
+}
+
 export function GetCurrentProject() {
   return window['go']['main']['App']['GetCurrentProject']();
 }
