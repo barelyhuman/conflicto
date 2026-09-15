@@ -580,10 +580,7 @@ export function App() {
                             />
                           }
                         >
-                          <ConflictViewer
-                            activeDiff={selection.activeDiff}
-                            loading={selection.diffLoading}
-                          />
+                          <ConflictViewer file={selection.activeFile} />
                         </Show>
                       )}
                     </Show>

@@ -1,5 +1,6 @@
 import { useMemo, useState, useCallback } from 'preact/hooks';
 import { IconArrowBackUp, IconChevronRight } from '@tabler/icons-preact';
+import { conflictKindGlyph, conflictKindLabel } from './conflictView.js';
 
 /**
  * @typedef {{ name: string, path: string, status?: string, children?: TreeNode[] }} TreeNode
@@ -103,13 +104,18 @@ export function splitPath(path) {
 }
 
 /**
- * Map git status letter → badge class + glyph.
+ * Map git status letter → badge class + glyph. Two-char unmerged codes
+ * (UU, AA, DU, ...) render with a conflict-colored badge whose glyph
+ * reflects the file's nature.
  * @param {string} [status]
  * @returns {{ glyph: string, kind: string }}
  */
 export function statusBadge(status) {
-  const s = (status || 'M').toUpperCase().charAt(0);
-  switch (s) {
+  const s = (status || 'M').toUpperCase();
+  if (conflictKindLabel(s) != null) {
+    return { glyph: conflictKindGlyph(s) ?? 'C', kind: 'conflict' };
+  }
+  switch (s.charAt(0)) {
     case 'A':
     case 'U':
     case '?':
@@ -250,6 +256,7 @@ function FileRow({
   onDiscard,
 }) {
   const badge = statusBadge(status);
+  const kindLabel = conflictKindLabel(status);
 
   return (
     <div
@@ -265,6 +272,9 @@ function FileRow({
       >
         <span class={`status-badge ${badge.kind}`}>{badge.glyph}</span>
         <span class="file-name">{name}</span>
+        {kindLabel != null && (
+          <span class="conflict-kind">{kindLabel}</span>
+        )}
         {dir != null && <span class="file-path">{dir}</span>}
       </button>
       <div class="row-actions change-tree-actions">

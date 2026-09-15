@@ -351,6 +351,15 @@ func (a *App) GetFileContents(path string, staged bool) (*FileContentsResult, er
 	return a.git.GetFileContents(path, staged)
 }
 
+// GetConflictFile returns the worktree contents and unmerged index stages
+// (base/ours/theirs) for a conflicted path.
+func (a *App) GetConflictFile(path string) (*ConflictFile, error) {
+	if a.git == nil || !a.git.IsRepo() {
+		return nil, fmt.Errorf("no repository open")
+	}
+	return a.git.GetConflictFile(path)
+}
+
 // Pull performs git pull
 func (a *App) Pull() error {
 	if a.git == nil {
