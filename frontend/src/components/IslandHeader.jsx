@@ -26,6 +26,7 @@ function absoluteFilePath(projectRoot, relativePath) {
  * @param {import('@preact/signals-core').ReadonlySignal<boolean>|boolean} [props.canEdit]
  * @param {import('@preact/signals-core').Signal<'diff' | 'edit'>} [props.viewMode]
  * @param {() => void} [props.onToggleViewMode]
+ * @param {import('@preact/signals-core').ReadonlySignal<boolean>|boolean} [props.dirty]
  * @param {number|null} props.selectedPR
  * @param {{ number: number, title: string, author: string, baseBranch: string }|null} props.currentPR
  * @param {(pr: { number: number, title: string, author: string, baseBranch: string } | null) => void} props.onSelectPR
@@ -43,6 +44,7 @@ export function IslandHeader({
   canEdit = false,
   viewMode,
   onToggleViewMode,
+  dirty = false,
   selectedPR,
   currentPR,
   onSelectPR,
@@ -65,6 +67,13 @@ export function IslandHeader({
           const fullPath = absoluteFilePath(projectPath, path);
           return (
             <div class="island-header-file" title={fullPath}>
+              <Show when={dirty}>
+                <span
+                  class="island-header-dirty"
+                  title="Unsaved changes"
+                  aria-label="Unsaved changes"
+                />
+              </Show>
               <span class="island-header-filename">{name}</span>
               {dir !== './' && <span class="island-header-dir">{dir}</span>}
               {!isPRMode && editable ? (

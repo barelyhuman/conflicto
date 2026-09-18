@@ -557,6 +557,7 @@ export function App() {
                       canEdit={selection.canEdit}
                       viewMode={selection.viewMode}
                       onToggleViewMode={() => selection.toggleViewMode()}
+                      dirty={selection.editorDirty}
                       selectedPR={activePR}
                       currentPR={currentPR}
                       onSelectPR={handleSelectPR}
@@ -587,7 +588,13 @@ export function App() {
                                 />
                               }
                             >
-                              <FileEditor path={path} onError={pushToast} />
+                              <FileEditor
+                                path={path}
+                                onError={pushToast}
+                                onDirtyChange={(dirty) => {
+                                  selection.editorDirty.value = dirty;
+                                }}
+                              />
                             </Show>
                           }
                         >

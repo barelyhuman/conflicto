@@ -126,4 +126,25 @@ describe('SelectionModel diffLoading', () => {
     selection.select('src/b.js', 'unstaged');
     expect(selection.viewMode.value).toBe('diff');
   });
+
+  it('editorDirty clears on select, clear, and leaving edit mode', () => {
+    selection.select('src/a.js', 'unstaged');
+    selection.toggleViewMode();
+    selection.editorDirty.value = true;
+    expect(selection.editorDirty.value).toBe(true);
+
+    selection.toggleViewMode();
+    expect(selection.viewMode.value).toBe('diff');
+    expect(selection.editorDirty.value).toBe(false);
+
+    selection.toggleViewMode();
+    selection.editorDirty.value = true;
+    selection.select('src/b.js', 'unstaged');
+    expect(selection.editorDirty.value).toBe(false);
+
+    selection.toggleViewMode();
+    selection.editorDirty.value = true;
+    selection.clear();
+    expect(selection.editorDirty.value).toBe(false);
+  });
 });

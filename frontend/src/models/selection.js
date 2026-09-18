@@ -19,6 +19,8 @@ export const SelectionModel = createModel(({ workingTree, activePR }) => {
   const showFullDiff = signal(false);
   /** @type {import('@preact/signals-core').Signal<'diff' | 'edit'>} */
   const viewMode = signal('diff');
+  /** True when the edit-mode buffer differs from the last saved disk contents. */
+  const editorDirty = signal(false);
 
   const isConflict = computed(
     () => activePR.value == null && activeSection.value === 'conflict'
@@ -70,6 +72,7 @@ export const SelectionModel = createModel(({ workingTree, activePR }) => {
     diffLoading,
     showFullDiff,
     viewMode,
+    editorDirty,
     isConflict,
     isUnstaged,
     canEdit,
@@ -85,6 +88,7 @@ export const SelectionModel = createModel(({ workingTree, activePR }) => {
       this.diffLoading.value = true;
       this.showFullDiff.value = false;
       this.viewMode.value = 'diff';
+      this.editorDirty.value = false;
       if (same) {
         // Same path is a signal no-op — effect won't re-run; fetch explicitly.
         requestDiff(path, section);
@@ -101,6 +105,7 @@ export const SelectionModel = createModel(({ workingTree, activePR }) => {
       this.diffLoading.value = false;
       this.showFullDiff.value = false;
       this.viewMode.value = 'diff';
+      this.editorDirty.value = false;
     },
 
     toggleShowFullDiff() {
@@ -112,6 +117,7 @@ export const SelectionModel = createModel(({ workingTree, activePR }) => {
       const next = this.viewMode.value === 'diff' ? 'edit' : 'diff';
       this.viewMode.value = next;
       if (next === 'diff') {
+        this.editorDirty.value = false;
         this.refetch();
       }
     },

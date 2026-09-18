@@ -797,6 +797,14 @@
   max-width: 60%;
 }
 
+.island-header-dirty {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--text);
+  flex-shrink: 0;
+}
+
 .island-header-dir {
   font-size: 11px;
   color: var(--grey);
