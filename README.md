@@ -1,4 +1,4 @@
-# conflicto 
+# conflicto
 
 <p align="center">
 <img src="./resources/docs/preview.png">
@@ -30,8 +30,8 @@ chmod +x conflicto-linux-x86_64.AppImage
 Requires glibc 2.39+ (Ubuntu 24.04+, Debian 13+, Fedora 40+) and `webkit2gtk 4.1` at runtime — installed by default on those distros' desktop editions; on Debian/Ubuntu install it with `sudo apt install libwebkit2gtk-4.1-0`.
 
 > [!WARNING]
-> 
-> Alpha software, expects bugs 
+>
+> Alpha software, expects bugs
 
 ## Prerequisites
 
@@ -75,15 +75,15 @@ That syncs the app icon and runs `wails build`. The binary lands under `build/bi
 
 Useful tasks (run with `mise run <task>`):
 
-| Task | Description |
-| --- | --- |
-| `dev` | Wails dev mode (live reload) |
-| `build` | Local debug binary |
-| `build:production` | Production binary (`-ldflags="-w -s" -trimpath`) |
-| `test` | Go + frontend tests |
-| `test:frontend` | Frontend unit tests (Vitest) |
-| `clean` | Remove build artifacts |
-| `setup` | First-time setup (clean, icon, deps, frontend build) |
+| Task               | Description                                          |
+| ------------------ | ---------------------------------------------------- |
+| `dev`              | Wails dev mode (live reload)                         |
+| `build`            | Local debug binary                                   |
+| `build:production` | Production binary (`-ldflags="-w -s" -trimpath`)     |
+| `test`             | Go + frontend tests                                  |
+| `test:frontend`    | Frontend unit tests (Vitest)                         |
+| `clean`            | Remove build artifacts                               |
+| `setup`            | First-time setup (clean, icon, deps, frontend build) |
 
 Frontend-only: `dev:frontend` / `build:frontend` (runs `pnpm` in `frontend/`). Vite alone has no Go backend — use `dev` for a working UI.
 
@@ -91,16 +91,16 @@ List all tasks: `mise tasks`
 
 ## Keybindings
 
-| Shortcut | Action |
-| --- | --- |
-| `Cmd/Ctrl+,` | Preferences |
-| `Escape` | Close Preferences |
-| `Cmd/Ctrl+R` | Reload |
-| `Cmd+Ctrl+F` (macOS) / `Ctrl+F` | Full Screen |
-| `Cmd/Ctrl+W` | Close window |
-| `Cmd/Ctrl+Enter` | Commit (from commit message field) |
-| ``Cmd/Ctrl+` `` | Toggle terminal dock |
-| ``Cmd/Ctrl+Shift+` `` | New terminal tab (opens dock if needed) |
-| `Cmd/Ctrl+\\` | Split terminal right (dock open) |
+| Shortcut                        | Action                                  |
+| ------------------------------- | --------------------------------------- |
+| `Cmd/Ctrl+,`                    | Preferences                             |
+| `Escape`                        | Close Preferences                       |
+| `Cmd/Ctrl+R`                    | Reload                                  |
+| `Cmd+Ctrl+F` (macOS) / `Ctrl+F` | Full Screen                             |
+| `Cmd/Ctrl+W`                    | Close window                            |
+| `Cmd/Ctrl+Enter`                | Commit (from commit message field)      |
+| ``Cmd/Ctrl+` ``                 | Toggle terminal dock                    |
+| ``Cmd/Ctrl+Shift+` ``           | New terminal tab (opens dock if needed) |
+| `Cmd/Ctrl+\\`                   | Split terminal right (dock open)        |
 
 On macOS, the Edit menu also provides the usual text-editing shortcuts (`Cmd+A/C/V/X/Z`).
