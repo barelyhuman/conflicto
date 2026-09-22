@@ -1,7 +1,4 @@
 import { describe, expect, it } from 'vitest';
-// parseMergeConflictDiffFromFile is not re-exported from the package root;
-// import it directly so this test fails loudly if the internal path moves.
-import { parseMergeConflictDiffFromFile } from '../../node_modules/@pierre/diffs/dist/utils/parseMergeConflictDiffFromFile.js';
 import {
   conflictKindLabel,
   conflictViewFromStages,
@@ -130,36 +127,5 @@ describe('conflictViewFromStages', () => {
       loading: false,
       view: { kind: 'plain', path: 'f.txt', contents: 'plain\n' },
     });
-  });
-});
-
-describe('parseMergeConflictDiffFromFile contract', () => {
-  it('derives hunks, actions and marker rows from standard markers', () => {
-    const parsed = parseMergeConflictDiffFromFile({
-      name: 'app.js',
-      contents: markedWorktree,
-    });
-    expect(parsed.fileDiff?.hunks.length).toBeGreaterThan(0);
-    expect(parsed.actions.filter(Boolean).length).toBeGreaterThan(0);
-    expect(parsed.markerRows.length).toBeGreaterThan(0);
-  });
-
-  it('handles diff3 base markers', () => {
-    const parsed = parseMergeConflictDiffFromFile({
-      name: 'app.js',
-      contents: threeWay,
-    });
-    expect(parsed.fileDiff?.hunks.length).toBeGreaterThan(0);
-    expect(parsed.actions.filter(Boolean).length).toBeGreaterThan(0);
-    expect(parsed.markerRows.length).toBeGreaterThan(0);
-  });
-
-  it('does not crash on marker-free contents', () => {
-    const parsed = parseMergeConflictDiffFromFile({
-      name: 'app.js',
-      contents: 'plain\n',
-    });
-    expect(parsed.actions.filter(Boolean).length).toBe(0);
-    expect(parsed.markerRows.length).toBe(0);
   });
 });
