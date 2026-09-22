@@ -147,4 +147,47 @@ describe('SelectionModel diffLoading', () => {
     selection.clear();
     expect(selection.editorDirty.value).toBe(false);
   });
+
+  it('openEditorAtLine enters edit mode with a one-shot goto line', () => {
+    selection.select('src/a.js', 'unstaged');
+    expect(selection.editorGotoLine.value).toBeNull();
+
+    selection.openEditorAtLine(12);
+    expect(selection.viewMode.value).toBe('edit');
+    expect(selection.isEditView.value).toBe(true);
+    expect(selection.editorGotoLine.value).toBe(12);
+  });
+
+  it('openEditorAtLine no-ops when cannot edit or line is invalid', () => {
+    selection.select('src/a.js', 'staged');
+    selection.openEditorAtLine(3);
+    expect(selection.viewMode.value).toBe('diff');
+    expect(selection.editorGotoLine.value).toBeNull();
+
+    selection.select('src/a.js', 'unstaged');
+    selection.openEditorAtLine(0);
+    expect(selection.viewMode.value).toBe('diff');
+    expect(selection.editorGotoLine.value).toBeNull();
+
+    selection.openEditorAtLine(NaN);
+    expect(selection.editorGotoLine.value).toBeNull();
+  });
+
+  it('editorGotoLine clears on select, clear, and leaving edit mode', () => {
+    selection.select('src/a.js', 'unstaged');
+    selection.openEditorAtLine(5);
+    expect(selection.editorGotoLine.value).toBe(5);
+
+    selection.toggleViewMode();
+    expect(selection.viewMode.value).toBe('diff');
+    expect(selection.editorGotoLine.value).toBeNull();
+
+    selection.openEditorAtLine(8);
+    selection.select('src/b.js', 'unstaged');
+    expect(selection.editorGotoLine.value).toBeNull();
+
+    selection.openEditorAtLine(2);
+    selection.clear();
+    expect(selection.editorGotoLine.value).toBeNull();
+  });
 });

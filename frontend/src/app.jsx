@@ -570,7 +570,7 @@ export function App() {
                         <div class="diff-empty">Select a file to view changes</div>
                       }
                     >
-                      {(path) => (
+                      {() => (
                         <Show
                           when={selection.isConflict}
                           fallback={
@@ -585,15 +585,16 @@ export function App() {
                                   showFullDiff={selection.showFullDiff}
                                   comments={isPRMode ? prComments : []}
                                   onPostComment={handlePostComment}
+                                  canOpenInEditor={selection.canEdit}
+                                  onOpenLineInEditor={(line) => selection.openEditorAtLine(line)}
                                 />
                               }
                             >
                               <FileEditor
-                                path={path}
+                                path={selection.activeFile}
                                 onError={pushToast}
-                                onDirtyChange={(dirty) => {
-                                  selection.editorDirty.value = dirty;
-                                }}
+                                editorDirty={selection.editorDirty}
+                                editorGotoLine={selection.editorGotoLine}
                               />
                             </Show>
                           }

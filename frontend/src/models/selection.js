@@ -21,6 +21,8 @@ export const SelectionModel = createModel(({ workingTree, activePR }) => {
   const viewMode = signal('diff');
   /** True when the edit-mode buffer differs from the last saved disk contents. */
   const editorDirty = signal(false);
+  /** One-shot 1-based line to focus when entering edit mode (e.g. diff double-click). */
+  const editorGotoLine = signal(/** @type {number|null} */ (null));
 
   const isConflict = computed(
     () => activePR.value == null && activeSection.value === 'conflict'
@@ -73,6 +75,7 @@ export const SelectionModel = createModel(({ workingTree, activePR }) => {
     showFullDiff,
     viewMode,
     editorDirty,
+    editorGotoLine,
     isConflict,
     isUnstaged,
     canEdit,
@@ -89,6 +92,7 @@ export const SelectionModel = createModel(({ workingTree, activePR }) => {
       this.showFullDiff.value = false;
       this.viewMode.value = 'diff';
       this.editorDirty.value = false;
+      this.editorGotoLine.value = null;
       if (same) {
         // Same path is a signal no-op — effect won't re-run; fetch explicitly.
         requestDiff(path, section);
@@ -106,6 +110,7 @@ export const SelectionModel = createModel(({ workingTree, activePR }) => {
       this.showFullDiff.value = false;
       this.viewMode.value = 'diff';
       this.editorDirty.value = false;
+      this.editorGotoLine.value = null;
     },
 
     toggleShowFullDiff() {
@@ -118,8 +123,21 @@ export const SelectionModel = createModel(({ workingTree, activePR }) => {
       this.viewMode.value = next;
       if (next === 'diff') {
         this.editorDirty.value = false;
+        this.editorGotoLine.value = null;
         this.refetch();
       }
+    },
+
+    /**
+     * Switch to edit mode and request focus on a 1-based worktree line.
+     * No-op when the selection cannot be edited.
+     * @param {number} lineNumber
+     */
+    openEditorAtLine(lineNumber) {
+      if (!this.canEdit.value) return;
+      if (!Number.isFinite(lineNumber) || lineNumber < 1) return;
+      this.editorGotoLine.value = Math.floor(lineNumber);
+      this.viewMode.value = 'edit';
     },
 
     applyDiff(data) {
