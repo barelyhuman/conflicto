@@ -190,4 +190,21 @@ describe('SelectionModel diffLoading', () => {
     selection.clear();
     expect(selection.editorGotoLine.value).toBeNull();
   });
+
+  it('openFromTerminal selects unstaged edit mode at a line', () => {
+    selection.select('src/a.js', 'staged');
+    selection.openFromTerminal('pkg/main.go', 7);
+    expect(selection.activeFile.value).toBe('pkg/main.go');
+    expect(selection.activeSection.value).toBe('unstaged');
+    expect(selection.viewMode.value).toBe('edit');
+    expect(selection.editorGotoLine.value).toBe(7);
+    expect(selection.diffLoading.value).toBe(true);
+  });
+
+  it('openFromTerminal no-ops in PR mode', () => {
+    activePR.value = 42;
+    selection.openFromTerminal('src/x.js', 1);
+    expect(selection.activeFile.value).toBeNull();
+    activePR.value = null;
+  });
 });

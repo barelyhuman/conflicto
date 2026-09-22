@@ -3,6 +3,7 @@ import { useModel, useSignal } from '@preact/signals';
 import { Show } from '@preact/signals/utils';
 import './app.css';
 import { setupWailsEvents, api, watchFullscreen, getPlatform } from './wails.js';
+import { BrowserOpenURL } from './wailsjs/runtime/runtime.js';
 import { WorkingTreeModel } from './models/workingTree.js';
 import { SelectionModel } from './models/selection.js';
 import { SyncModel } from './models/sync.js';
@@ -449,8 +450,16 @@ export function App() {
     setConfirmKind(null);
   }, []);
 
-
-
+  const handleTerminalLinkOpen = useCallback((payload) => {
+    if (!payload) return;
+    if (payload.kind === 'http') {
+      BrowserOpenURL(payload.url);
+      return;
+    }
+    if (payload.kind === 'file') {
+      selection.openFromTerminal(payload.path, payload.line);
+    }
+  }, [selection]);
   const handlePostComment = useCallback((path, body, line, side) => {
     if (activePR == null) return;
     api.postPRComment(activePR, path, body, line, side, 0, '').catch((err) => {
@@ -608,6 +617,8 @@ export function App() {
                   <TerminalDock
                     open={terminalOpen}
                     height={terminalHeight}
+                    repoRoot={projectPath || null}
+                    onTerminalLinkOpen={handleTerminalLinkOpen}
                     onHeightChange={handleTerminalHeight}
                     onRequestOpen={() => setTerminalOpen(true)}
                     onTabClosed={(layouts) => {

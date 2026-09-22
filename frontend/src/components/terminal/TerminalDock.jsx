@@ -36,7 +36,7 @@ function useTerminalStore() {
  * pane hosts mounted — across all project scopes — so PTY + scrollback survive.
  * Tabs/visible panes reflect the current project/worktree scope only.
  */
-export function TerminalDock({ open, height, onHeightChange, onRequestOpen, onTabClosed }) {
+export function TerminalDock({ open, height, repoRoot, onTerminalLinkOpen, onHeightChange, onRequestOpen, onTabClosed }) {
   const { panes, layouts, activeLayoutId, activeLocalId, splitLocalIds, splitRatio } = useTerminalStore();
   const [dragging, setDragging] = useState(false);
   const dragRef = useRef(null);
@@ -280,6 +280,9 @@ export function TerminalDock({ open, height, onHeightChange, onRequestOpen, onTa
                   <TerminalPane
                     sessionId={pane.sessionId}
                     focused={open && visible && pane.localId === activeLocalId}
+                    repoRoot={repoRoot}
+                    cwd={pane.cwd || pane.scopePath}
+                    onLinkOpen={onTerminalLinkOpen}
                     onFocus={() => setActivePane(pane.localId)}
                     onExit={handleExit}
                     onCwdChange={updatePaneCwdBySessionId}
