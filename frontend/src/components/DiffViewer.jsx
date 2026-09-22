@@ -5,6 +5,7 @@ import { BrowserOpenURL } from '../wailsjs/runtime/runtime.js';
 import { useTheme } from '../theme/ThemeProvider.jsx';
 import { api } from '../wails.js';
 import { buildPRLineAnnotations } from './prLineAnnotations.js';
+import { mapDiffLineToEditorLine } from './diffLineToEditorLine.js';
 import {
   annotationUnsafeCSS,
   expandUnchangedForDiff,
@@ -128,6 +129,8 @@ const diffViewerStyles = `
  * @param {import('@preact/signals-core').ReadonlySignal<boolean>|boolean} props.isUnstaged
  * @param {import('@preact/signals-core').ReadonlySignal<boolean>|boolean} [props.showFullDiff]
  * @param {{ path: string, line: number, side?: string, body: string, html_url?: string, user: { login: string } }[]} props.comments
+ * @param {import('@preact/signals-core').ReadonlySignal<boolean>|boolean} [props.canOpenInEditor]
+ * @param {(lineNumber: number) => void} [props.onOpenLineInEditor]
  */
 export function DiffViewer({
   activeDiff,
@@ -136,6 +139,8 @@ export function DiffViewer({
   isUnstaged = false,
   showFullDiff = false,
   comments = [],
+  canOpenInEditor = false,
+  onOpenLineInEditor,
 }) {
   const { theme, themeType } = useTheme();
   const isLoading = typeof loading === 'boolean' ? loading : loading.value;
@@ -144,6 +149,8 @@ export function DiffViewer({
   const filename = diff?.path ?? '';
   const unstaged = typeof isUnstaged === 'boolean' ? isUnstaged : isUnstaged.value;
   const fullDiff = typeof showFullDiff === 'boolean' ? showFullDiff : showFullDiff.value;
+  const openInEditor =
+    typeof canOpenInEditor === 'boolean' ? canOpenInEditor : canOpenInEditor.value;
 
   const wrapperRef = useRef(null);
   const prevFullDiff = useRef(fullDiff);
@@ -200,6 +207,16 @@ export function DiffViewer({
     );
   }, []);
 
+  const handleLineClick = useCallback(
+    (props) => {
+      if (!openInEditor || onOpenLineInEditor == null) return;
+      if ((props.event?.detail ?? 0) < 2) return;
+      const line = mapDiffLineToEditorLine(props);
+      if (line != null) onOpenLineInEditor(line);
+    },
+    [openInEditor, onOpenLineInEditor]
+  );
+
   if (isLoading) {
     return (
       <div class="diff-viewer-wrapper diff-loading" aria-busy="true" aria-label="Loading diff">
@@ -245,6 +262,12 @@ export function DiffViewer({
           expandUnchanged: expandUnchangedForDiff(isPRMode, fullDiff),
           collapsedContextThreshold: 1,
           unsafeCSS: annotationUnsafeCSS(isPRMode),
+          ...(openInEditor
+            ? {
+                onLineClick: handleLineClick,
+                lineHoverHighlight: 'line',
+              }
+            : {}),
           loadDiffFiles: loadDiffFilesForDiff(isPRMode, async (meta) => {
             const staged = !unstaged;
             const res = await api.getFileContents(meta.name, staged);

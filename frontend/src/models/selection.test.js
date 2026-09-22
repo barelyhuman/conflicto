@@ -102,4 +102,92 @@ describe('SelectionModel diffLoading', () => {
     expect(selection.activeFile.value).toBe('conflicted.js');
     expect(selection.activeSection.value).toBe('conflict');
   });
+
+  it('toggleViewMode switches between diff and edit for unstaged files', () => {
+    selection.select('src/a.js', 'unstaged');
+    expect(selection.viewMode.value).toBe('diff');
+    expect(selection.canEdit.value).toBe(true);
+
+    selection.toggleViewMode();
+    expect(selection.viewMode.value).toBe('edit');
+    expect(selection.isEditView.value).toBe(true);
+
+    getDiff.mockClear();
+    selection.toggleViewMode();
+    expect(selection.viewMode.value).toBe('diff');
+    expect(getDiff).toHaveBeenCalledWith('src/a.js', false);
+  });
+
+  it('select resets view mode to diff', () => {
+    selection.select('src/a.js', 'unstaged');
+    selection.toggleViewMode();
+    expect(selection.viewMode.value).toBe('edit');
+
+    selection.select('src/b.js', 'unstaged');
+    expect(selection.viewMode.value).toBe('diff');
+  });
+
+  it('editorDirty clears on select, clear, and leaving edit mode', () => {
+    selection.select('src/a.js', 'unstaged');
+    selection.toggleViewMode();
+    selection.editorDirty.value = true;
+    expect(selection.editorDirty.value).toBe(true);
+
+    selection.toggleViewMode();
+    expect(selection.viewMode.value).toBe('diff');
+    expect(selection.editorDirty.value).toBe(false);
+
+    selection.toggleViewMode();
+    selection.editorDirty.value = true;
+    selection.select('src/b.js', 'unstaged');
+    expect(selection.editorDirty.value).toBe(false);
+
+    selection.toggleViewMode();
+    selection.editorDirty.value = true;
+    selection.clear();
+    expect(selection.editorDirty.value).toBe(false);
+  });
+
+  it('openEditorAtLine enters edit mode with a one-shot goto line', () => {
+    selection.select('src/a.js', 'unstaged');
+    expect(selection.editorGotoLine.value).toBeNull();
+
+    selection.openEditorAtLine(12);
+    expect(selection.viewMode.value).toBe('edit');
+    expect(selection.isEditView.value).toBe(true);
+    expect(selection.editorGotoLine.value).toBe(12);
+  });
+
+  it('openEditorAtLine no-ops when cannot edit or line is invalid', () => {
+    selection.select('src/a.js', 'staged');
+    selection.openEditorAtLine(3);
+    expect(selection.viewMode.value).toBe('diff');
+    expect(selection.editorGotoLine.value).toBeNull();
+
+    selection.select('src/a.js', 'unstaged');
+    selection.openEditorAtLine(0);
+    expect(selection.viewMode.value).toBe('diff');
+    expect(selection.editorGotoLine.value).toBeNull();
+
+    selection.openEditorAtLine(NaN);
+    expect(selection.editorGotoLine.value).toBeNull();
+  });
+
+  it('editorGotoLine clears on select, clear, and leaving edit mode', () => {
+    selection.select('src/a.js', 'unstaged');
+    selection.openEditorAtLine(5);
+    expect(selection.editorGotoLine.value).toBe(5);
+
+    selection.toggleViewMode();
+    expect(selection.viewMode.value).toBe('diff');
+    expect(selection.editorGotoLine.value).toBeNull();
+
+    selection.openEditorAtLine(8);
+    selection.select('src/b.js', 'unstaged');
+    expect(selection.editorGotoLine.value).toBeNull();
+
+    selection.openEditorAtLine(2);
+    selection.clear();
+    expect(selection.editorGotoLine.value).toBeNull();
+  });
 });

@@ -11,6 +11,7 @@ import { ThemeProvider } from './theme/ThemeProvider.jsx';
 import { EditProvider } from './components/EditProvider.jsx';
 import { FileTree } from './components/FileTree.jsx';
 import { DiffViewer } from './components/DiffViewer.jsx';
+import { FileEditor } from './components/FileEditor.jsx';
 import { ConflictViewer } from './components/ConflictViewer.jsx';
 import { ConfirmDialog } from './components/ConfirmDialog.jsx';
 import { ToastContainer } from './components/ToastContainer.jsx';
@@ -553,6 +554,10 @@ export function App() {
                       isPRMode={isPRMode}
                       showFullDiff={selection.showFullDiff}
                       onToggleShowFullDiff={() => selection.toggleShowFullDiff()}
+                      canEdit={selection.canEdit}
+                      viewMode={selection.viewMode}
+                      onToggleViewMode={() => selection.toggleViewMode()}
+                      dirty={selection.editorDirty}
                       selectedPR={activePR}
                       currentPR={currentPR}
                       onSelectPR={handleSelectPR}
@@ -569,15 +574,29 @@ export function App() {
                         <Show
                           when={selection.isConflict}
                           fallback={
-                            <DiffViewer
-                              activeDiff={selection.activeDiff}
-                              loading={selection.diffLoading}
-                              isPRMode={isPRMode}
-                              isUnstaged={selection.isUnstaged}
-                              showFullDiff={selection.showFullDiff}
-                              comments={isPRMode ? prComments : []}
-                              onPostComment={handlePostComment}
-                            />
+                            <Show
+                              when={selection.isEditView}
+                              fallback={
+                                <DiffViewer
+                                  activeDiff={selection.activeDiff}
+                                  loading={selection.diffLoading}
+                                  isPRMode={isPRMode}
+                                  isUnstaged={selection.isUnstaged}
+                                  showFullDiff={selection.showFullDiff}
+                                  comments={isPRMode ? prComments : []}
+                                  onPostComment={handlePostComment}
+                                  canOpenInEditor={selection.canEdit}
+                                  onOpenLineInEditor={(line) => selection.openEditorAtLine(line)}
+                                />
+                              }
+                            >
+                              <FileEditor
+                                path={selection.activeFile}
+                                onError={pushToast}
+                                editorDirty={selection.editorDirty}
+                                editorGotoLine={selection.editorGotoLine}
+                              />
+                            </Show>
                           }
                         >
                           <ConflictViewer file={selection.activeFile} />
