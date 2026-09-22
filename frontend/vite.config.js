@@ -17,6 +17,11 @@ export default defineConfig({
   test: {
     environment: 'node',
     include: ['src/**/*.test.js'],
+    server: {
+      deps: {
+        inline: [/@pierre/, /@shikijs/, /shiki/],
+      },
+    },
   },
   build: {
     rolldownOptions: {

@@ -3,8 +3,9 @@
  *
  * Debug: reproduce "no cursor / cannot edit" in edit mode.
  */
-import { afterEach, describe, expect, it } from 'vitest';
-import { render, h } from 'preact';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { render } from 'preact/compat';
+import { h } from 'preact';
 import { EditProvider } from './EditProvider.jsx';
 import { FileEditor } from './FileEditor.jsx';
 import { ThemeProvider } from '../theme/ThemeProvider.jsx';
@@ -19,7 +20,23 @@ function registerThemes() {
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 
 describe('FileEditor (real component)', () => {
+  let originalGetContext;
+
+  beforeEach(() => {
+    originalGetContext = HTMLCanvasElement.prototype.getContext;
+    HTMLCanvasElement.prototype.getContext = function (type, ...args) {
+      if (type === '2d') {
+        return {
+          measureText: (text) => ({ width: String(text).length * 8 }),
+          font: '12px monospace',
+        };
+      }
+      return originalGetContext?.call(this, type, ...args) ?? null;
+    };
+  });
+
   afterEach(() => {
+    HTMLCanvasElement.prototype.getContext = originalGetContext;
     document.body.replaceChildren();
   });
 
