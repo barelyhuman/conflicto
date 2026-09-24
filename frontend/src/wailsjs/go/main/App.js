@@ -70,6 +70,22 @@ export function GetRecentProjects() {
   return window['go']['main']['App']['GetRecentProjects']();
 }
 
+export function GetCIPrefs() {
+  return window['go']['main']['App']['GetCIPrefs']();
+}
+
+export function SetCIPrefs(arg1, arg2) {
+  return window['go']['main']['App']['SetCIPrefs'](arg1, arg2);
+}
+
+export function StartPRChecksMonitor(arg1) {
+  return window['go']['main']['App']['StartPRChecksMonitor'](arg1);
+}
+
+export function StopPRChecksMonitor() {
+  return window['go']['main']['App']['StopPRChecksMonitor']();
+}
+
 export function GetTerminalPrefs() {
   return window['go']['main']['App']['GetTerminalPrefs']();
 }

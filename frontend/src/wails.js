@@ -27,6 +27,9 @@ function emitTerminalExit(data) {
 
 export function setupWailsEvents(callbacks) {
   // Subscribe to Wails events
+  window.runtime.EventsOn('prChecksUpdated', (data) => {
+    callbacks.onPRChecksUpdated?.(data);
+  });
   window.runtime.EventsOn('fileStatusChanged', (data) => {
     callbacks.onFileStatusChanged?.(data);
   });
@@ -165,6 +168,14 @@ export const api = {
   getTerminalPrefs: () => window.go.main.App.GetTerminalPrefs(),
 
   setTerminalPrefs: (open, height) => window.go.main.App.SetTerminalPrefs(open, height),
+
+  getCIPrefs: () => window.go.main.App.GetCIPrefs(),
+
+  setCIPrefs: (enabled, mode) => window.go.main.App.SetCIPrefs(enabled, mode),
+
+  startPRChecksMonitor: (number) => window.go.main.App.StartPRChecksMonitor(number),
+
+  stopPRChecksMonitor: () => window.go.main.App.StopPRChecksMonitor(),
 
   onTerminalData: (fn) => {
     terminalDataListeners.add(fn);
