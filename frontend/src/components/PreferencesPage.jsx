@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'preact/hooks';
 import { IconX } from '@tabler/icons-preact';
 import { GHSettings } from './GHSettings.jsx';
+import { CISettings } from './CISettings.jsx';
 
 /**
  * @param {Object} props
@@ -8,8 +9,10 @@ import { GHSettings } from './GHSettings.jsx';
  * @param {() => void} props.onClose
  * @param {{ installed: boolean, version: string, user: string }} props.ghStatus
  * @param {() => void} props.onRefreshGH
+ * @param {{ enabled: boolean, mode: string }} props.ciPrefs
+ * @param {(prefs: { enabled: boolean, mode: string }) => void} props.onCIPrefsChange
  */
-export function PreferencesPage({ open, onClose, ghStatus, onRefreshGH }) {
+export function PreferencesPage({ open, onClose, ghStatus, onRefreshGH, ciPrefs, onCIPrefsChange }) {
   const [activeTab, setActiveTab] = useState('github');
 
   // Close on Escape
@@ -57,9 +60,7 @@ export function PreferencesPage({ open, onClose, ghStatus, onRefreshGH }) {
 
           <main class="prefs-content">
             {activeTab === 'general' && (
-              <div class="prefs-empty-tab">
-                <p>General settings coming soon.</p>
-              </div>
+              <CISettings prefs={ciPrefs} onChange={onCIPrefsChange} />
             )}
             {activeTab === 'github' && <GHSettings ghStatus={ghStatus} onRefresh={onRefreshGH} />}
           </main>

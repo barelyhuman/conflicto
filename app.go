@@ -40,6 +40,7 @@ type App struct {
 	git      *GitService
 	recents  *RecentsManager
 	prCache  map[int]PRCache
+	prChecks *prChecksMonitor
 	terms    *terminalManager
 }
 
@@ -87,12 +88,19 @@ func (a *App) startup(ctx context.Context) {
 func (a *App) domReady(ctx context.Context) {
 	// Align system traffic lights with the 44px island header (vertically centered).
 	applyMacTrafficLightPosition(16, 16)
+	if runtime.IsNotificationAvailable(ctx) {
+		_ = runtime.InitializeNotifications(ctx)
+	}
 }
 
 // shutdown is called at application termination
 func (a *App) shutdown(ctx context.Context) {
 	if a.terms != nil {
 		a.terms.stopAll()
+	}
+	a.StopPRChecksMonitor()
+	if runtime.IsNotificationAvailable(ctx) {
+		runtime.CleanupNotifications(ctx)
 	}
 	// Save settings
 	if a.settings != nil {
@@ -164,6 +172,39 @@ func (a *App) SetTerminalPrefs(open bool, height int) error {
 	}
 	a.settings.TerminalOpen = open
 	a.settings.TerminalHeight = height
+	return a.settings.Save()
+}
+
+// GetCIPrefs returns persisted CI notification preferences.
+func (a *App) GetCIPrefs() map[string]interface{} {
+	enabled := false
+	mode := "all"
+	if a.settings != nil {
+		enabled = a.settings.CINotificationsEnabled
+		mode = a.settings.CINotificationMode
+		if mode == "" {
+			mode = "all"
+		}
+	}
+	return map[string]interface{}{
+		"enabled": enabled,
+		"mode":    mode,
+	}
+}
+
+// SetCIPrefs persists CI notification preferences.
+// mode is "off", "all", or "workflow".
+func (a *App) SetCIPrefs(enabled bool, mode string) error {
+	if a.settings == nil {
+		a.settings = &Settings{}
+	}
+	switch mode {
+	case "off", "all", "workflow":
+	default:
+		mode = "all"
+	}
+	a.settings.CINotificationsEnabled = enabled
+	a.settings.CINotificationMode = mode
 	return a.settings.Save()
 }
 

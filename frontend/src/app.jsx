@@ -63,6 +63,8 @@ export function App() {
   const [ghStatus, setGhStatus] = useState({ installed: false, version: '', user: '' });
   const [prList, setPrList] = useState([]);
   const [prComments, setPrComments] = useState([]);
+  const [prChecksSummary, setPrChecksSummary] = useState(null);
+  const [ciPrefs, setCiPrefs] = useState({ enabled: false, mode: 'all' });
   const [prPrompt, setPrPrompt] = useState(null);
   const [prCheckoutPending, setPrCheckoutPending] = useState(/** @type {null | 'local' | 'worktree'} */ (null));
   // Create PR modal
@@ -148,6 +150,10 @@ export function App() {
       onPRListUpdated: (data) => {
         setPrList(data?.prs ?? []);
       },
+      onPRChecksUpdated: (data) => {
+        if (activePRRef.current == null || data?.number !== activePRRef.current) return;
+        setPrChecksSummary(data);
+      },
       onPRFilesUpdated: (data) => {
         const number = data?.number;
         const files = data?.files ?? [];
@@ -207,6 +213,8 @@ export function App() {
         selectionRef.current.clear();
         activePRSignalRef.current.value = null;
         setActivePR(null);
+        setPrChecksSummary(null);
+        api.stopPRChecksMonitor();
         setTerminalScope(data.path ?? '');
       },
       onRecentProjectsUpdated: (data) => {
@@ -285,6 +293,12 @@ export function App() {
       if (typeof prefs?.terminalOpen === 'boolean') setTerminalOpen(prefs.terminalOpen);
       terminalPrefsReady.current = true;
     });
+    api.getCIPrefs().then((prefs) => {
+      setCiPrefs({
+        enabled: !!prefs?.enabled,
+        mode: prefs?.mode || 'all',
+      });
+    });
   }, []);
 
   useEffect(() => {
@@ -332,6 +346,20 @@ export function App() {
     } else {
       setPrComments([]);
     }
+  }, [isPRMode, activePR]);
+
+  // Poll CI checks while a PR is open in review mode
+  useEffect(() => {
+    if (!isPRMode || activePR == null) {
+      setPrChecksSummary(null);
+      api.stopPRChecksMonitor();
+      return;
+    }
+    setPrChecksSummary(null);
+    api.startPRChecksMonitor(activePR);
+    return () => {
+      api.stopPRChecksMonitor();
+    };
   }, [isPRMode, activePR]);
 
   const handleSelectPR = useCallback((pr) => {
@@ -563,6 +591,8 @@ export function App() {
                       onSelectPR={handleSelectPR}
                       onError={pushToast}
                       onCreatePR={() => setCreatePROpen(true)}
+                      showCIMonitor={isPRMode}
+                      prChecksSummary={prChecksSummary}
                     />
                     <Show
                       when={selection.activeFile}
@@ -681,6 +711,8 @@ export function App() {
             onClose={() => setPreferencesOpen(false)}
             ghStatus={ghStatus}
             onRefreshGH={() => api.detectGH()}
+            ciPrefs={ciPrefs}
+            onCIPrefsChange={setCiPrefs}
           />
 
           <CreatePRModal

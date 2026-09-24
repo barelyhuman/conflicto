@@ -4,6 +4,7 @@ import { DiffExpandToggle } from './DiffExpandToggle.jsx';
 import { CopyPathButton } from './CopyPathButton.jsx';
 import { ViewModeToggle } from './ViewModeToggle.jsx';
 import { PRPicker } from './PRPicker.jsx';
+import { PRChecksStatus } from './PRChecksStatus.jsx';
 import { splitPath } from './ChangeTree.jsx';
 
 function absoluteFilePath(projectRoot, relativePath) {
@@ -32,6 +33,8 @@ function absoluteFilePath(projectRoot, relativePath) {
  * @param {(pr: { number: number, title: string, author: string, baseBranch: string } | null) => void} props.onSelectPR
  * @param {(title: string, message: string) => void} [props.onError]
  * @param {() => void} props.onCreatePR
+ * @param {boolean} [props.showCIMonitor]
+ * @param {{ status?: string, pending?: number, pass?: number, fail?: number, total?: number, checks?: unknown[], error?: string }|null} [props.prChecksSummary]
  */
 export function IslandHeader({
   sidebarOpen,
@@ -50,6 +53,8 @@ export function IslandHeader({
   onSelectPR,
   onError,
   onCreatePR,
+  showCIMonitor = false,
+  prChecksSummary = null,
 }) {
   const fullDiff = typeof showFullDiff === 'boolean' ? showFullDiff : showFullDiff.value;
   const editable = typeof canEdit === 'boolean' ? canEdit : canEdit.value;
@@ -92,6 +97,7 @@ export function IslandHeader({
       </Show>
 
       <div class="island-header-actions">
+        <PRChecksStatus active={showCIMonitor} summary={prChecksSummary} />
         <button
           type="button"
           class="create-pr-trigger"
