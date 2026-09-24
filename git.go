@@ -104,29 +104,6 @@ func (gs *GitService) GetRepoName() string {
 	return filepath.Base(gs.path)
 }
 
-// GetRepoSlug returns "owner/repo" for the current repository using gh CLI
-func (gs *GitService) GetRepoSlug() (string, error) {
-	if gs.path == "" {
-		return "", fmt.Errorf("no repository open")
-	}
-	cmd := appCommand("gh", "repo", "view", "--json", "owner,name")
-	cmd.Dir = gs.path
-	out, err := cmd.Output()
-	if err != nil {
-		return "", fmt.Errorf("failed to get repo info via gh: %w", err)
-	}
-	var result struct {
-		Owner struct {
-			Login string `json:"login"`
-		} `json:"owner"`
-		Name string `json:"name"`
-	}
-	if err := json.Unmarshal(out, &result); err != nil {
-		return "", fmt.Errorf("failed to parse repo info: %w", err)
-	}
-	return result.Owner.Login + "/" + result.Name, nil
-}
-
 // runGit runs a git command in the repo directory and returns stdout
 func (gs *GitService) runGit(args ...string) ([]byte, error) {
 	if gs.path == "" {

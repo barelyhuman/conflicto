@@ -169,7 +169,8 @@ func (gs *GitService) ListWorktrees() ([]WorktreeInfo, error) {
 }
 
 // FetchPRHead fetches a PR head into a local branch without touching the main working tree.
-func (gs *GitService) FetchPRHead(number int, localBranch string) error {
+// headOID is used when git cannot fetch pull/N/head (e.g. via the review connector).
+func (gs *GitService) FetchPRHead(number int, localBranch string, headOID func() (string, error)) error {
 	mainRepo, err := gs.MainRepoPath()
 	if err != nil {
 		return err
@@ -183,8 +184,8 @@ func (gs *GitService) FetchPRHead(number int, localBranch string) error {
 		return nil
 	}
 
-	// Fallback: fetch by OID via gh (handles edge cases where pull/N/head is unavailable).
-	oid, oidErr := gs.prHeadOID(mainRepo, number)
+	// Fallback: fetch by OID from the review connector (handles edge cases where pull/N/head is unavailable).
+	oid, oidErr := headOID()
 	if oidErr != nil {
 		return fmt.Errorf("%s: %w", strings.TrimSpace(string(out)), err)
 	}
@@ -197,20 +198,6 @@ func (gs *GitService) FetchPRHead(number int, localBranch string) error {
 		return fmt.Errorf("%s: %w", strings.TrimSpace(string(fallbackOut)), fallbackErr)
 	}
 	return nil
-}
-
-func (gs *GitService) prHeadOID(repoPath string, number int) (string, error) {
-	cmd := appCommand("gh", "pr", "view", fmt.Sprintf("%d", number), "--json", "headRefOid", "--jq", ".headRefOid")
-	cmd.Dir = repoPath
-	out, err := cmd.Output()
-	if err != nil {
-		return "", err
-	}
-	oid := strings.TrimSpace(string(out))
-	if oid == "" {
-		return "", fmt.Errorf("empty PR head OID")
-	}
-	return oid, nil
 }
 
 // AddWorktree creates a new worktree at path checking out branch.
