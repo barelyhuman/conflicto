@@ -59,8 +59,8 @@ export function App() {
   const isMacOS = platform === 'darwin';
   const isLinux = platform === 'linux';
 
-  // GitHub / PR state
-  const [ghStatus, setGhStatus] = useState({ installed: false, version: '', user: '' });
+  // Review connectors (UI slots + PR state)
+  const [connectorSlots, setConnectorSlots] = useState([]);
   const [prList, setPrList] = useState([]);
   const [prComments, setPrComments] = useState([]);
   const [prPrompt, setPrPrompt] = useState(null);
@@ -142,8 +142,11 @@ export function App() {
       onDiffLoaded: (data) => {
         selectionRef.current.applyDiff(data);
       },
-      onGHStatusChanged: (data) => {
-        setGhStatus(data ?? { installed: false, version: '', user: '' });
+      onGHStatusChanged: () => {
+        // Host status is mirrored in connector slot payloads; slots drive the UI.
+      },
+      onConnectorSlotsUpdated: (data) => {
+        setConnectorSlots(data?.slots ?? []);
       },
       onPRListUpdated: (data) => {
         setPrList(data?.prs ?? []);
@@ -220,6 +223,12 @@ export function App() {
       },
     });
   }, [sync]);
+
+  useEffect(() => {
+    api.getConnectorSlots().then((slots) => {
+      setConnectorSlots(slots ?? []);
+    }).catch(() => {});
+  }, []);
 
   // Resolve platform via the Wails runtime (GOOS)
   useEffect(() => {
@@ -563,6 +572,7 @@ export function App() {
                       onSelectPR={handleSelectPR}
                       onError={pushToast}
                       onCreatePR={() => setCreatePROpen(true)}
+                      connectorSlots={connectorSlots}
                     />
                     <Show
                       when={selection.activeFile}
@@ -679,8 +689,8 @@ export function App() {
           <PreferencesPage
             open={preferencesOpen}
             onClose={() => setPreferencesOpen(false)}
-            ghStatus={ghStatus}
-            onRefreshGH={() => api.detectGH()}
+            connectorSlots={connectorSlots}
+            onRefreshConnectors={() => api.detectGH()}
           />
 
           <CreatePRModal

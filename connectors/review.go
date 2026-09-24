@@ -29,14 +29,19 @@ type ReviewConnector interface {
 
 	// ClearRepoCache removes all cached reviews for a repository (e.g. on project switch).
 	ClearRepoCache(repoPath string)
+
+	// UISlots returns mount points this connector fills. active is true when this
+	// connector is the resolved review source for repoPath.
+	UISlots(repoPath string, active bool) []UISlot
 }
 
 // HostStatus is emitted to the UI (today mapped to ghStatusChanged).
 type HostStatus struct {
-	Installed bool
-	Version   string
-	User      string
-	Error     string
+	ConnectorID string
+	Installed   bool
+	Version     string
+	User        string
+	Error       string
 }
 
 // Review is a forge-agnostic pull request summary.

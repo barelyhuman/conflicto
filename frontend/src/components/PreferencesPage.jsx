@@ -1,16 +1,26 @@
-import { useState, useEffect } from 'preact/hooks';
+import { useState, useEffect, useMemo } from 'preact/hooks';
 import { IconX } from '@tabler/icons-preact';
-import { GHSettings } from './GHSettings.jsx';
+import { ConnectorSettingsPanel } from '../connectors/ConnectorSettingsPanel.jsx';
+import { preferencePanelSlots } from '../connectors/slots.js';
 
 /**
  * @param {Object} props
  * @param {boolean} props.open
  * @param {() => void} props.onClose
- * @param {{ installed: boolean, version: string, user: string }} props.ghStatus
- * @param {() => void} props.onRefreshGH
+ * @param {import('../connectors/types').ConnectorSlot[]} props.connectorSlots
+ * @param {() => void} props.onRefreshConnectors
  */
-export function PreferencesPage({ open, onClose, ghStatus, onRefreshGH }) {
-  const [activeTab, setActiveTab] = useState('github');
+export function PreferencesPage({ open, onClose, connectorSlots = [], onRefreshConnectors }) {
+  const panelSlots = useMemo(() => preferencePanelSlots(connectorSlots), [connectorSlots]);
+  const [activeTab, setActiveTab] = useState('general');
+
+  useEffect(() => {
+    if (activeTab === 'general') return;
+    const stillThere = panelSlots.some((s) => s.payload?.tabId === activeTab);
+    if (!stillThere) {
+      setActiveTab('general');
+    }
+  }, [panelSlots, activeTab]);
 
   // Close on Escape
   useEffect(() => {
@@ -24,6 +34,8 @@ export function PreferencesPage({ open, onClose, ghStatus, onRefreshGH }) {
   }, [open, onClose]);
 
   if (!open) return null;
+
+  const activePanel = panelSlots.find((s) => s.payload?.tabId === activeTab);
 
   return (
     <div class="prefs-overlay" onClick={(e) => {
@@ -46,13 +58,20 @@ export function PreferencesPage({ open, onClose, ghStatus, onRefreshGH }) {
             >
               General
             </button>
-            <button
-              type="button"
-              class={`prefs-tab${activeTab === 'github' ? ' active' : ''}`}
-              onClick={() => setActiveTab('github')}
-            >
-              GitHub
-            </button>
+            {panelSlots.map((slot) => {
+              const tabId = String(slot.payload?.tabId ?? slot.connectorId);
+              const label = String(slot.payload?.tabLabel ?? slot.connectorId);
+              return (
+                <button
+                  key={slot.connectorId}
+                  type="button"
+                  class={`prefs-tab${activeTab === tabId ? ' active' : ''}`}
+                  onClick={() => setActiveTab(tabId)}
+                >
+                  {label}
+                </button>
+              );
+            })}
           </aside>
 
           <main class="prefs-content">
@@ -61,7 +80,12 @@ export function PreferencesPage({ open, onClose, ghStatus, onRefreshGH }) {
                 <p>General settings coming soon.</p>
               </div>
             )}
-            {activeTab === 'github' && <GHSettings ghStatus={ghStatus} onRefresh={onRefreshGH} />}
+            {activePanel ? (
+              <ConnectorSettingsPanel
+                payload={{ ...activePanel.payload, connectorId: activePanel.connectorId }}
+                onRefresh={onRefreshConnectors}
+              />
+            ) : null}
           </main>
         </div>
       </div>

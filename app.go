@@ -83,6 +83,7 @@ func (a *App) startup(ctx context.Context) {
 func (a *App) domReady(ctx context.Context) {
 	// Align system traffic lights with the 44px island header (vertically centered).
 	applyMacTrafficLightPosition(16, 16)
+	a.emitConnectorSlots()
 }
 
 // shutdown is called at application termination
@@ -440,23 +441,46 @@ func emitHostStatus(a *App, status connectors.HostStatus) {
 		status.Error = "GitHub CLI (gh) was not found. Install it with Homebrew or add it to PATH."
 	}
 	a.EmitEvent("ghStatusChanged", map[string]interface{}{
-		"installed": status.Installed,
-		"version":   status.Version,
-		"user":      status.User,
-		"error":     status.Error,
+		"connectorId": status.ConnectorID,
+		"installed":   status.Installed,
+		"version":     status.Version,
+		"user":        status.User,
+		"error":       status.Error,
 	})
+}
+
+func (a *App) emitConnectorSlots() {
+	repo := ""
+	if a.git != nil && a.git.IsRepo() {
+		repo = a.git.path
+	}
+	a.EmitEvent("connectorSlotsUpdated", map[string]interface{}{
+		"slots": connectors.SlotsToMaps(a.reviews.SlotsForUI(repo)),
+	})
+}
+
+// GetConnectorSlots returns the current UI slot manifest (for initial frontend hydration).
+func (a *App) GetConnectorSlots() ([]map[string]interface{}, error) {
+	repo := ""
+	if a.git != nil && a.git.IsRepo() {
+		repo = a.git.path
+	}
+	return connectors.SlotsToMaps(a.reviews.SlotsForUI(repo)), nil
 }
 
 // DetectGH detects the primary review connector host (GitHub / gh today).
 func (a *App) DetectGH() {
 	if _, pathErr := commandPath("gh"); pathErr != nil {
 		emitHostStatus(a, connectors.HostStatus{
-			Installed: false,
-			Error:     "GitHub CLI (gh) was not found. Install it with Homebrew or add it to PATH.",
+			ConnectorID: "github",
+			Installed:   false,
+			Error:       "GitHub CLI (gh) was not found. Install it with Homebrew or add it to PATH.",
 		})
+		a.emitConnectorSlots()
 		return
 	}
 	emitHostStatus(a, a.reviews.PrimaryHostStatus())
+	a.emitConnectorSlots()
 }
 
 // GetPRList gets list of open PRs for the current repo and emits structured data
@@ -932,6 +956,7 @@ func (a *App) switchToProject(path string) error {
 		a.reviews.ClearRepoCache(previousPath)
 	}
 	a.reviews.ClearRepoCache(path)
+	a.emitConnectorSlots()
 	go a.GetPRList()
 
 	a.emitWorktreesUpdated()
@@ -1009,6 +1034,8 @@ func (a *App) Refresh() {
 	if a.git != nil && a.git.IsRepo() {
 		a.invalidatePRCache()
 		go a.GetPRList()
+	} else {
+		a.emitConnectorSlots()
 	}
 	a.emitWorktreesUpdated()
 	a.EmitEvent("refreshCompleted", nil)

@@ -33,8 +33,9 @@ func (g *GitHubConnector) DetectHost() HostStatus {
 	out, err := cmd.Output()
 	if err != nil {
 		return HostStatus{
-			Installed: false,
-			Error:     fmt.Sprintf("GitHub CLI could not be started: %v", err),
+			ConnectorID: g.ID(),
+			Installed:   false,
+			Error:       fmt.Sprintf("GitHub CLI could not be started: %v", err),
 		}
 	}
 
@@ -55,9 +56,60 @@ func (g *GitHubConnector) DetectHost() HostStatus {
 	}
 
 	return HostStatus{
-		Installed: true,
-		Version:   version,
-		User:      user,
+		ConnectorID: g.ID(),
+		Installed:   true,
+		Version:     version,
+		User:        user,
+	}
+}
+
+func (g *GitHubConnector) UISlots(repoPath string, active bool) []UISlot {
+	host := g.DetectHost()
+	settingsPayload := map[string]interface{}{
+		"tabId":     g.ID(),
+		"tabLabel":  g.DisplayName(),
+		"docsUrl":   "https://cli.github.com",
+		"installed": host.Installed,
+		"version":   host.Version,
+		"user":      host.User,
+		"error":     host.Error,
+	}
+
+	headerVisible := active && repoPath != ""
+	headerEnabled := headerVisible && host.Installed
+
+	reviewLabel := "PR"
+	createLabel := "+PR"
+
+	return []UISlot{
+		{
+			Slot:        SlotHeaderReviews,
+			ConnectorID: g.ID(),
+			Visible:     headerVisible,
+			Enabled:     headerEnabled,
+			Kind:        SlotKindReviewPicker,
+			Payload: map[string]interface{}{
+				"reviewLabel": reviewLabel,
+			},
+		},
+		{
+			Slot:        SlotHeaderCreateReview,
+			ConnectorID: g.ID(),
+			Visible:     headerVisible,
+			Enabled:     headerEnabled,
+			Kind:        SlotKindCreateReview,
+			Payload: map[string]interface{}{
+				"label": createLabel,
+			},
+		},
+		{
+			Slot:        SlotPreferencesPanel,
+			ConnectorID: g.ID(),
+			Visible:     true,
+			Enabled:     true,
+			Kind:        SlotKindConnectorSettings,
+			Payload:     settingsPayload,
+		},
 	}
 }
 

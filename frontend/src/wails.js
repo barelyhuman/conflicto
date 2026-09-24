@@ -42,6 +42,9 @@ export function setupWailsEvents(callbacks) {
   window.runtime.EventsOn('ghStatusChanged', (data) => {
     callbacks.onGHStatusChanged?.(data);
   });
+  window.runtime.EventsOn('connectorSlotsUpdated', (data) => {
+    callbacks.onConnectorSlotsUpdated?.(data);
+  });
   window.runtime.EventsOn('prListUpdated', (data) => {
     callbacks.onPRListUpdated?.(data);
   });
@@ -121,6 +124,8 @@ export const api = {
   refresh: () => window.go.main.App.Refresh(),
 
   detectGH: () => window.go.main.App.DetectGH(),
+
+  getConnectorSlots: () => window.go.main.App.GetConnectorSlots(),
 
   searchPRList: (limit, search) => window.go.main.App.SearchPRList(limit, search),
 

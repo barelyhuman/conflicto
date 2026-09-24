@@ -10,8 +10,19 @@ import { api } from '../wails.js';
  * @param {{ number: number, title: string, author: string, baseBranch: string }|null} props.currentPR
  * @param {(pr: { number: number, title: string, author: string, baseBranch: string } | null) => void} props.onSelect
  * @param {(title: string, message: string) => void} [props.onError]
+ * @param {boolean} [props.disabled]
+ * @param {string} [props.connectorId]
+ * @param {string} [props.reviewLabel]
  */
-export function PRPicker({ selectedPR, currentPR, onSelect, onError }) {
+export function PRPicker({
+  selectedPR,
+  currentPR,
+  onSelect,
+  onError,
+  disabled = false,
+  connectorId,
+  reviewLabel = 'PR',
+}) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
   const [results, setResults] = useState([]);
@@ -114,11 +125,13 @@ export function PRPicker({ selectedPR, currentPR, onSelect, onError }) {
         ref={triggerRef}
         type="button"
         class={`pr-trigger${selectedPR ? ' active' : ''}`}
-        onClick={() => setOpen(!open)}
+        onClick={() => !disabled && setOpen(!open)}
         aria-expanded={open}
+        disabled={disabled}
+        data-connector-id={connectorId ?? undefined}
       >
         <span class="pr-label">
-          {currentPR ? `#${currentPR.number} ${currentPR.title}` : 'PRs'}
+          {currentPR ? `#${currentPR.number} ${currentPR.title}` : `${reviewLabel}s`}
         </span>
         <IconChevronDown size={10} class={open ? 'open' : ''} />
       </button>

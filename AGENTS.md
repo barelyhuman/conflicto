@@ -40,6 +40,7 @@ Signals are the primary state layer. The repo includes local OpenCode skills und
 ## Backend (Go)
 
 - **Review connectors**: PR lists, file diffs, comments, checkout, and create flow through `connectors.ReviewConnector` (GitHub via `gh` today). `App` keeps the Wails method names (`GetPRList`, etc.); add new forges by implementing the interface and registering in `NewApp`.
+- **Connector UI slots**: Each connector implements `UISlots(repoPath, active)` with stable slot ids (`header.reviews`, `header.createReview`, `preferences.panel`) and kinds (`review-picker`, `create-review`, `connector-settings`). Backend emits `connectorSlotsUpdated`; frontend mounts components from `frontend/src/connectors/`.
 - **Go version**: 1.26+ (see `go.mod`).
 - **Wails binding**: Any exported method on the `App` struct (`app.go`) is automatically bound to JS as `window.go.main.App.MethodName`. Private helpers stay lowercase and are not callable from the frontend.
 - **Events**: Go emits via `runtime.EventsEmit`; frontend subscribes via `window.runtime.EventsOn`. See `frontend/src/wails.js` for the canonical event map.

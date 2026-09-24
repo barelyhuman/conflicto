@@ -3,7 +3,7 @@ import { SidebarToggle } from './SidebarToggle.jsx';
 import { DiffExpandToggle } from './DiffExpandToggle.jsx';
 import { CopyPathButton } from './CopyPathButton.jsx';
 import { ViewModeToggle } from './ViewModeToggle.jsx';
-import { PRPicker } from './PRPicker.jsx';
+import { HeaderConnectorSlots } from '../connectors/HeaderConnectorSlots.jsx';
 import { splitPath } from './ChangeTree.jsx';
 
 function absoluteFilePath(projectRoot, relativePath) {
@@ -32,6 +32,7 @@ function absoluteFilePath(projectRoot, relativePath) {
  * @param {(pr: { number: number, title: string, author: string, baseBranch: string } | null) => void} props.onSelectPR
  * @param {(title: string, message: string) => void} [props.onError]
  * @param {() => void} props.onCreatePR
+ * @param {import('../connectors/types').ConnectorSlot[]} [props.connectorSlots]
  */
 export function IslandHeader({
   sidebarOpen,
@@ -50,6 +51,7 @@ export function IslandHeader({
   onSelectPR,
   onError,
   onCreatePR,
+  connectorSlots = [],
 }) {
   const fullDiff = typeof showFullDiff === 'boolean' ? showFullDiff : showFullDiff.value;
   const editable = typeof canEdit === 'boolean' ? canEdit : canEdit.value;
@@ -91,22 +93,14 @@ export function IslandHeader({
         }}
       </Show>
 
-      <div class="island-header-actions">
-        <button
-          type="button"
-          class="create-pr-trigger"
-          onClick={onCreatePR}
-          title="Create PR"
-        >
-          +PR
-        </button>
-        <PRPicker
-          selectedPR={selectedPR}
-          currentPR={currentPR}
-          onSelect={onSelectPR}
-          onError={onError}
-        />
-      </div>
+      <HeaderConnectorSlots
+        slots={connectorSlots}
+        selectedPR={selectedPR}
+        currentPR={currentPR}
+        onSelectPR={onSelectPR}
+        onError={onError}
+        onCreatePR={onCreatePR}
+      />
     </div>
   );
 }

@@ -42,6 +42,10 @@ export function GetCurrentProject() {
   return window['go']['main']['App']['GetCurrentProject']();
 }
 
+export function GetConnectorSlots() {
+  return window['go']['main']['App']['GetConnectorSlots']();
+}
+
 export function GetDiff(arg1, arg2) {
   return window['go']['main']['App']['GetDiff'](arg1, arg2);
 }

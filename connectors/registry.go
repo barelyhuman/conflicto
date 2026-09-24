@@ -37,3 +37,37 @@ func (r *Registry) ClearRepoCache(repoPath string) {
 		c.ClearRepoCache(repoPath)
 	}
 }
+
+// SlotsForUI aggregates UISlot contributions from every registered connector.
+func (r *Registry) SlotsForUI(repoPath string) []UISlot {
+	var resolved ReviewConnector
+	if repoPath != "" {
+		resolved, _ = r.Resolve(repoPath)
+	}
+
+	out := make([]UISlot, 0, len(r.connectors)*3)
+	for _, c := range r.connectors {
+		active := resolved != nil && resolved.ID() == c.ID()
+		out = append(out, c.UISlots(repoPath, active)...)
+	}
+	return out
+}
+
+// SlotsToMaps serializes slots for Wails events.
+func SlotsToMaps(slots []UISlot) []map[string]interface{} {
+	out := make([]map[string]interface{}, 0, len(slots))
+	for _, s := range slots {
+		entry := map[string]interface{}{
+			"slot":        s.Slot,
+			"connectorId": s.ConnectorID,
+			"visible":     s.Visible,
+			"enabled":     s.Enabled,
+			"kind":        s.Kind,
+		}
+		if len(s.Payload) > 0 {
+			entry["payload"] = s.Payload
+		}
+		out = append(out, entry)
+	}
+	return out
+}
