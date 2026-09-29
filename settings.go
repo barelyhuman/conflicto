@@ -11,6 +11,9 @@ import (
 type Settings struct {
 	TerminalOpen   bool `json:"terminalOpen,omitempty"`
 	TerminalHeight int  `json:"terminalHeight,omitempty"`
+
+	// CINotificationMode: "off" (default), "all" (entire PR), or "workflow" (per workflow group).
+	CINotificationMode string `json:"ciNotificationMode,omitempty"`
 }
 
 // settingsFilePath returns the path to the settings file
