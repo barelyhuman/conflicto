@@ -140,6 +140,28 @@ export const SelectionModel = createModel(({ workingTree, activePR }) => {
       this.viewMode.value = 'edit';
     },
 
+    /**
+     * Open the mini editor from a terminal Cmd/Ctrl+click (repo-relative path).
+     * @param {string} path
+     * @param {number} [lineNumber=1]
+     */
+    openFromTerminal(path, lineNumber = 1) {
+      if (!path || this.activePR.peek() != null) return;
+      const line = Number.isFinite(lineNumber) && lineNumber >= 1 ? Math.floor(lineNumber) : 1;
+      this.activeDiff.value = null;
+      this.diffLoading.value = true;
+      this.showFullDiff.value = false;
+      this.editorGotoLine.value = line;
+      this.viewMode.value = 'edit';
+      const same =
+        this.activeFile.peek() === path && this.activeSection.peek() === 'unstaged';
+      this.activeFile.value = path;
+      this.activeSection.value = 'unstaged';
+      if (same) {
+        requestDiff(path, 'unstaged');
+      }
+    },
+
     applyDiff(data) {
       const path = data?.path ?? null;
       // Ignore late responses for a file the user already navigated away from.
