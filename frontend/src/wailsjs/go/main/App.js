@@ -34,6 +34,10 @@ export function Fetch() {
   return window['go']['main']['App']['Fetch']();
 }
 
+export function GetCIPrefs() {
+  return window['go']['main']['App']['GetCIPrefs']();
+}
+
 export function GetConflictFile(arg1) {
   return window['go']['main']['App']['GetConflictFile'](arg1);
 }
@@ -68,22 +72,6 @@ export function GetPRList() {
 
 export function GetRecentProjects() {
   return window['go']['main']['App']['GetRecentProjects']();
-}
-
-export function GetCIPrefs() {
-  return window['go']['main']['App']['GetCIPrefs']();
-}
-
-export function SetCIPrefs(arg1, arg2) {
-  return window['go']['main']['App']['SetCIPrefs'](arg1, arg2);
-}
-
-export function StartPRChecksMonitor(arg1) {
-  return window['go']['main']['App']['StartPRChecksMonitor'](arg1);
-}
-
-export function StopPRChecksMonitor() {
-  return window['go']['main']['App']['StopPRChecksMonitor']();
 }
 
 export function GetTerminalPrefs() {
@@ -126,12 +114,24 @@ export function SearchPRList(arg1, arg2) {
   return window['go']['main']['App']['SearchPRList'](arg1, arg2);
 }
 
+export function SetCIPrefs(arg1) {
+  return window['go']['main']['App']['SetCIPrefs'](arg1);
+}
+
 export function SetTerminalPrefs(arg1, arg2) {
   return window['go']['main']['App']['SetTerminalPrefs'](arg1, arg2);
 }
 
 export function StageFile(arg1) {
   return window['go']['main']['App']['StageFile'](arg1);
+}
+
+export function StartPRChecksMonitor(arg1) {
+  return window['go']['main']['App']['StartPRChecksMonitor'](arg1);
+}
+
+export function StopPRChecksMonitor() {
+  return window['go']['main']['App']['StopPRChecksMonitor']();
 }
 
 export function SwitchBranch(arg1) {

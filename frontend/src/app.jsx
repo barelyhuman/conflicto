@@ -64,7 +64,7 @@ export function App() {
   const [prList, setPrList] = useState([]);
   const [prComments, setPrComments] = useState([]);
   const [prChecksSummary, setPrChecksSummary] = useState(null);
-  const [ciPrefs, setCiPrefs] = useState({ enabled: false, mode: 'all' });
+  const [ciNotifyMode, setCiNotifyMode] = useState(/** @type {'off' | 'all' | 'workflow'} */ ('off'));
   const [prPrompt, setPrPrompt] = useState(null);
   const [prCheckoutPending, setPrCheckoutPending] = useState(/** @type {null | 'local' | 'worktree'} */ (null));
   // Create PR modal
@@ -294,10 +294,10 @@ export function App() {
       terminalPrefsReady.current = true;
     });
     api.getCIPrefs().then((prefs) => {
-      setCiPrefs({
-        enabled: !!prefs?.enabled,
-        mode: prefs?.mode || 'all',
-      });
+      const mode = prefs?.mode;
+      if (mode === 'off' || mode === 'all' || mode === 'workflow') {
+        setCiNotifyMode(mode);
+      }
     });
   }, []);
 
@@ -711,8 +711,8 @@ export function App() {
             onClose={() => setPreferencesOpen(false)}
             ghStatus={ghStatus}
             onRefreshGH={() => api.detectGH()}
-            ciPrefs={ciPrefs}
-            onCIPrefsChange={setCiPrefs}
+            ciNotifyMode={ciNotifyMode}
+            onCINotifyModeChange={setCiNotifyMode}
           />
 
           <CreatePRModal

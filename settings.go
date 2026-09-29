@@ -12,9 +12,7 @@ type Settings struct {
 	TerminalOpen   bool `json:"terminalOpen,omitempty"`
 	TerminalHeight int  `json:"terminalHeight,omitempty"`
 
-	// CINotificationsEnabled toggles desktop notifications for PR check completion.
-	CINotificationsEnabled bool `json:"ciNotificationsEnabled,omitempty"`
-	// CINotificationMode: "off", "all" (entire PR), or "workflow" (per workflow group).
+	// CINotificationMode: "off" (default), "all" (entire PR), or "workflow" (per workflow group).
 	CINotificationMode string `json:"ciNotificationMode,omitempty"`
 }
 

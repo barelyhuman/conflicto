@@ -171,7 +171,7 @@ export const api = {
 
   getCIPrefs: () => window.go.main.App.GetCIPrefs(),
 
-  setCIPrefs: (enabled, mode) => window.go.main.App.SetCIPrefs(enabled, mode),
+  setCIPrefs: (mode) => window.go.main.App.SetCIPrefs(mode),
 
   startPRChecksMonitor: (number) => window.go.main.App.StartPRChecksMonitor(number),
 

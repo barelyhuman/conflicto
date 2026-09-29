@@ -9,10 +9,10 @@ import { CISettings } from './CISettings.jsx';
  * @param {() => void} props.onClose
  * @param {{ installed: boolean, version: string, user: string }} props.ghStatus
  * @param {() => void} props.onRefreshGH
- * @param {{ enabled: boolean, mode: string }} props.ciPrefs
- * @param {(prefs: { enabled: boolean, mode: string }) => void} props.onCIPrefsChange
+ * @param {'off' | 'all' | 'workflow'} props.ciNotifyMode
+ * @param {(mode: 'off' | 'all' | 'workflow') => void} props.onCINotifyModeChange
  */
-export function PreferencesPage({ open, onClose, ghStatus, onRefreshGH, ciPrefs, onCIPrefsChange }) {
+export function PreferencesPage({ open, onClose, ghStatus, onRefreshGH, ciNotifyMode, onCINotifyModeChange }) {
   const [activeTab, setActiveTab] = useState('github');
 
   // Close on Escape
@@ -60,7 +60,7 @@ export function PreferencesPage({ open, onClose, ghStatus, onRefreshGH, ciPrefs,
 
           <main class="prefs-content">
             {activeTab === 'general' && (
-              <CISettings prefs={ciPrefs} onChange={onCIPrefsChange} />
+              <CISettings mode={ciNotifyMode} onChange={onCINotifyModeChange} />
             )}
             {activeTab === 'github' && <GHSettings ghStatus={ghStatus} onRefresh={onRefreshGH} />}
           </main>

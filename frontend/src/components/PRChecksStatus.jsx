@@ -4,6 +4,7 @@ import { AnchoredMenu } from './AnchoredMenu.jsx';
 
 /**
  * CI status dot + check list popover for the active PR.
+ * Labels derive from the summary; open state is local UI only.
  *
  * @param {Object} props
  * @param {boolean} props.active
@@ -19,21 +20,20 @@ export function PRChecksStatus({ active, summary }) {
 
   if (!active) return null;
 
-  const status = summary?.error ? 'error' : (summary?.status ?? 'none');
-  const label = statusLabel(summary);
+  const view = checksView(summary);
 
   return (
     <>
       <button
         ref={triggerRef}
         type="button"
-        class={`pr-checks-trigger status-${status}`}
+        class={`pr-checks-trigger status-${view.status}`}
         onClick={() => setOpen((v) => !v)}
-        title={label}
-        aria-label={label}
+        title={view.title}
+        aria-label={view.title}
       >
         <span class="pr-checks-dot" aria-hidden="true" />
-        <span class="pr-checks-label">{shortLabel(summary)}</span>
+        <span class="pr-checks-label">{view.short}</span>
       </button>
 
       <AnchoredMenu
@@ -44,9 +44,9 @@ export function PRChecksStatus({ active, summary }) {
       >
         <div class="pr-checks-panel">
           <div class="pr-checks-panel-title">CI checks</div>
-          {summary?.error ? (
+          {view.body === 'error' ? (
             <p class="pr-checks-error">{summary.error}</p>
-          ) : (summary?.total ?? 0) === 0 ? (
+          ) : view.body === 'empty' ? (
             <p class="pr-checks-empty">No checks reported for this PR.</p>
           ) : (
             <>
@@ -79,141 +79,48 @@ export function PRChecksStatus({ active, summary }) {
           )}
         </div>
       </AnchoredMenu>
-
-      <style>{`
-        .pr-checks-trigger {
-          display: inline-flex;
-          align-items: center;
-          gap: 6px;
-          padding: 4px 8px;
-          border-radius: 6px;
-          border: 1px solid var(--border-subtle);
-          background: var(--surface);
-          color: var(--text-muted);
-          font-size: 11px;
-          cursor: pointer;
-          transition: background 0.15s, border-color 0.15s;
-        }
-        .pr-checks-trigger:hover {
-          background: var(--accent-bg);
-          color: var(--text);
-        }
-        .pr-checks-dot {
-          width: 8px;
-          height: 8px;
-          border-radius: 50%;
-          background: var(--text-muted);
-          flex-shrink: 0;
-        }
-        .status-running .pr-checks-dot {
-          background: #d4a017;
-          box-shadow: 0 0 0 0 rgba(212, 160, 23, 0.5);
-          animation: pr-checks-pulse 1.6s ease-out infinite;
-        }
-        .status-success .pr-checks-dot { background: #3d9a57; }
-        .status-failure .pr-checks-dot { background: #c44; }
-        .status-error .pr-checks-dot { background: #888; }
-        @keyframes pr-checks-pulse {
-          0% { box-shadow: 0 0 0 0 rgba(212, 160, 23, 0.45); }
-          70% { box-shadow: 0 0 0 6px rgba(212, 160, 23, 0); }
-          100% { box-shadow: 0 0 0 0 rgba(212, 160, 23, 0); }
-        }
-        .pr-checks-label {
-          max-width: 72px;
-          overflow: hidden;
-          text-overflow: ellipsis;
-          white-space: nowrap;
-        }
-        .pr-checks-menu {
-          min-width: 280px;
-          max-width: 360px;
-        }
-        .pr-checks-panel {
-          padding: 10px 12px 12px;
-        }
-        .pr-checks-panel-title {
-          font-size: 12px;
-          font-weight: 600;
-          color: var(--text-h);
-          margin-bottom: 8px;
-        }
-        .pr-checks-stats {
-          display: flex;
-          gap: 10px;
-          font-size: 11px;
-          margin-bottom: 8px;
-          color: var(--text-muted);
-        }
-        .stat-fail { color: #c44; }
-        .stat-pass { color: #3d9a57; }
-        .pr-checks-list {
-          list-style: none;
-          margin: 0;
-          padding: 0;
-          max-height: 220px;
-          overflow-y: auto;
-        }
-        .check-row {
-          display: grid;
-          grid-template-columns: 1fr auto auto;
-          gap: 6px;
-          align-items: center;
-          padding: 5px 0;
-          border-top: 1px solid var(--border-subtle);
-          font-size: 11px;
-        }
-        .check-row:first-child { border-top: none; }
-        .check-name { color: var(--text); }
-        .check-workflow {
-          color: var(--text-muted);
-          font-size: 10px;
-        }
-        .check-link {
-          color: var(--text-muted);
-          display: flex;
-        }
-        .check-link:hover { color: var(--text); }
-        .bucket-fail .check-name { color: #c44; }
-        .pr-checks-empty, .pr-checks-error {
-          margin: 0;
-          font-size: 11px;
-          color: var(--text-muted);
-        }
-        .pr-checks-error { color: #c44; }
-      `}</style>
     </>
   );
 }
 
-function statusLabel(summary) {
-  if (summary?.error) return `CI status unavailable: ${summary.error}`;
-  switch (summary?.status) {
-    case 'running':
-      return `${summary.pending ?? 0} CI check(s) running`;
-    case 'success':
-      return 'All CI checks passed';
-    case 'failure':
-      return `${summary.fail ?? 0} CI check(s) failed`;
-    case 'none':
-      return 'No CI checks';
-    default:
-      return 'Loading CI status…';
+/** Derive trigger/panel presentation from a summary payload. */
+function checksView(summary) {
+  if (summary?.error) {
+    return {
+      status: 'error',
+      title: `CI status unavailable: ${summary.error}`,
+      short: 'CI ?',
+      body: 'error',
+    };
   }
-}
-
-function shortLabel(summary) {
-  if (summary?.error) return 'CI ?';
-  if (!summary) return 'CI …';
+  if (!summary) {
+    return { status: 'none', title: 'Loading CI status…', short: 'CI …', body: 'empty' };
+  }
   switch (summary.status) {
     case 'running':
-      return `${summary.pending ?? 0} running`;
+      return {
+        status: 'running',
+        title: `${summary.pending ?? 0} CI check(s) running`,
+        short: `${summary.pending ?? 0} running`,
+        body: 'list',
+      };
     case 'success':
-      return 'passed';
+      return {
+        status: 'success',
+        title: 'All CI checks passed',
+        short: 'passed',
+        body: 'list',
+      };
     case 'failure':
-      return `${summary.fail ?? 0} failed`;
+      return {
+        status: 'failure',
+        title: `${summary.fail ?? 0} CI check(s) failed`,
+        short: `${summary.fail ?? 0} failed`,
+        body: 'list',
+      };
     case 'none':
-      return 'no checks';
+      return { status: 'none', title: 'No CI checks', short: 'no checks', body: 'empty' };
     default:
-      return 'CI';
+      return { status: 'none', title: 'Loading CI status…', short: 'CI', body: 'empty' };
   }
 }

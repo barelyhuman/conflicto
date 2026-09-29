@@ -18,6 +18,8 @@ export function EmitEvent(arg1:string,arg2:any):Promise<void>;
 
 export function Fetch():Promise<void>;
 
+export function GetCIPrefs():Promise<Record<string, any>>;
+
 export function GetConflictFile(arg1:string):Promise<main.ConflictFile>;
 
 export function GetCurrentProject():Promise<Record<string, string>>;
@@ -56,9 +58,15 @@ export function RemoveWorktree(arg1:string):Promise<void>;
 
 export function SearchPRList(arg1:number,arg2:string):Promise<Array<Record<string, any>>>;
 
+export function SetCIPrefs(arg1:string):Promise<void>;
+
 export function SetTerminalPrefs(arg1:boolean,arg2:number):Promise<void>;
 
 export function StageFile(arg1:string):Promise<void>;
+
+export function StartPRChecksMonitor(arg1:number):Promise<void>;
+
+export function StopPRChecksMonitor():Promise<void>;
 
 export function SwitchBranch(arg1:string):Promise<void>;
 

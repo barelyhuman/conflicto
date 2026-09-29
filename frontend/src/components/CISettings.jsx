@@ -1,25 +1,18 @@
-import { useState, useEffect } from 'preact/hooks';
 import { api } from '../wails.js';
 
 /**
+ * Controlled CI notification prefs. Truth lives in the parent; this only renders + persists.
+ *
  * @param {Object} props
- * @param {{ enabled: boolean, mode: string }} props.prefs
- * @param {(prefs: { enabled: boolean, mode: string }) => void} props.onChange
+ * @param {'off' | 'all' | 'workflow'} props.mode
+ * @param {(mode: 'off' | 'all' | 'workflow') => void} props.onChange
  */
-export function CISettings({ prefs, onChange }) {
-  const [enabled, setEnabled] = useState(prefs.enabled);
-  const [mode, setMode] = useState(prefs.mode || 'all');
+export function CISettings({ mode, onChange }) {
+  const enabled = mode !== 'off';
 
-  useEffect(() => {
-    setEnabled(prefs.enabled);
-    setMode(prefs.mode || 'all');
-  }, [prefs.enabled, prefs.mode]);
-
-  const persist = (nextEnabled, nextMode) => {
-    setEnabled(nextEnabled);
-    setMode(nextMode);
-    onChange({ enabled: nextEnabled, mode: nextMode });
-    api.setCIPrefs(nextEnabled, nextMode).catch(() => {});
+  const persist = (next) => {
+    onChange(next);
+    api.setCIPrefs(next).catch(() => {});
   };
 
   return (
@@ -33,23 +26,20 @@ export function CISettings({ prefs, onChange }) {
       <label class="ci-settings-row">
         <input
           type="checkbox"
-          checked={enabled && mode !== 'off'}
-          onChange={(e) => {
-            const on = e.currentTarget.checked;
-            persist(on, on ? (mode === 'off' ? 'all' : mode) : mode);
-          }}
+          checked={enabled}
+          onChange={(e) => persist(e.currentTarget.checked ? 'all' : 'off')}
         />
         <span>Enable CI completion notifications</span>
       </label>
 
-      <fieldset class="ci-settings-modes" disabled={!enabled || mode === 'off'}>
+      <fieldset class="ci-settings-modes" disabled={!enabled}>
         <legend class="ci-settings-legend">Notify when</legend>
         <label class="ci-settings-row">
           <input
             type="radio"
             name="ci-notify-mode"
             checked={mode === 'all'}
-            onChange={() => persist(true, 'all')}
+            onChange={() => persist('all')}
           />
           <span>All checks on the PR have finished</span>
         </label>
@@ -58,52 +48,11 @@ export function CISettings({ prefs, onChange }) {
             type="radio"
             name="ci-notify-mode"
             checked={mode === 'workflow'}
-            onChange={() => persist(true, 'workflow')}
+            onChange={() => persist('workflow')}
           />
           <span>Each workflow group finishes (one notification per workflow)</span>
         </label>
       </fieldset>
-
-      <style>{`
-        .ci-settings-heading {
-          margin: 0 0 6px;
-          font-size: 15px;
-          font-weight: 600;
-          color: var(--text-h);
-        }
-        .ci-settings-desc {
-          margin: 0 0 16px;
-          font-size: 13px;
-          color: var(--text-muted);
-          line-height: 1.45;
-        }
-        .ci-settings-row {
-          display: flex;
-          align-items: flex-start;
-          gap: 8px;
-          font-size: 13px;
-          color: var(--text);
-          margin-bottom: 10px;
-          cursor: pointer;
-        }
-        .ci-settings-row input {
-          margin-top: 2px;
-        }
-        .ci-settings-modes {
-          border: none;
-          margin: 8px 0 0;
-          padding: 0;
-        }
-        .ci-settings-legend {
-          font-size: 12px;
-          font-weight: 500;
-          color: var(--text-muted);
-          margin-bottom: 8px;
-        }
-        .ci-settings-modes:disabled {
-          opacity: 0.45;
-        }
-      `}</style>
     </div>
   );
 }

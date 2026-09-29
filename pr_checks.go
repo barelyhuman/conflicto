@@ -25,7 +25,7 @@ type PRCheck struct {
 // PRChecksSummary is emitted to the frontend on each poll.
 type PRChecksSummary struct {
 	Number  int       `json:"number"`
-	Status  string    `json:"status"`
+	Status  string    `json:"status"` // none | running | success | failure
 	Pending int       `json:"pending"`
 	Pass    int       `json:"pass"`
 	Fail    int       `json:"fail"`
@@ -33,26 +33,36 @@ type PRChecksSummary struct {
 	Checks  []PRCheck `json:"checks"`
 }
 
-type prChecksMonitor struct {
-	mu sync.Mutex
-
-	cancel context.CancelFunc
-	number int
-
-	initialized         bool
-	allCompleteNotified bool
-	workflows           map[string]*workflowTrack
+// ciNotification is a desktop notification to send (I/O happens at the edge).
+type ciNotification struct {
+	Title string
+	Body  string
 }
 
-type workflowTrack struct {
-	hadPending       bool
-	completeNotified bool
+// ciWatchState tracks pending→done edges across polls so we only notify once per cycle.
+type ciWatchState struct {
+	Primed      bool
+	AllNotified bool
+	Pending     map[string]bool // workflow → currently pending
+	WFNotified  map[string]bool // workflow → already notified for current done cycle
+}
+
+func emptyCIWatchState() ciWatchState {
+	return ciWatchState{
+		Pending:    map[string]bool{},
+		WFNotified: map[string]bool{},
+	}
+}
+
+type prChecksMonitor struct {
+	mu     sync.Mutex
+	cancel context.CancelFunc
+	number int
+	watch  ciWatchState
 }
 
 func newPRChecksMonitor() *prChecksMonitor {
-	return &prChecksMonitor{
-		workflows: make(map[string]*workflowTrack),
-	}
+	return &prChecksMonitor{watch: emptyCIWatchState()}
 }
 
 func (m *prChecksMonitor) stop() {
@@ -63,13 +73,32 @@ func (m *prChecksMonitor) stop() {
 		m.cancel = nil
 	}
 	m.number = 0
-	m.resetTrackingLocked()
+	m.watch = emptyCIWatchState()
 }
 
-func (m *prChecksMonitor) resetTrackingLocked() {
-	m.initialized = false
-	m.allCompleteNotified = false
-	m.workflows = make(map[string]*workflowTrack)
+// checkKind maps a gh check row into pending | pass | fail | other.
+func checkKind(c PRCheck) string {
+	switch c.Bucket {
+	case "pending":
+		return "pending"
+	case "pass", "skipping":
+		return "pass"
+	case "fail", "cancel":
+		return "fail"
+	}
+	switch c.State {
+	case "PENDING", "IN_PROGRESS", "QUEUED", "WAITING", "REQUESTED":
+		return "pending"
+	default:
+		return "other"
+	}
+}
+
+func workflowKey(workflow string) string {
+	if workflow == "" {
+		return "Checks"
+	}
+	return workflow
 }
 
 func summarizePRChecks(number int, checks []PRCheck) PRChecksSummary {
@@ -80,17 +109,13 @@ func summarizePRChecks(number int, checks []PRCheck) PRChecksSummary {
 		Status: "none",
 	}
 	for _, c := range checks {
-		switch c.Bucket {
+		switch checkKind(c) {
 		case "pending":
 			summary.Pending++
-		case "pass", "skipping":
+		case "pass":
 			summary.Pass++
-		case "fail", "cancel":
+		case "fail":
 			summary.Fail++
-		default:
-			if isPendingBucket(c.Bucket, c.State) {
-				summary.Pending++
-			}
 		}
 	}
 	switch {
@@ -106,32 +131,90 @@ func summarizePRChecks(number int, checks []PRCheck) PRChecksSummary {
 	return summary
 }
 
-func isPendingBucket(bucket, state string) bool {
-	if bucket == "pending" {
-		return true
-	}
-	switch state {
-	case "PENDING", "IN_PROGRESS", "QUEUED", "WAITING", "REQUESTED":
-		return true
-	default:
-		return false
-	}
-}
-
-func workflowKey(workflow string) string {
-	if workflow == "" {
-		return "Checks"
-	}
-	return workflow
-}
-
-func pendingByWorkflow(checks []PRCheck) map[string]int {
-	out := make(map[string]int)
+// workflowPending returns workflow → has any pending check.
+func workflowPending(checks []PRCheck) map[string]bool {
+	out := make(map[string]bool)
 	for _, c := range checks {
 		key := workflowKey(c.Workflow)
-		if isPendingBucket(c.Bucket, c.State) {
-			out[key]++
+		if checkKind(c) == "pending" {
+			out[key] = true
+		} else if _, ok := out[key]; !ok {
+			out[key] = false
 		}
+	}
+	return out
+}
+
+// advanceCINotify is pure: previous watch + summary + mode → next watch + notifications.
+// mode: "off" | "all" | "workflow". Watch state always advances; notes only when mode matches.
+func advanceCINotify(prev ciWatchState, summary PRChecksSummary, mode string) (ciWatchState, []ciNotification) {
+	cur := workflowPending(summary.Checks)
+	next := ciWatchState{
+		Primed:      true,
+		AllNotified: prev.AllNotified,
+		Pending:     cur,
+		WFNotified:  copyBoolMap(prev.WFNotified),
+	}
+
+	if !prev.Primed {
+		// Seed without firing: already-idle PR should not notify on open.
+		if summary.Total > 0 && summary.Pending == 0 {
+			next.AllNotified = true
+			for k := range cur {
+				next.WFNotified[k] = true
+			}
+		}
+		return next, nil
+	}
+
+	title := fmt.Sprintf("PR #%d CI", summary.Number)
+	var notes []ciNotification
+
+	if summary.Pending > 0 {
+		next.AllNotified = false
+	} else if summary.Total > 0 && !prev.AllNotified {
+		next.AllNotified = true
+		if mode == "all" {
+			body := "All checks finished"
+			if summary.Fail > 0 {
+				body = fmt.Sprintf("All checks finished (%d failed)", summary.Fail)
+			}
+			notes = append(notes, ciNotification{Title: title, Body: body})
+		}
+	}
+
+	keys := make(map[string]struct{}, len(prev.Pending)+len(cur))
+	for k := range prev.Pending {
+		keys[k] = struct{}{}
+	}
+	for k := range cur {
+		keys[k] = struct{}{}
+	}
+	for k := range keys {
+		wasPending := prev.Pending[k]
+		nowPending := cur[k]
+		if nowPending {
+			next.WFNotified[k] = false
+			continue
+		}
+		if wasPending && !prev.WFNotified[k] {
+			next.WFNotified[k] = true
+			if mode == "workflow" {
+				notes = append(notes, ciNotification{
+					Title: title,
+					Body:  fmt.Sprintf("%s checks finished", k),
+				})
+			}
+		}
+	}
+
+	return next, notes
+}
+
+func copyBoolMap(in map[string]bool) map[string]bool {
+	out := make(map[string]bool, len(in))
+	for k, v := range in {
+		out[k] = v
 	}
 	return out
 }
@@ -156,6 +239,19 @@ func (a *App) fetchPRChecks(number int) ([]PRCheck, error) {
 	return checks, nil
 }
 
+func (a *App) ciNotifyMode() string {
+	if a.settings == nil {
+		return "off"
+	}
+	mode := a.settings.CINotificationMode
+	switch mode {
+	case "all", "workflow", "off":
+		return mode
+	default:
+		return "off"
+	}
+}
+
 // StartPRChecksMonitor polls CI for the given PR until stopped or switched.
 func (a *App) StartPRChecksMonitor(number int) {
 	if number <= 0 {
@@ -176,7 +272,7 @@ func (a *App) StartPRChecksMonitor(number int) {
 	ctx, cancel := context.WithCancel(context.Background())
 	a.prChecks.cancel = cancel
 	a.prChecks.number = number
-	a.prChecks.resetTrackingLocked()
+	a.prChecks.watch = emptyCIWatchState()
 	a.prChecks.mu.Unlock()
 
 	go a.runPRChecksMonitor(ctx, number)
@@ -202,7 +298,7 @@ func (a *App) runPRChecksMonitor(ctx context.Context, number int) {
 		}
 		summary := summarizePRChecks(number, checks)
 		a.EmitEvent("prChecksUpdated", summary)
-		a.maybeNotifyPRChecks(number, summary)
+		a.applyCINotifications(number, summary)
 	}
 
 	tick()
@@ -218,78 +314,23 @@ func (a *App) runPRChecksMonitor(ctx context.Context, number int) {
 	}
 }
 
-func (a *App) maybeNotifyPRChecks(number int, summary PRChecksSummary) {
-	if a.settings == nil || !a.settings.CINotificationsEnabled {
-		return
-	}
-	mode := a.settings.CINotificationMode
-	if mode == "" || mode == "off" {
-		return
-	}
+func (a *App) applyCINotifications(number int, summary PRChecksSummary) {
 	if a.prChecks == nil {
 		return
 	}
+	mode := a.ciNotifyMode()
 
 	a.prChecks.mu.Lock()
-	defer a.prChecks.mu.Unlock()
-
 	if a.prChecks.number != number {
+		a.prChecks.mu.Unlock()
 		return
 	}
+	next, notes := advanceCINotify(a.prChecks.watch, summary, mode)
+	a.prChecks.watch = next
+	a.prChecks.mu.Unlock()
 
-	pendingMap := pendingByWorkflow(summary.Checks)
-	allKeys := make(map[string]struct{})
-	for k := range pendingMap {
-		allKeys[k] = struct{}{}
-	}
-	for _, c := range summary.Checks {
-		allKeys[workflowKey(c.Workflow)] = struct{}{}
-	}
-
-	for key := range allKeys {
-		if _, ok := a.prChecks.workflows[key]; !ok {
-			a.prChecks.workflows[key] = &workflowTrack{}
-		}
-	}
-
-	if !a.prChecks.initialized {
-		for key := range allKeys {
-			a.prChecks.workflows[key].hadPending = pendingMap[key] > 0
-		}
-		if summary.Total > 0 && summary.Pending == 0 {
-			a.prChecks.allCompleteNotified = true
-		}
-		a.prChecks.initialized = true
-		return
-	}
-
-	titleBase := fmt.Sprintf("PR #%d CI", number)
-
-	if mode == "workflow" {
-		for key, track := range a.prChecks.workflows {
-			pending := pendingMap[key]
-			if track.hadPending && pending == 0 && !track.completeNotified {
-				track.completeNotified = true
-				a.sendCINotification(
-					titleBase,
-					fmt.Sprintf("%s checks finished", key),
-				)
-			}
-			track.hadPending = pending > 0
-		}
-		return
-	}
-
-	if mode == "all" && summary.Total > 0 && summary.Pending == 0 && !a.prChecks.allCompleteNotified {
-		a.prChecks.allCompleteNotified = true
-		body := "All checks finished"
-		if summary.Fail > 0 {
-			body = fmt.Sprintf("All checks finished (%d failed)", summary.Fail)
-		}
-		a.sendCINotification(titleBase, body)
-	}
-	if mode == "all" && summary.Pending > 0 {
-		a.prChecks.allCompleteNotified = false
+	for _, n := range notes {
+		a.sendCINotification(n.Title, n.Body)
 	}
 }
 

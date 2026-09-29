@@ -177,33 +177,21 @@ func (a *App) SetTerminalPrefs(open bool, height int) error {
 
 // GetCIPrefs returns persisted CI notification preferences.
 func (a *App) GetCIPrefs() map[string]interface{} {
-	enabled := false
-	mode := "all"
-	if a.settings != nil {
-		enabled = a.settings.CINotificationsEnabled
-		mode = a.settings.CINotificationMode
-		if mode == "" {
-			mode = "all"
-		}
-	}
 	return map[string]interface{}{
-		"enabled": enabled,
-		"mode":    mode,
+		"mode": a.ciNotifyMode(),
 	}
 }
 
-// SetCIPrefs persists CI notification preferences.
-// mode is "off", "all", or "workflow".
-func (a *App) SetCIPrefs(enabled bool, mode string) error {
+// SetCIPrefs persists CI notification mode: "off", "all", or "workflow".
+func (a *App) SetCIPrefs(mode string) error {
 	if a.settings == nil {
 		a.settings = &Settings{}
 	}
 	switch mode {
 	case "off", "all", "workflow":
 	default:
-		mode = "all"
+		mode = "off"
 	}
-	a.settings.CINotificationsEnabled = enabled
 	a.settings.CINotificationMode = mode
 	return a.settings.Save()
 }
