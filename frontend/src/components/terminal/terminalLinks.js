@@ -9,7 +9,7 @@
 const HTTP_RE = /https?:\/\/[^\s<>"'\]]+/g;
 const FILE_URL_RE = /file:\/\/[^\s<>"'\]]+/g;
 const FILE_PATH_RE =
-  /(?:\.\.?\/|\/)(?:[^\s\]:]+)(?::\d+(?::\d+)?)?|\b[A-Za-z0-9._-]+\/[A-Za-z0-9._./-]+(?::\d+(?::\d+)?)?/g;
+  /(?:\.\.?\/|\/)(?:[^\s\]:]+)(?::\d+(?::\d+)?)?|\b[A-Za-z0-9._-]+\/[A-Za-z0-9._./-]+\.[A-Za-z0-9]+(?::\d+(?::\d+)?)?|\b[A-Za-z0-9._-]+\/[A-Za-z0-9._./-]+:\d+(?::\d+)?/g;
 
 /**
  * @param {MouseEvent} event
@@ -96,7 +96,7 @@ export function findTerminalLinksInLine(lineText) {
       if (overlaps(start, end)) continue;
       mark(start, end);
       if (re === HTTP_RE) {
-        links.push({ kind: 'http', url: match[0], start, end });
+        links.push({ kind: 'http', url: trimLinkToken(match[0]), start, end });
       } else {
         const parsed = parsePathLineColumn(match[0]);
         links.push({
@@ -243,7 +243,7 @@ export function terminalLinksForLine(lineText, bufferLineNumber, ctx) {
       text: link.kind === 'http' ? link.url : link.raw,
       range: {
         start: { x: startX, y: bufferLineNumber },
-        end: { x: endX, y: bufferLineNumber },
+        end: { x: endX + 1, y: bufferLineNumber },
       },
       activate: (event) => {
         if (!isTerminalLinkClick(event)) return;
@@ -268,7 +268,7 @@ export function terminalLinksForLine(lineText, bufferLineNumber, ctx) {
 
 /**
  * @param {import('@xterm/xterm').Terminal} term
- * @param {{ repoRoot: string|null|undefined, getCwd: () => string|null|undefined, onOpen: (payload: TerminalOpenPayload) => void }} options
+ * @param {{ getRepoRoot: () => string|null|undefined, getCwd: () => string|null|undefined, onOpen: (payload: TerminalOpenPayload) => void }} options
  */
 export function attachTerminalLinkHandling(term, options) {
   const linkHandler = {
@@ -281,7 +281,7 @@ export function attachTerminalLinkHandling(term, options) {
       }
       if (/^file:\/\//i.test(text)) {
         const repoPath = resolveTerminalFilePath(text, {
-          repoRoot: options.repoRoot,
+          repoRoot: options.getRepoRoot(),
           cwd: options.getCwd(),
         });
         if (!repoPath) return;
@@ -302,7 +302,7 @@ export function attachTerminalLinkHandling(term, options) {
       }
       const lineText = line.translateToString(true);
       const links = terminalLinksForLine(lineText, bufferLineNumber, {
-        repoRoot: options.repoRoot,
+        repoRoot: options.getRepoRoot(),
         cwd: options.getCwd(),
         onOpen: options.onOpen,
       });

@@ -159,7 +159,7 @@ export function TerminalPane({
     });
 
     const detachLinks = attachTerminalLinkHandling(term, {
-      repoRoot: repoRootRef.current,
+      getRepoRoot: () => repoRootRef.current,
       getCwd: () => cwdRef.current ?? repoRootRef.current,
       onOpen: (payload) => onLinkOpenRef.current?.(payload),
     });

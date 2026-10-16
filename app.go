@@ -252,6 +252,8 @@ func (a *App) emitDiff(path string, staged bool) {
 			"title":   "Diff Error",
 			"message": err.Error(),
 		})
+		// Emit an empty diff so the frontend clears its loading state for this path.
+		a.EmitEvent("diffLoaded", &FileDiff{Path: path})
 		return
 	}
 
