@@ -1,98 +1,116 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { signal } from '@preact/signals';
-import { SelectionModel } from './selection.js';
+import { TabsModel } from './tabs.js';
 import { WorkingTreeModel } from './workingTree.js';
-import { createNavigator, openFileAt, registerNavigator } from './navigation.js';
+import { createNavigator, openDiff, openFileAt, registerNavigator } from './navigation.js';
 
 describe('navigation', () => {
-  let selection;
+  let tabs;
   let workingTree;
   let activePR;
   let prFiles;
-  let open;
+  let reveal;
+  let nav;
+
+  const active = () => tabs.activeTab.value;
 
   beforeEach(() => {
+    tabs = new TabsModel();
+    tabs.setScope('/wt');
     activePR = signal(null);
     prFiles = [];
+    reveal = vi.fn();
     workingTree = new WorkingTreeModel({ api: {} });
-    selection = new SelectionModel({
-      workingTree,
-      activePR,
-      api: { getDiff: vi.fn(), getPRFileDiff: vi.fn() },
-    });
     workingTree.applyStatus({
       staged: [{ path: 'staged.go' }, { path: 'both.go' }],
       unstaged: [{ path: 'dirty.go' }, { path: 'both.go' }],
       conflicts: [{ path: 'conflict.go' }],
     });
-    open = createNavigator({ selection, workingTree, isPRFile: (p) => prFiles.includes(p) });
+    nav = createNavigator({
+      tabs,
+      workingTree,
+      activePR,
+      isPRFile: (p) => prFiles.includes(p),
+      reveal,
+    });
   });
 
   afterEach(() => {
-    selection[Symbol.dispose]?.();
+    registerNavigator(null);
   });
 
-  it('opens a clean file in the editor at the line', () => {
-    expect(open('clean.go', 12)).toBe(true);
-    expect(selection.activeFile.value).toBe('clean.go');
-    expect(selection.viewMode.value).toBe('edit');
-    expect(selection.editorGotoLine.value).toBe(12);
+  it('opens a clean file as a file tab revealed at line:col', () => {
+    expect(nav.openFileAt('clean.go', 12, 5)).toBe(true);
+    expect(active()).toMatchObject({ kind: 'file', path: 'clean.go', preview: false });
+    expect(reveal).toHaveBeenCalledWith('file:clean.go', 12, 5, '/wt');
   });
 
-  it('defaults to line 1 for a clean file with no line', () => {
-    open('clean.go');
-    expect(selection.viewMode.value).toBe('edit');
-    expect(selection.editorGotoLine.value).toBe(1);
+  it('opens a clean file with no line without revealing', () => {
+    nav.openFileAt('clean.go');
+    expect(active().kind).toBe('file');
+    expect(reveal).not.toHaveBeenCalled();
   });
 
-  it('shows the diff for a changed file when no line is given', () => {
-    open('dirty.go');
-    expect(selection.activeSection.value).toBe('unstaged');
-    expect(selection.viewMode.value).toBe('diff');
+  it('defaults column to 1', () => {
+    nav.openFileAt('clean.go', 3);
+    expect(reveal).toHaveBeenCalledWith('file:clean.go', 3, 1, '/wt');
   });
 
-  it('opens a changed file in the editor when a line is given', () => {
-    open('dirty.go', 30, 4);
-    expect(selection.viewMode.value).toBe('edit');
-    expect(selection.editorGotoLine.value).toBe(30);
+  it('shows the working diff for a changed file when no line is given', () => {
+    nav.openFileAt('dirty.go');
+    expect(active()).toMatchObject({ kind: 'diff', path: 'dirty.go', mode: 'working' });
+  });
+
+  it('opens a file tab for a changed file when a line is given', () => {
+    nav.openFileAt('dirty.go', 30, 4);
+    expect(active()).toMatchObject({ kind: 'file', path: 'dirty.go' });
+    expect(reveal).toHaveBeenCalledWith('file:dirty.go', 30, 4, '/wt');
   });
 
   it('shows the staged diff for staged-only files', () => {
-    open('staged.go', 3);
-    expect(selection.activeSection.value).toBe('staged');
-    expect(selection.viewMode.value).toBe('diff');
+    nav.openFileAt('staged.go');
+    expect(active()).toMatchObject({ kind: 'diff', mode: 'staged' });
   });
 
-  it('prefers the unstaged (editable) view when a file is both', () => {
-    open('both.go', 3);
-    expect(selection.activeSection.value).toBe('unstaged');
-    expect(selection.viewMode.value).toBe('edit');
+  it('prefers the working diff when a file is both staged and unstaged', () => {
+    nav.openFileAt('both.go');
+    expect(active()).toMatchObject({ kind: 'diff', mode: 'working' });
   });
 
-  it('selects conflicts in the conflict section', () => {
-    open('conflict.go', 3);
-    expect(selection.activeSection.value).toBe('conflict');
+  it('shows the conflict view for conflicted files', () => {
+    nav.openFileAt('conflict.go');
+    expect(active()).toMatchObject({ kind: 'diff', mode: 'conflict' });
   });
 
-  it('in PR mode only opens files that are in the PR', () => {
+  it('focuses an existing tab instead of duplicating', () => {
+    nav.openFileAt('clean.go', 1);
+    nav.openFileAt('clean.go', 9);
+    expect(tabs.tabs.value).toHaveLength(1);
+    expect(reveal).toHaveBeenLastCalledWith('file:clean.go', 9, 1, '/wt');
+  });
+
+  it('PR mode opens PR files as pr diffs and others as file tabs', () => {
     activePR.value = 7;
     prFiles = ['pr.go'];
-    expect(open('nope.go', 1)).toBe(false);
-    expect(selection.activeFile.value).toBeNull();
-    expect(open('pr.go', 1)).toBe(true);
-    expect(selection.activeSection.value).toBe('pr');
+    nav.openFileAt('pr.go', 10);
+    expect(active()).toMatchObject({ kind: 'diff', mode: 'pr', path: 'pr.go' });
+    nav.openFileAt('other.go', 2);
+    expect(active()).toMatchObject({ kind: 'file', path: 'other.go' });
   });
 
-  it('rejects empty paths', () => {
-    expect(open('')).toBe(false);
+  it('openDiff opens a preview diff tab', () => {
+    nav.openDiff('dirty.go', 'staged');
+    expect(active()).toMatchObject({ kind: 'diff', mode: 'staged', preview: true });
   });
 
-  it('openFileAt delegates to the registered navigator', () => {
+  it('module-level helpers delegate to the registered navigator', () => {
     expect(openFileAt('a.go', 1)).toBe(false);
-    const impl = vi.fn(() => true);
+    expect(openDiff('a.go')).toBe(false);
+    const impl = { openFileAt: vi.fn(() => true), openDiff: vi.fn(() => true) };
     const off = registerNavigator(impl);
     expect(openFileAt('a.go', 5, 2)).toBe(true);
-    expect(impl).toHaveBeenCalledWith('a.go', 5, 2);
+    expect(impl.openFileAt).toHaveBeenCalledWith('a.go', 5, 2);
+    expect(openDiff('a.go', 'staged')).toBe(true);
     off();
     expect(openFileAt('a.go', 1)).toBe(false);
   });

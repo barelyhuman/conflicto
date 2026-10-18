@@ -1,58 +1,76 @@
+import { revealLine as defaultReveal } from './editorRegistry.js';
+
 /**
- * Narrow "go to code" seam. Anything that wants to show a file at a line
- * (terminal links today; palette / search / review comments later) calls
- * `openFileAt`. The implementation below targets today's single-selection UI;
- * the editor-tabs work can swap `createNavigator` without touching callers.
+ * Narrow "go to code" seam. Anything that wants to show a file (terminal
+ * links, palette, search, LSP goto-definition, review comments) calls
+ * `openFileAt` / `openDiff`. The implementation below sits on the editor tabs.
  */
+
+const hasLineNumber = (line) => Number.isFinite(line) && line >= 1;
 
 /**
  * @param {{
- *   selection: InstanceType<typeof import('./selection.js').SelectionModel>,
+ *   tabs: InstanceType<typeof import('./tabs.js').TabsModel>,
  *   workingTree: InstanceType<typeof import('./workingTree.js').WorkingTreeModel>,
+ *   activePR: import('@preact/signals-core').ReadonlySignal<number|null>,
  *   isPRFile?: (path: string) => boolean,
+ *   reveal?: typeof defaultReveal,
  * }} deps
- * @returns {(path: string, line?: number | null, col?: number | null) => boolean}
+ * @returns {{
+ *   openFileAt: (path: string, line?: number | null, col?: number | null) => boolean,
+ *   openDiff: (path: string, mode?: import('./tabs.js').DiffMode, opts?: { preview?: boolean }) => boolean,
+ * }}
  */
-export function createNavigator({ selection, workingTree, isPRFile = () => false }) {
-  return function openFileAt(path, line = null, _col = null) {
+export function createNavigator({
+  tabs,
+  workingTree,
+  activePR,
+  isPRFile = () => false,
+  reveal = defaultReveal,
+}) {
+  function openDiff(path, mode = 'working', { preview = true } = {}) {
     if (!path) return false;
 
-    const hasLine = Number.isFinite(line) && line >= 1;
+    return tabs.open({ kind: 'diff', path, mode, preview }) != null;
+  }
 
-    // PR mode shows the PR's diff; only files that are part of it can be opened.
-    if (selection.activePR.peek() != null) {
-      if (!isPRFile(path)) return false;
-      selection.select(path, 'pr');
+  function openFile(path, line, col) {
+    const tab = tabs.open({ kind: 'file', path, preview: false });
 
-      return true;
+    if (!tab) return false;
+
+    if (hasLineNumber(line)) {
+      reveal(tab.id, line, hasLineNumber(col) ? col : 1, tabs.currentScope());
+    }
+
+    return true;
+  }
+
+  function openFileAt(path, line = null, col = null) {
+    if (!path) return false;
+
+    const hasLine = hasLineNumber(line);
+
+    // PR review shows the PR's diff for files that are part of it; anything
+    // else exists on disk in the worktree and opens as source.
+    if (activePR.peek() != null) {
+      return isPRFile(path) ? openDiff(path, 'pr', { preview: false }) : openFile(path, line, col);
     }
 
     const inList = (list) => list.peek().some((f) => f.path === path);
 
-    if (inList(workingTree.conflicts)) {
-      selection.select(path, 'conflict');
+    if (!hasLine) {
+      if (inList(workingTree.conflicts)) return openDiff(path, 'conflict', { preview: false });
 
-      return true;
+      if (inList(workingTree.unstaged)) return openDiff(path, 'working', { preview: false });
+
+      if (inList(workingTree.staged)) return openDiff(path, 'staged', { preview: false });
     }
 
-    const stagedOnly = inList(workingTree.staged) && !inList(workingTree.unstaged);
+    return openFile(path, line, col);
+  }
 
-    // Staged-only files can't be edited in place: show their diff.
-    if (stagedOnly) {
-      selection.select(path, 'staged');
-
-      return true;
-    }
-
-    const changed = inList(workingTree.unstaged);
-    selection.select(path, 'unstaged');
-
-    // Changed file without a line: the diff is the useful view.
-    // Otherwise (clean file, or an explicit line) open the editor at the line.
-    if (hasLine || !changed) selection.openEditorAtLine(hasLine ? line : 1);
-
-    return true;
-  };
+  return { openFileAt, openDiff };
 }
 
 /** @type {ReturnType<typeof createNavigator> | null} */
@@ -68,10 +86,18 @@ export function registerNavigator(impl) {
 }
 
 /**
- * Open `path` (repo-relative, active worktree) and reveal `line` (1-based).
- * `col` is accepted for forward compatibility and currently ignored.
+ * Open `path` (repo-relative, active worktree) and reveal `line`/`col` (1-based).
+ * Changed file without a line opens its diff; otherwise an editable file tab.
  * @returns {boolean} whether something was opened
  */
 export function openFileAt(path, line = null, col = null) {
-  return navigator ? navigator(path, line, col) : false;
+  return navigator ? navigator.openFileAt(path, line, col) : false;
+}
+
+/**
+ * Open the diff of `path` in the given mode.
+ * @returns {boolean}
+ */
+export function openDiff(path, mode = 'working', opts) {
+  return navigator ? navigator.openDiff(path, mode, opts) : false;
 }
