@@ -7,6 +7,7 @@ import { WorkingTreeModel } from './models/workingTree.js';
 import { SelectionModel } from './models/selection.js';
 import { SyncModel } from './models/sync.js';
 import { WorktreeModel } from './models/worktree.js';
+import { WorkspaceIndexModel } from './models/workspaceIndex.js';
 import { ThemeProvider } from './theme/ThemeProvider.jsx';
 import { EditProvider } from './components/EditProvider.jsx';
 import { FileTree } from './components/FileTree.jsx';
@@ -24,6 +25,7 @@ import { setTerminalScope, removeTerminalScope } from './components/terminal/ter
 import { SidebarActions } from './components/SidebarActions.jsx';
 import { IslandHeader } from './components/IslandHeader.jsx';
 import { WorktreesPanel } from './components/WorktreesPanel.jsx';
+import { CommandPalette } from './components/palette/CommandPalette.jsx';
 
 /** Stable empty list so FileTree does not remount on unrelated App re-renders. */
 const EMPTY_FILES = [];
@@ -104,6 +106,12 @@ export function App() {
     },
   }));
 
+  const workspaceIndex = useModel(() => new WorkspaceIndexModel({
+    onError: (title, message) => {
+      setToasts((prev) => [...prev, { id: Date.now().toString(), title, message }]);
+    },
+  }));
+
   const selection = useModel(() => new SelectionModel({
     workingTree,
     activePR: activePRSignal,
@@ -113,10 +121,12 @@ export function App() {
   const workingTreeRef = useRef(workingTree);
   const worktreeRef = useRef(worktree);
   const selectionRef = useRef(selection);
+  const workspaceIndexRef = useRef(workspaceIndex);
   const activePRSignalRef = useRef(activePRSignal);
   workingTreeRef.current = workingTree;
   worktreeRef.current = worktree;
   selectionRef.current = selection;
+  workspaceIndexRef.current = workspaceIndex;
   activePRSignalRef.current = activePRSignal;
 
   const activePRRef = useRef(activePR);
@@ -228,6 +238,9 @@ export function App() {
       },
       onWorktreesUpdated: (data) => {
         worktreeRef.current.applyWorktrees(data);
+      },
+      onWorkspaceIndexUpdated: (data) => {
+        workspaceIndexRef.current.applyIndex(data);
       },
       onRefreshCompleted: () => {
         selectionRef.current.refetch();
@@ -737,6 +750,8 @@ export function App() {
             onConfirm={handleConfirmDialog}
             onCancel={handleCancelConfirm}
           />
+
+          <CommandPalette index={workspaceIndex} />
 
           <ToastContainer
             toasts={toasts}
