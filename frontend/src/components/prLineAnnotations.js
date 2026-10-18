@@ -1,7 +1,9 @@
 /** GitHub LEFT/RIGHT → Pierre additions/deletions. */
 export function toPierreSide(side) {
-  const s = typeof side === 'string' ? side.toLowerCase() : '';
+  const s = String(side ?? '').toLowerCase();
+
   if (s === 'left' || s === 'deletions') return 'deletions';
+
   return 'additions';
 }
 
@@ -13,6 +15,7 @@ export function buildPRLineAnnotations({ isPRMode, comments, filename }) {
   if (!isPRMode || !comments?.length || !filename) return undefined;
 
   const mapped = [];
+
   for (const c of comments) {
     if (c.path !== filename || c.line == null) continue;
     mapped.push({
@@ -21,5 +24,6 @@ export function buildPRLineAnnotations({ isPRMode, comments, filename }) {
       metadata: { body: c.body, user: c.user, html_url: c.html_url },
     });
   }
+
   return mapped.length ? mapped : undefined;
 }

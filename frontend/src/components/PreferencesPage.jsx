@@ -20,8 +20,10 @@ export function PreferencesPage({ open, onClose, ghStatus, onRefreshGH, ciNotify
     function onKey(e) {
       if (e.key === 'Escape') onClose();
     }
+
     if (open) {
       document.addEventListener('keydown', onKey);
+
       return () => document.removeEventListener('keydown', onKey);
     }
   }, [open, onClose]);

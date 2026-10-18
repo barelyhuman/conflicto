@@ -8,6 +8,7 @@ function makeLine(lineNumber, tokens) {
   const line = document.createElement('div');
   line.dataset.line = String(lineNumber);
   line.dataset.lineType = 'context';
+
   for (const [char, text, left, width] of tokens) {
     const span = document.createElement('span');
     span.dataset.char = String(char);
@@ -25,6 +26,7 @@ function makeLine(lineNumber, tokens) {
     });
     line.appendChild(span);
   }
+
   return line;
 }
 
@@ -34,10 +36,12 @@ describe('positionFromEditorPointer', () => {
     const shadow = host.attachShadow({ mode: 'open' });
     const content = document.createElement('div');
     content.dataset.content = '';
+
     const line = makeLine(3, [
       [0, 'abc', 10, 30],
       [3, 'def', 40, 30],
     ]);
+
     content.appendChild(line);
     shadow.appendChild(content);
 
@@ -57,11 +61,13 @@ describe('positionFromEditorPointer', () => {
     const host = document.createElement('div');
     const shadow = host.attachShadow({ mode: 'open' });
     shadow.appendChild(document.createElement('div'));
+
     const event = {
       clientX: 0,
       clientY: 0,
       composedPath: () => [shadow, host],
     };
+
     expect(positionFromEditorPointer(shadow, event)).toBeNull();
   });
 });

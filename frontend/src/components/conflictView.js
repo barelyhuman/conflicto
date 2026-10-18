@@ -84,12 +84,14 @@ export function conflictViewFromStages(path, res) {
   if (!hasWorktree && !hasOurs && !hasTheirs) {
     return { loading: false, view: { kind: 'deleted' } };
   }
+
   if (hasWorktree && hasConflictMarkers(r.worktree)) {
     return {
       loading: false,
       view: { kind: 'markers', path, contents: r.worktree ?? '' },
     };
   }
+
   if (hasOurs || hasTheirs) {
     return {
       loading: false,
@@ -101,6 +103,7 @@ export function conflictViewFromStages(path, res) {
       },
     };
   }
+
   return {
     loading: false,
     view: { kind: 'plain', path, contents: r.worktree ?? '' },

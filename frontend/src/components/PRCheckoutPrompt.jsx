@@ -49,6 +49,7 @@ export function PRCheckoutPrompt({
 
   function handleOverlayClick(e) {
     if (isBusy) return;
+
     if (e.target === e.currentTarget) onClose();
   }
 

@@ -17,6 +17,7 @@ function buildFileTree(files) {
 
   for (const file of files) {
     const parts = file.path.split('/').filter(Boolean);
+
     if (parts.length === 0) continue;
 
     /** @type {Map<string, TreeNode>} */
@@ -29,6 +30,7 @@ function buildFileTree(files) {
       const isFile = i === parts.length - 1;
 
       let node = level.get(name);
+
       if (!node) {
         node = isFile
           ? { name, path: acc, status: file.status }
@@ -43,9 +45,11 @@ function buildFileTree(files) {
 
       if (!isFile) {
         if (!node.children) node.children = [];
+
         if (!node._childMap) {
           node._childMap = new Map(node.children.map((c) => [c.name, c]));
         }
+
         level = node._childMap;
       }
     }
@@ -60,6 +64,7 @@ function buildFileTree(files) {
  */
 function finalize(map) {
   const nodes = [...map.values()];
+
   for (const node of nodes) {
     if (node._childMap) {
       node.children = finalize(node._childMap);
@@ -68,6 +73,7 @@ function finalize(map) {
       node.children = sortNodes(node.children);
     }
   }
+
   return sortNodes(nodes);
 }
 
@@ -79,7 +85,9 @@ function sortNodes(nodes) {
   return [...nodes].sort((a, b) => {
     const aDir = a.children != null;
     const bDir = b.children != null;
+
     if (aDir !== bDir) return aDir ? -1 : 1;
+
     return a.name.localeCompare(b.name);
   });
 }
@@ -99,7 +107,9 @@ function sortFlatFiles(files) {
  */
 export function splitPath(path) {
   const idx = path.lastIndexOf('/');
+
   if (idx < 0) return { name: path, dir: './' };
+
   return { name: path.slice(idx + 1), dir: path.slice(0, idx + 1) };
 }
 
@@ -112,9 +122,11 @@ export function splitPath(path) {
  */
 export function statusBadge(status) {
   const s = (status || 'M').toUpperCase();
+
   if (conflictKindLabel(s) != null) {
     return { glyph: conflictKindGlyph(s) ?? 'C', kind: 'conflict' };
   }
+
   switch (s.charAt(0)) {
     case 'A':
     case 'U':
@@ -165,8 +177,10 @@ export function ChangeTree({
   const toggleFolder = useCallback((path) => {
     setCollapsed((prev) => {
       const next = new Set(prev);
+
       if (next.has(path)) next.delete(path);
       else next.add(path);
+
       return next;
     });
   }, []);
@@ -178,6 +192,7 @@ export function ChangeTree({
       <div class="change-tree change-tree-flat" role="list">
         {flatFiles.map((file) => {
           const { name, dir } = splitPath(file.path);
+
           return (
             <FileRow
               key={file.path}

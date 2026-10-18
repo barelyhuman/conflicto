@@ -33,7 +33,8 @@ export function AnchoredMenu({
 
   function setMenuRef(node) {
     localMenuRef.current = node;
-    if (typeof menuRefProp === 'function') {
+
+    if (menuRefProp instanceof Function) {
       menuRefProp(node);
     } else if (menuRefProp) {
       menuRefProp.current = node;
@@ -45,11 +46,13 @@ export function AnchoredMenu({
 
     const anchor = anchorRef.current;
     const menu = localMenuRef.current;
+
     if (!anchor || !menu) return;
 
     function position() {
       const a = anchorRef.current;
       const m = localMenuRef.current;
+
       if (!a || !m) return;
 
       m.style.position = 'fixed';
@@ -72,6 +75,7 @@ export function AnchoredMenu({
       const availAbove = anchorBox.top - offset - VIEWPORT_PAD;
 
       let pos = preferred;
+
       if (preferred === 'bottom' && menuBox.height > availBelow && availAbove > availBelow) {
         pos = 'top';
       } else if (preferred === 'top' && menuBox.height > availAbove && availBelow > availAbove) {
@@ -88,6 +92,7 @@ export function AnchoredMenu({
         pos === 'bottom'
           ? vh - VIEWPORT_PAD - (anchorBox.bottom + offset)
           : anchorBox.top - offset - VIEWPORT_PAD;
+
       m.style.maxHeight = `${Math.max(120, space)}px`;
 
       popper.move(pos, alignment).offset(offset);
@@ -109,11 +114,13 @@ export function AnchoredMenu({
 
     let raf = 0;
     let positioning = false;
+
     function schedulePosition() {
       if (positioning) return;
       cancelAnimationFrame(raf);
       raf = requestAnimationFrame(() => {
         positioning = true;
+
         try {
           position();
         } finally {
@@ -145,6 +152,7 @@ export function AnchoredMenu({
       const a = anchorRef.current;
       const m = localMenuRef.current;
       const t = /** @type {Node} */ (e.target);
+
       if (a?.contains(t) || m?.contains(t)) return;
       onClose?.();
     }
@@ -155,6 +163,7 @@ export function AnchoredMenu({
 
     document.addEventListener('mousedown', onPointerDown);
     document.addEventListener('keydown', onKeyDown);
+
     return () => {
       document.removeEventListener('mousedown', onPointerDown);
       document.removeEventListener('keydown', onKeyDown);

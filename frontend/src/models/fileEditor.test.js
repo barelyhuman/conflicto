@@ -3,20 +3,15 @@
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { signal } from '@preact/signals';
+import { FileEditorModel } from './fileEditor.js';
 
 const getFileContents = vi.fn();
 
-vi.mock('../wails.js', () => ({
-  api: {
-    getFileContents: (...args) => getFileContents(...args),
-  },
-}));
+const api = {
+  getFileContents: (...args) => getFileContents(...args),
+};
 
-vi.mock('../components/fileEditorCaret.js', () => ({
-  bindEditorClickCaret: () => () => {},
-}));
-
-const { FileEditorModel } = await import('./fileEditor.js');
+const bindEditorClickCaret = () => () => {};
 
 describe('FileEditorModel', () => {
   /** @type {InstanceType<typeof FileEditorModel>} */
@@ -39,7 +34,7 @@ describe('FileEditorModel', () => {
   it('loads file contents for the current path', async () => {
     const path = signal('src/a.js');
     const editorDirty = signal(false);
-    model = new FileEditorModel({ path, editorDirty });
+    model = new FileEditorModel({ path, editorDirty, api, bindEditorClickCaret });
 
     await vi.waitFor(() => {
       expect(model.file.peek()).not.toBeNull();
@@ -52,7 +47,7 @@ describe('FileEditorModel', () => {
   it('clears file and dirty when path becomes null', async () => {
     const path = signal('src/a.js');
     const editorDirty = signal(false);
-    model = new FileEditorModel({ path, editorDirty });
+    model = new FileEditorModel({ path, editorDirty, api, bindEditorClickCaret });
 
     await vi.waitFor(() => {
       expect(model.file.peek()).not.toBeNull();

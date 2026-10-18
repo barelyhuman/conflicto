@@ -14,10 +14,12 @@ export function ToastItem({ id, title, message, onDismiss }) {
 
   useEffect(() => {
     requestAnimationFrame(() => setVisible(true));
+
     const timer = setTimeout(() => {
       setVisible(false);
       setTimeout(() => onDismiss(id), 300);
     }, 5000);
+
     return () => clearTimeout(timer);
   }, [id, onDismiss]);
 

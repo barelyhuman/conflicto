@@ -30,6 +30,7 @@ export const SyncModel = createModel(({ onError } = {}) => {
     async pull() {
       if (this.isPulling.value) return;
       this.isPulling.value = true;
+
       try {
         await api.pull();
       } catch (err) {
@@ -42,6 +43,7 @@ export const SyncModel = createModel(({ onError } = {}) => {
     async push() {
       if (this.isPushing.value) return;
       this.isPushing.value = true;
+
       try {
         await api.push();
       } catch (err) {

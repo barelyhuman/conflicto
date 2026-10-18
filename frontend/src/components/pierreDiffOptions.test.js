@@ -53,6 +53,7 @@ index 111..222 100644
 -old
 +new
 `);
+
     expect(meta?.hunks?.length).toBe(1);
   });
 });

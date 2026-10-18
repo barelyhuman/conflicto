@@ -1,3 +1,4 @@
+import { Signal } from '@preact/signals';
 import { useMemo, useRef, useState, useLayoutEffect, useCallback } from 'preact/hooks';
 import { FileDiff } from '@pierre/diffs/react';
 import { IconExternalLink } from '@tabler/icons-preact';
@@ -143,14 +144,15 @@ export function DiffViewer({
   onOpenLineInEditor,
 }) {
   const { theme, themeType } = useTheme();
-  const isLoading = typeof loading === 'boolean' ? loading : loading.value;
+  const isLoading = loading instanceof Signal ? loading.value : loading;
   const diff = activeDiff.value;
   const patch = diff?.patch;
   const filename = diff?.path ?? '';
-  const unstaged = typeof isUnstaged === 'boolean' ? isUnstaged : isUnstaged.value;
-  const fullDiff = typeof showFullDiff === 'boolean' ? showFullDiff : showFullDiff.value;
+  const unstaged = isUnstaged instanceof Signal ? isUnstaged.value : isUnstaged;
+  const fullDiff = showFullDiff instanceof Signal ? showFullDiff.value : showFullDiff;
+
   const openInEditor =
-    typeof canOpenInEditor === 'boolean' ? canOpenInEditor : canOpenInEditor.value;
+    canOpenInEditor instanceof Signal ? canOpenInEditor.value : canOpenInEditor;
 
   const wrapperRef = useRef(null);
   const prevFullDiff = useRef(fullDiff);
@@ -163,11 +165,13 @@ export function DiffViewer({
       savedScrollTop.current = wrapperRef.current?.scrollTop ?? 0;
       setCollapseKey((k) => k + 1);
     }
+
     prevFullDiff.current = fullDiff;
   }, [fullDiff]);
 
   useLayoutEffect(() => {
     const el = wrapperRef.current;
+
     if (el && savedScrollTop.current > 0) {
       el.scrollTop = savedScrollTop.current;
       savedScrollTop.current = 0;
@@ -183,6 +187,7 @@ export function DiffViewer({
 
   const renderAnnotation = useCallback((annotation) => {
     const htmlUrl = annotation.metadata?.html_url;
+
     return (
       <div class="diff-comment">
         <div class="diff-comment-header">
@@ -210,8 +215,10 @@ export function DiffViewer({
   const handleLineClick = useCallback(
     (props) => {
       if (!openInEditor || onOpenLineInEditor == null) return;
+
       if ((props.event?.detail ?? 0) < 2) return;
       const line = mapDiffLineToEditorLine(props);
+
       if (line != null) onOpenLineInEditor(line);
     },
     [openInEditor, onOpenLineInEditor]
@@ -239,6 +246,7 @@ export function DiffViewer({
     const emptyMessage = isPRMode
       ? 'No patch available for this file. GitHub often omits patches for binary or very large files.'
       : 'No diff available';
+
     return (
       <div class="diff-empty">
         {emptyMessage}
@@ -262,15 +270,12 @@ export function DiffViewer({
           expandUnchanged: expandUnchangedForDiff(isPRMode, fullDiff),
           collapsedContextThreshold: 1,
           unsafeCSS: annotationUnsafeCSS(isPRMode),
-          ...(openInEditor
-            ? {
-                onLineClick: handleLineClick,
-                lineHoverHighlight: 'line',
-              }
-            : {}),
+          onLineClick: openInEditor ? handleLineClick : undefined,
+          lineHoverHighlight: openInEditor ? 'line' : undefined,
           loadDiffFiles: loadDiffFilesForDiff(isPRMode, async (meta) => {
             const staged = !unstaged;
             const res = await api.getFileContents(meta.name, staged);
+
             return mapFileContentsToDiffFiles(meta, res);
           }),
         }}

@@ -8,6 +8,7 @@
     "build": "vite build",
     "preview": "vite preview",
     "lint": "eslint src",
+    "lint:slop": "oxlint",
     "test": "vitest run"
   },
   "dependencies": {
@@ -22,12 +23,14 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@oxlint/plugins": "1.78.0",
     "@preact/eslint-plugin-signals": "^0.3.0",
     "@preact/preset-vite": "^2.10.6",
     "eslint": "^10.8.0",
     "eslint-plugin-react": "^7.37.5",
     "eslint-plugin-react-hooks": "^7.1.1",
     "globals": "^17.9.0",
+    "oxlint": "1.78.0",
     "vite": "^8.2.0",
     "vitest": "^4.1.10"
   },

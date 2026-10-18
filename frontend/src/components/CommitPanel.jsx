@@ -1,3 +1,4 @@
+import { Signal } from '@preact/signals';
 import { useState } from 'preact/hooks';
 
 /**
@@ -6,7 +7,9 @@ import { useState } from 'preact/hooks';
  */
 function truncateBranch(branch, max = 18) {
   const name = branch || 'main';
+
   if (name.length <= max) return name;
+
   return `${name.slice(0, max - 1)}…`;
 }
 
@@ -24,13 +27,14 @@ export function CommitPanel({ stagedCount, currentBranch = 'main', onCommit }) {
   const [committing, setCommitting] = useState(false);
 
   const count =
-    typeof stagedCount === 'object' && stagedCount != null && 'value' in stagedCount
+    stagedCount instanceof Signal
       ? stagedCount.value
       : /** @type {number} */ (stagedCount ?? 0);
 
   const canCommit = count > 0 && commitMessage.trim().length > 0 && !committing;
   const branch = currentBranch || 'main';
   const shortBranch = truncateBranch(branch);
+
   const modKey =
     typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform)
       ? '⌘'
@@ -38,8 +42,10 @@ export function CommitPanel({ stagedCount, currentBranch = 'main', onCommit }) {
 
   async function submit() {
     const message = commitMessage.trim();
+
     if (!message || count === 0 || committing) return;
     setCommitting(true);
+
     try {
       await onCommit?.(message);
       setCommitMessage('');

@@ -179,11 +179,13 @@ export const api = {
 
   onTerminalData: (fn) => {
     terminalDataListeners.add(fn);
+
     return () => terminalDataListeners.delete(fn);
   },
 
   onTerminalExit: (fn) => {
     terminalExitListeners.add(fn);
+
     return () => terminalExitListeners.delete(fn);
   },
 };
@@ -195,12 +197,15 @@ export function getPlatform() {
 
 export function watchFullscreen(callback, intervalMs = 500) {
   let last = false;
+
   const id = setInterval(async () => {
     const current = await window.runtime.WindowIsFullscreen();
+
     if (current !== last) {
       last = current;
       callback(current);
     }
   }, intervalMs);
+
   return () => clearInterval(id);
 }

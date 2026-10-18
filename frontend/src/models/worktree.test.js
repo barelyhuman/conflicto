@@ -1,19 +1,16 @@
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
 import { signal } from '@preact/signals';
+import { WorktreeModel } from './worktree.js';
 
 const previewWorktreePath = vi.fn();
 const getWorktrees = vi.fn();
 const removeWorktree = vi.fn();
 
-vi.mock('../wails.js', () => ({
-  api: {
-    previewWorktreePath: (...args) => previewWorktreePath(...args),
-    getWorktrees: (...args) => getWorktrees(...args),
-    removeWorktree: (...args) => removeWorktree(...args),
-  },
-}));
-
-const { WorktreeModel } = await import('./worktree.js');
+const api = {
+  previewWorktreePath: (...args) => previewWorktreePath(...args),
+  getWorktrees: (...args) => getWorktrees(...args),
+  removeWorktree: (...args) => removeWorktree(...args),
+};
 
 describe('WorktreeModel', () => {
   /** @type {InstanceType<typeof WorktreeModel>} */
@@ -23,7 +20,7 @@ describe('WorktreeModel', () => {
     previewWorktreePath.mockReset();
     getWorktrees.mockReset();
     removeWorktree.mockReset();
-    worktree = new WorktreeModel();
+    worktree = new WorktreeModel({ api });
   });
 
   afterEach(() => {
@@ -40,7 +37,7 @@ describe('WorktreeModel', () => {
 
   it('uses external currentPath signal when provided', () => {
     const repoPath = signal('/repo/main');
-    const linked = new WorktreeModel({ currentPath: repoPath });
+    const linked = new WorktreeModel({ currentPath: repoPath, api });
     repoPath.value = '/repo/wt';
     expect(linked.currentPath.value).toBe('/repo/wt');
     linked[Symbol.dispose]?.();

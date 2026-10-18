@@ -28,6 +28,7 @@ function maxHeight() {
 function useTerminalStore() {
   const [snap, setSnap] = useState(getTerminalStoreSnapshot);
   useEffect(() => subscribeTerminalStore(() => setSnap(getTerminalStoreSnapshot())), []);
+
   return snap;
 }
 
@@ -47,13 +48,16 @@ export function TerminalDock({ open, height, onHeightChange, onRequestOpen, onTa
   const ensureSession = useCallback(async (localId) => {
     const snap = getTerminalStoreSnapshot();
     const pane = snap.panes.find((t) => t.localId === localId);
+
     if (!pane || pane.sessionId) return;
+
     try {
       const result = await api.terminalStart({
         cwd: pane.scopePath || null,
         cols: 80,
         rows: 24,
       });
+
       if (result?.id) {
         bindSession(localId, result.id, result.cwd);
       }
@@ -64,13 +68,16 @@ export function TerminalDock({ open, height, onHeightChange, onRequestOpen, onTa
 
   useEffect(() => {
     if (!open) return;
+
     if (hasTabs()) {
       const snap = getTerminalStoreSnapshot();
       snap.panes.forEach((t) => {
         if (!t.sessionId) void ensureSession(t.localId);
       });
+
       return;
     }
+
     if (bootstrapping.current) return;
     bootstrapping.current = true;
     const localId = createTabPlaceholder('Terminal');
@@ -87,20 +94,25 @@ export function TerminalDock({ open, height, onHeightChange, onRequestOpen, onTa
 
   useEffect(() => {
     if (!dragging) return;
+
     const onMove = (e) => {
       const drag = dragRef.current;
+
       if (!drag) return;
       const delta = drag.startY - e.clientY;
       const next = Math.min(maxHeight(), Math.max(MIN_HEIGHT, drag.startHeight + delta));
       onHeightChange?.(next);
     };
+
     const onUp = () => {
       dragRef.current = null;
       setDragging(false);
     };
+
     window.addEventListener('pointermove', onMove);
     window.addEventListener('pointerup', onUp);
     window.addEventListener('pointercancel', onUp);
+
     return () => {
       window.removeEventListener('pointermove', onMove);
       window.removeEventListener('pointerup', onUp);
@@ -117,19 +129,24 @@ export function TerminalDock({ open, height, onHeightChange, onRequestOpen, onTa
   function onSplitPointerDown(e) {
     e.preventDefault();
     const body = bodyRef.current;
+
     if (!body) return;
     splitDragRef.current = { startX: e.clientX, startRatio: splitRatio, width: body.clientWidth };
+
     const onMove = (ev) => {
       const drag = splitDragRef.current;
+
       if (!drag || drag.width <= 0) return;
       const delta = (ev.clientX - drag.startX) / drag.width;
       setSplitRatio(drag.startRatio + delta);
     };
+
     const onUp = () => {
       splitDragRef.current = null;
       window.removeEventListener('pointermove', onMove);
       window.removeEventListener('pointerup', onUp);
     };
+
     window.addEventListener('pointermove', onMove);
     window.addEventListener('pointerup', onUp);
   }
@@ -137,6 +154,7 @@ export function TerminalDock({ open, height, onHeightChange, onRequestOpen, onTa
   async function handleCloseLayout(layoutId, e) {
     e?.stopPropagation();
     const sessionIds = removeLayout(layoutId);
+
     for (const sessionId of sessionIds) {
       try {
         await api.terminalStop(sessionId);
@@ -144,6 +162,7 @@ export function TerminalDock({ open, height, onHeightChange, onRequestOpen, onTa
         // ignore
       }
     }
+
     onTabClosed?.(getTerminalStoreSnapshot().layouts);
   }
 
@@ -159,21 +178,27 @@ export function TerminalDock({ open, height, onHeightChange, onRequestOpen, onTa
 
   function handleSplit() {
     const localId = splitRight();
+
     if (localId) void ensureSession(localId);
   }
 
   // Cmd+\ (mac) / Ctrl+\ — split right while terminal dock is open
   useEffect(() => {
     if (!open) return undefined;
+
     function onKey(e) {
       if (e.key !== '\\') return;
+
       if (!(e.metaKey || e.ctrlKey) || e.altKey || e.shiftKey) return;
       e.preventDefault();
       e.stopPropagation();
       const localId = splitRight();
+
       if (localId) void ensureSession(localId);
     }
+
     document.addEventListener('keydown', onKey, true);
+
     return () => document.removeEventListener('keydown', onKey, true);
   }, [open, ensureSession]);
 
@@ -182,6 +207,7 @@ export function TerminalDock({ open, height, onHeightChange, onRequestOpen, onTa
     function onKey(e) {
       // Shift+` often reports as '~' depending on layout
       const isBacktick = e.key === '`' || e.key === '~' || e.code === 'Backquote';
+
       if (!isBacktick || !e.ctrlKey || !e.shiftKey || e.metaKey || e.altKey) return;
       e.preventDefault();
       e.stopPropagation();
@@ -189,7 +215,9 @@ export function TerminalDock({ open, height, onHeightChange, onRequestOpen, onTa
       const localId = createTabPlaceholder('Terminal');
       void ensureSession(localId);
     }
+
     document.addEventListener('keydown', onKey, true);
+
     return () => document.removeEventListener('keydown', onKey, true);
   }, [ensureSession, onRequestOpen]);
 
@@ -252,6 +280,7 @@ export function TerminalDock({ open, height, onHeightChange, onRequestOpen, onTa
           const splitIndex = splitLocalIds.indexOf(pane.localId);
           const visible = inSplit;
           let slotStyle;
+
           if (splitMode && visible) {
             if (twoPaneSplit && splitIndex === 0) {
               slotStyle = { flex: `0 0 ${splitRatio * 100}%` };
@@ -261,6 +290,7 @@ export function TerminalDock({ open, height, onHeightChange, onRequestOpen, onTa
               slotStyle = { flex: '1 1 0', minWidth: 0 };
             }
           }
+
           return (
             <div
               key={pane.localId}
@@ -298,6 +328,7 @@ export function TerminalDock({ open, height, onHeightChange, onRequestOpen, onTa
 }
 
 export function isTerminalFocusTarget(target) {
-  if (!target || typeof target.closest !== 'function') return false;
+  if (!(target instanceof Element)) return false;
+
   return Boolean(target.closest('[data-terminal-dock]'));
 }

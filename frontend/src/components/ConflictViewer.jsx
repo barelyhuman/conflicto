@@ -73,11 +73,13 @@ function ConflictSideDiff({ path, ours, theirs, theme, themeType }) {
     () => (ours != null ? { name: `${path} (ours)`, contents: ours } : null),
     [path, ours]
   );
+
   const theirsFile = useMemo(
     () =>
       theirs != null ? { name: `${path} (theirs)`, contents: theirs } : null,
     [path, theirs]
   );
+
   const fileDiff = useMemo(
     () => parseDiffFromFile(oursFile, theirsFile),
     [oursFile, theirsFile]
@@ -115,17 +117,22 @@ export function ConflictViewer({ file }) {
   const status = useSignal({ loading: false, view: null });
 
   const busy = useComputed(() => status.value.loading);
+
   const view = useComputed(() => {
     const s = status.value;
+
     return s.loading ? null : s.view;
   });
 
   useSignalEffect(() => {
     const path = file.value;
+
     if (!path) {
       status.value = { loading: false, view: null };
+
       return;
     }
+
     status.value = { loading: true, view: null };
     const request = ++requestId.current;
     api.getConflictFile(path).then(
@@ -155,6 +162,7 @@ export function ConflictViewer({ file }) {
               if (data.kind === 'deleted') {
                 return <div class="diff-empty">Both sides deleted this file</div>;
               }
+
               if (data.kind === 'sides') {
                 return (
                   <ConflictSideDiff
@@ -167,6 +175,7 @@ export function ConflictViewer({ file }) {
                   />
                 );
               }
+
               if (data.kind === 'plain') {
                 // Marker-free with no stages (e.g. the conflict was just
                 // resolved): UnresolvedFile draws nothing without hunks, so
@@ -184,6 +193,7 @@ export function ConflictViewer({ file }) {
                   />
                 );
               }
+
               return (
                 <UnresolvedFile
                   key={data.path}

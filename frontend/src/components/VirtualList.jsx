@@ -26,10 +26,12 @@ export function VirtualList({ items, itemHeight, overscan = 3, onScrollEnd, clas
     measure();
     let ro = null;
     const el = ref.current;
+
     if (typeof ResizeObserver !== 'undefined' && el) {
       ro = new ResizeObserver(measure);
       ro.observe(el);
     }
+
     return () => {
       if (ro && el) ro.unobserve(el);
     };
@@ -39,6 +41,7 @@ export function VirtualList({ items, itemHeight, overscan = 3, onScrollEnd, clas
     (e) => {
       const el = e.target;
       setScrollTop(el.scrollTop);
+
       if (el.scrollTop + el.clientHeight >= el.scrollHeight - 100) {
         onScrollEnd?.();
       }

@@ -13,6 +13,7 @@ import {
  */
 export function SidebarToggle({ open, onToggle, className = '' }) {
   const cls = ['sidebar-toggle', className].filter(Boolean).join(' ');
+
   return (
     <button
       type="button"

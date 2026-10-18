@@ -13,6 +13,7 @@ function makeLine(lineType, lineNumber) {
   const el = document.createElement('div');
   el.dataset.line = String(lineNumber);
   el.dataset.lineType = lineType;
+
   return el;
 }
 

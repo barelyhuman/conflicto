@@ -7,16 +7,20 @@ import { terminalTheme } from './terminalTheme.js';
 
 function decodeTerminalPayload(payload) {
   const raw = payload?.data ?? '';
+
   if (payload?.enc === 'b64') {
     try {
       const bin = atob(raw);
       const bytes = new Uint8Array(bin.length);
+
       for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+
       return new TextDecoder('utf-8').decode(bytes);
     } catch {
       return raw;
     }
   }
+
   return raw;
 }
 
@@ -59,6 +63,7 @@ export function TerminalPane({
 
   useEffect(() => {
     const host = hostRef.current;
+
     if (!host || !sessionId) return undefined;
 
     disposedRef.current = false;
@@ -101,6 +106,7 @@ export function TerminalPane({
       if (ev.key === 'Enter' && ev.shiftKey && !ev.ctrlKey && !ev.altKey && !ev.metaKey) {
         ev.preventDefault();
         void api.terminalWrite(sessionIdRef.current, '\x1b\r');
+
         return false;
       }
 
@@ -108,6 +114,7 @@ export function TerminalPane({
       if (ev.key === 'j' && ev.ctrlKey && !ev.shiftKey && !ev.altKey && !ev.metaKey) {
         ev.preventDefault();
         void api.terminalWrite(sessionIdRef.current, '\n');
+
         return false;
       }
 
@@ -131,7 +138,9 @@ export function TerminalPane({
     // OSC 7: file://host/path — shell reports cwd (macOS Terminal / iTerm / modern zsh)
     const osc7Disp = term.parser.registerOscHandler(7, (data) => {
       const cwd = parseOsc7Cwd(data);
+
       if (cwd) onCwdChangeRef.current?.(sessionIdRef.current, cwd);
+
       return true;
     });
 
@@ -141,6 +150,7 @@ export function TerminalPane({
 
     const offData = api.onTerminalData((payload) => {
       if (!payload || payload.id !== sessionIdRef.current) return;
+
       if (disposedRef.current) return;
       term.write(decodeTerminalPayload(payload));
     });
@@ -151,6 +161,7 @@ export function TerminalPane({
     });
 
     let resizeTimer = null;
+
     const ro = new ResizeObserver(() => {
       if (resizeTimer) clearTimeout(resizeTimer);
       resizeTimer = setTimeout(() => {
@@ -163,6 +174,7 @@ export function TerminalPane({
         }
       }, 16);
     });
+
     ro.observe(host);
 
     // Initial resize after layout
@@ -177,6 +189,7 @@ export function TerminalPane({
 
     return () => {
       disposedRef.current = true;
+
       if (resizeTimer) clearTimeout(resizeTimer);
       ro.disconnect();
       offData?.();
@@ -194,6 +207,7 @@ export function TerminalPane({
   useEffect(() => {
     if (!focused) return;
     const term = termRef.current;
+
     if (term) {
       term.focus();
     }
@@ -204,6 +218,7 @@ export function TerminalPane({
     if (!focused) return;
     const term = termRef.current;
     const fit = fitRef.current;
+
     if (!term || !fit) return;
     requestAnimationFrame(() => {
       try {
@@ -230,19 +245,24 @@ export function TerminalPane({
 /** Parse OSC 7 payload like `file://hostname/Users/foo` → `/Users/foo`. */
 // TODO: reaper - probably need a more reliable way to get this out
 function parseOsc7Cwd(data) {
-  if (!data || typeof data !== 'string') return null;
+  if (!data) return null;
+
   try {
     if (data.startsWith('file://')) {
       const url = new URL(data);
       let path = decodeURIComponent(url.pathname || '');
+
       // Windows: file:///C:/Users/... → pathname "/C:/Users/..."
       if (/^\/[A-Za-z]:\//.test(path)) path = path.slice(1);
+
       return path || null;
     }
+
     // Some shells send a bare path
     if (data.startsWith('/')) return data;
   } catch {
     // ignore malformed
   }
+
   return null;
 }

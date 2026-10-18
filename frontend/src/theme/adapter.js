@@ -56,9 +56,11 @@ export const appTokens = {
  */
 export function resolveThemeMode(mode) {
   if (mode === 'light' || mode === 'dark') return mode;
+
   if (typeof window !== 'undefined' && window.matchMedia('(prefers-color-scheme: dark)').matches) {
     return 'dark';
   }
+
   return 'light';
 }
 

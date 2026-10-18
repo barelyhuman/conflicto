@@ -34,6 +34,7 @@ export function PRPicker({ selectedPR, currentPR, onSelect, onError }) {
   const fetchPRs = useCallback(
     async (newLimit, newQuery, isBackground = false) => {
       if (!isBackground) setLoading(true);
+
       try {
         const data = await api.searchPRList(newLimit, newQuery);
         cacheRef.current = {
@@ -52,6 +53,7 @@ export function PRPicker({ selectedPR, currentPR, onSelect, onError }) {
         }
       } finally {
         lastFetchRef.current = Date.now();
+
         if (!isBackground) setLoading(false);
       }
     },
@@ -69,11 +71,13 @@ export function PRPicker({ selectedPR, currentPR, onSelect, onError }) {
   useEffect(() => {
     if (!open) return;
     const cache = cacheRef.current;
+
     if (cache.fetchedAt > 0 && Date.now() - cache.fetchedAt < 30000) {
       setResults(cache.results);
       setLimit(cache.limit);
       setHasMore(cache.results.length >= cache.limit);
     }
+
     fetchPRs(cache.limit, cache.query, true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
@@ -81,10 +85,12 @@ export function PRPicker({ selectedPR, currentPR, onSelect, onError }) {
   // Debounced search
   useEffect(() => {
     if (!open) return;
+
     if (debounceRef.current) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(() => {
       fetchPRs(10, query);
     }, 300);
+
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current);
     };
@@ -93,6 +99,7 @@ export function PRPicker({ selectedPR, currentPR, onSelect, onError }) {
 
   function handleScrollEnd() {
     if (loading || !hasMore) return;
+
     if (Date.now() - lastFetchRef.current < 500) return;
     const nextLimit = limit + 10;
     fetchPRs(nextLimit, queryRef.current);

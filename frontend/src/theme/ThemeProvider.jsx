@@ -14,6 +14,7 @@ export function ThemeProvider({ children }) {
     const mq = window.matchMedia('(prefers-color-scheme: dark)');
     const onChange = () => setThemeType(resolveThemeMode());
     mq.addEventListener('change', onChange);
+
     return () => mq.removeEventListener('change', onChange);
   }, []);
 

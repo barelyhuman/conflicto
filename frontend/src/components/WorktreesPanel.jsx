@@ -12,7 +12,9 @@ import { ChangeSection } from './ChangeSection.jsx';
 function shortenPath(path) {
   if (!path) return '';
   const parts = path.split('/');
+
   if (parts.length <= 3) return path;
+
   return `…/${parts.slice(-3).join('/')}`;
 }
 
@@ -25,9 +27,11 @@ function shortenPath(path) {
  */
 function WorktreeRow({ wt, worktree, onSwitch, onRemove }) {
   const isActive = useComputed(() => wt.path === worktree.currentPath.value || wt.isCurrent);
+
   const rowClass = useComputed(
     () => `worktree-row${isActive.value ? ' active' : ''}`
   );
+
   const label = wt.branch || wt.head || 'detached';
 
   return (

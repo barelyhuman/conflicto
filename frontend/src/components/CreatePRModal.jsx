@@ -18,6 +18,7 @@ export function CreatePRModal({ open, onClose, baseBranches, onSubmit }) {
 
   function handleSubmit(e) {
     e.preventDefault();
+
     if (!title.trim()) return;
     onSubmit?.(title.trim(), body.trim(), baseBranch, draft);
     setTitle('');

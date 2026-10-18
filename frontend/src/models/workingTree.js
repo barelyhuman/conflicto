@@ -1,12 +1,12 @@
 import { createModel, signal } from '@preact/signals';
-import { api } from '../wails.js';
+import { api as defaultApi } from '../wails.js';
 
 /**
  * Working-tree domain: staged / unstaged / conflicts + git mutate actions.
  *
  * @param {{ onError?: (title: string, message: string) => void }} [opts]
  */
-export const WorkingTreeModel = createModel(({ onError } = {}) => {
+export const WorkingTreeModel = createModel(({ onError, api = defaultApi } = {}) => {
   const staged = signal([]);
   const unstaged = signal([]);
   const conflicts = signal([]);
@@ -32,9 +32,13 @@ export const WorkingTreeModel = createModel(({ onError } = {}) => {
       const c = this.conflicts.value;
       const s = this.staged.value;
       const u = this.unstaged.value;
+
       if (c[0]) return { path: c[0].path, section: /** @type {const} */ ('conflict') };
+
       if (s[0]) return { path: s[0].path, section: /** @type {const} */ ('staged') };
+
       if (u[0]) return { path: u[0].path, section: /** @type {const} */ ('unstaged') };
+
       return null;
     },
 
@@ -58,6 +62,7 @@ export const WorkingTreeModel = createModel(({ onError } = {}) => {
 
     async discardAll() {
       const paths = this.unstaged.value.map((f) => f.path);
+
       for (const path of paths) {
         try {
           await api.discardFile(path);
@@ -70,6 +75,7 @@ export const WorkingTreeModel = createModel(({ onError } = {}) => {
 
     async stageAll() {
       const paths = this.unstaged.value.map((f) => f.path);
+
       for (const path of paths) {
         try {
           await api.stageFile(path);
@@ -82,6 +88,7 @@ export const WorkingTreeModel = createModel(({ onError } = {}) => {
 
     async unstageAll() {
       const paths = this.staged.value.map((f) => f.path);
+
       for (const path of paths) {
         try {
           await api.unstageFile(path);

@@ -18,6 +18,7 @@ export function DiffExpandToggle({ expanded, onToggle, className = '' }) {
 
   const chevUpRef = (node) => {
     if (!node) return
+
     if (!expanded) {
       node.base.setAttribute("viewBox", `0 ${-offset} 24 24`);
     } else {
@@ -27,6 +28,7 @@ export function DiffExpandToggle({ expanded, onToggle, className = '' }) {
 
   const chevDownRef = (node) => {
     if (!node) return
+
     if (!expanded) {
       node.base.setAttribute("viewBox", `0 ${offset} 24 24`);
     } else {

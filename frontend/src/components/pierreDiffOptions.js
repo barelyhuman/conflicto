@@ -12,13 +12,16 @@ export function expandUnchangedForDiff(isPRMode, fullDiff) {
 export function fileDiffFromPatch(patch) {
   if (!patch) return null;
   const meta = processFile(patch, { isGitDiff: true });
+
   if (!meta?.hunks?.length) return null;
+
   return meta;
 }
 
 
 export function annotationUnsafeCSS(isPRMode) {
   if (!isPRMode) return undefined;
+
   return `[data-line-annotation], [data-gutter-buffer="annotation"] { --diffs-annotation-bg: transparent; }`;
 }
 
@@ -38,13 +41,17 @@ export function loadDiffFilesForDiff(isPRMode, loader) {
 export function mapFileContentsToDiffFiles(meta, res) {
   const path = meta?.name ?? '';
   const oldName = meta?.prevName ?? path;
+
   const oldFile = res?.hasOld
     ? { name: oldName, contents: res.oldContent ?? '' }
     : null;
+
   const newFile = {
     name: path,
     contents: res?.hasNew ? (res.newContent ?? '') : '',
   };
+
   if (oldFile) return { oldFile, newFile };
+
   return { oldFile: null, newFile };
 }

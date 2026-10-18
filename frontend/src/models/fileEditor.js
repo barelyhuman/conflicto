@@ -1,6 +1,6 @@
 import { createModel, signal, effect } from '@preact/signals';
-import { api } from '../wails.js';
-import { bindEditorClickCaret } from '../components/fileEditorCaret.js';
+import { api as defaultApi } from '../wails.js';
+import { bindEditorClickCaret as defaultBindCaret } from '../components/fileEditorCaret.js';
 
 /**
  * Count 1-based lines in a text buffer (empty → 1 editable line).
@@ -10,12 +10,15 @@ import { bindEditorClickCaret } from '../components/fileEditorCaret.js';
 function lineCountOf(text) {
   if (text.length === 0) return 1;
   let count = 1;
+
   for (let i = 0; i < text.length; i++) {
     if (text.charCodeAt(i) === 10) count++;
   }
+
   // Trailing newline yields an extra empty line in split semantics; Pierre's
   // document still treats the final break as ending the last line, so drop it.
   if (text.charCodeAt(text.length - 1) === 10) count--;
+
   return Math.max(1, count);
 }
 
@@ -27,6 +30,7 @@ function lineCountOf(text) {
  */
 function clampEditorLine(editor, requested) {
   const lineCount = lineCountOf(editor.getText());
+
   return Math.max(1, Math.min(Math.floor(requested), lineCount));
 }
 
@@ -40,7 +44,7 @@ function clampEditorLine(editor, requested) {
  *   onError?: (title: string, message: string) => void,
  * }} opts
  */
-export const FileEditorModel = createModel(({ path, editorDirty, editorGotoLine, onError }) => {
+export const FileEditorModel = createModel(({ path, editorDirty, editorGotoLine, onError, api = defaultApi, bindEditorClickCaret = defaultBindCaret }) => {
   /** @type {import('@preact/signals-core').Signal<null | { name: string, contents: string, cacheKey: string }>} */
   const file = signal(null);
   const loadError = signal(/** @type {string|null} */ (null));
@@ -69,9 +73,11 @@ export const FileEditorModel = createModel(({ path, editorDirty, editorGotoLine,
       const requested = editorGotoLine?.peek() ?? 1;
       const target = clampEditorLine(editor, requested);
       editor.focus({ lineNumber: target, character: 0, preventScroll: false });
+
       if (editorGotoLine != null) {
         editorGotoLine.value = null;
       }
+
       reportDirty(editor.getText());
     });
   }
@@ -101,11 +107,13 @@ export const FileEditorModel = createModel(({ path, editorDirty, editorGotoLine,
 
     api.getFileContents(targetPath, false).then((res) => {
       if (cancelled) return;
+
       const contents = res.hasNew
         ? res.newContent
         : res.hasOld
           ? res.oldContent
           : '';
+
       savedContents = contents;
       file.value = {
         name: targetPath,
@@ -128,9 +136,11 @@ export const FileEditorModel = createModel(({ path, editorDirty, editorGotoLine,
   async function save() {
     const editor = editorRef;
     const targetPath = path.peek();
+
     if (!editor || !targetPath) return;
 
     const next = editor.getText();
+
     if (next === savedContents) return;
 
     try {
@@ -148,7 +158,9 @@ export const FileEditorModel = createModel(({ path, editorDirty, editorGotoLine,
       e.preventDefault();
       save();
     }
+
     document.addEventListener('keydown', onKey);
+
     return () => document.removeEventListener('keydown', onKey);
   });
 

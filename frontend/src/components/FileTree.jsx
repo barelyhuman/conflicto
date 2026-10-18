@@ -50,14 +50,17 @@ export function FileTree({
     (path) => selection.select(path, 'conflict'),
     [selection]
   );
+
   const selectStaged = useCallback(
     (path) => selection.select(path, 'staged'),
     [selection]
   );
+
   const selectUnstaged = useCallback(
     (path) => selection.select(path, 'unstaged'),
     [selection]
   );
+
   const selectPR = useCallback(
     (path) => selection.select(path, 'pr'),
     [selection]
@@ -210,6 +213,7 @@ function SignalChangeTree({
   onDiscard,
 }) {
   const list = filesSignal ? filesSignal.value : files;
+
   const activeFile =
     selection.activeSection.value === section ? selection.activeFile.value : null;
 

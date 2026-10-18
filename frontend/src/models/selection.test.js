@@ -1,17 +1,14 @@
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
 import { signal } from '@preact/signals';
+import { SelectionModel } from './selection.js';
 
 const getDiff = vi.fn();
 const getPRFileDiff = vi.fn();
 
-vi.mock('../wails.js', () => ({
-  api: {
-    getDiff: (...args) => getDiff(...args),
-    getPRFileDiff: (...args) => getPRFileDiff(...args),
-  },
-}));
-
-const { SelectionModel } = await import('./selection.js');
+const api = {
+  getDiff: (...args) => getDiff(...args),
+  getPRFileDiff: (...args) => getPRFileDiff(...args),
+};
 
 function makeWorkingTree(first = null) {
   return {
@@ -32,6 +29,7 @@ describe('SelectionModel diffLoading', () => {
     selection = new SelectionModel({
       workingTree: makeWorkingTree(),
       activePR,
+      api,
     });
   });
 

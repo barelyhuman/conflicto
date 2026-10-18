@@ -1,21 +1,18 @@
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
+import { WorkingTreeModel } from './workingTree.js';
 
 const discardFile = vi.fn();
 
-vi.mock('../wails.js', () => ({
-  api: {
-    discardFile: (...args) => discardFile(...args),
-  },
-}));
-
-const { WorkingTreeModel } = await import('./workingTree.js');
+const api = {
+  discardFile: (...args) => discardFile(...args),
+};
 
 describe('WorkingTreeModel', () => {
   let workingTree;
 
   beforeEach(() => {
     discardFile.mockReset();
-    workingTree = new WorkingTreeModel();
+    workingTree = new WorkingTreeModel({ api });
   });
 
   afterEach(() => {

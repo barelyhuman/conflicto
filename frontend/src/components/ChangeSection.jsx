@@ -1,3 +1,4 @@
+import { Signal } from '@preact/signals';
 import { Show } from '@preact/signals/utils';
 import { IconChevronRight } from '@tabler/icons-preact';
 
@@ -69,7 +70,8 @@ export function ChangeSection({
                 {action.icon}
               </button>
             );
-            return typeof action.show === 'object' && action.show !== null && 'value' in action.show
+
+            return action.show instanceof Signal
               ? <Show key={action.title} when={action.show}>{button}</Show>
               : action.show ? button : null;
           })}

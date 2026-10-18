@@ -1,5 +1,5 @@
 import { createModel, signal, computed, effect } from '@preact/signals';
-import { api } from '../wails.js';
+import { api as defaultApi } from '../wails.js';
 
 /**
  * File / section / diff selection and diff fetching.
@@ -9,7 +9,7 @@ import { api } from '../wails.js';
  *   activePR: import('@preact/signals-core').Signal<number|null>,
  * }} opts
  */
-export const SelectionModel = createModel(({ workingTree, activePR }) => {
+export const SelectionModel = createModel(({ workingTree, activePR, api = defaultApi }) => {
   const activeFile = signal(/** @type {string|null} */ (null));
   /** @type {import('@preact/signals-core').Signal<null | 'conflict' | 'staged' | 'unstaged' | 'pr'>} */
   const activeSection = signal(null);
@@ -27,10 +27,13 @@ export const SelectionModel = createModel(({ workingTree, activePR }) => {
   const isConflict = computed(
     () => activePR.value == null && activeSection.value === 'conflict'
   );
+
   const isUnstaged = computed(() => activeSection.value === 'unstaged');
+
   const canEdit = computed(
     () => activePR.value == null && activeSection.value === 'unstaged'
   );
+
   const isEditView = computed(
     () => viewMode.value === 'edit' && canEdit.value
   );
@@ -38,15 +41,20 @@ export const SelectionModel = createModel(({ workingTree, activePR }) => {
   function requestDiff(file, section) {
     if (!file) {
       diffLoading.value = false;
+
       return;
     }
+
     // ConflictViewer fetches stages via GetConflictFile; skip the unused patch.
     if (section === 'conflict') {
       diffLoading.value = false;
+
       return;
     }
+
     diffLoading.value = true;
     const pr = activePR.peek();
+
     if (pr != null) {
       api.getPRFileDiff(pr, file);
     } else {
@@ -60,10 +68,13 @@ export const SelectionModel = createModel(({ workingTree, activePR }) => {
     const section = activeSection.value;
     // Subscribe to PR so entering/leaving PR mode re-fetches.
     activePR.value;
+
     if (!file) {
       diffLoading.value = false;
+
       return;
     }
+
     requestDiff(file, section);
   });
 
@@ -86,6 +97,7 @@ export const SelectionModel = createModel(({ workingTree, activePR }) => {
     select(path, section) {
       const same =
         this.activeFile.peek() === path && this.activeSection.peek() === section;
+
       // Drop stale viewer content immediately so we never flash the previous file.
       this.activeDiff.value = null;
       this.diffLoading.value = true;
@@ -93,11 +105,14 @@ export const SelectionModel = createModel(({ workingTree, activePR }) => {
       this.viewMode.value = 'diff';
       this.editorDirty.value = false;
       this.editorGotoLine.value = null;
+
       if (same) {
         // Same path is a signal no-op — effect won't re-run; fetch explicitly.
         requestDiff(path, section);
+
         return;
       }
+
       this.activeFile.value = path;
       this.activeSection.value = section;
     },
@@ -121,6 +136,7 @@ export const SelectionModel = createModel(({ workingTree, activePR }) => {
       if (!this.canEdit.value) return;
       const next = this.viewMode.value === 'diff' ? 'edit' : 'diff';
       this.viewMode.value = next;
+
       if (next === 'diff') {
         this.editorDirty.value = false;
         this.editorGotoLine.value = null;
@@ -135,6 +151,7 @@ export const SelectionModel = createModel(({ workingTree, activePR }) => {
      */
     openEditorAtLine(lineNumber) {
       if (!this.canEdit.value) return;
+
       if (!Number.isFinite(lineNumber) || lineNumber < 1) return;
       this.editorGotoLine.value = Math.floor(lineNumber);
       this.viewMode.value = 'edit';
@@ -142,10 +159,12 @@ export const SelectionModel = createModel(({ workingTree, activePR }) => {
 
     applyDiff(data) {
       const path = data?.path ?? null;
+
       // Ignore late responses for a file the user already navigated away from.
       if (path != null && this.activeFile.peek() != null && path !== this.activeFile.peek()) {
         return;
       }
+
       this.activeDiff.value = data ?? null;
       this.diffLoading.value = false;
     },
@@ -154,6 +173,7 @@ export const SelectionModel = createModel(({ workingTree, activePR }) => {
     selectFirstFromWorkingTreeIfNeeded() {
       if (this.activeFile.value) return;
       const next = workingTree.firstEntry();
+
       if (!next) return;
       this.select(next.path, next.section);
     },
@@ -161,10 +181,13 @@ export const SelectionModel = createModel(({ workingTree, activePR }) => {
     /** Restore selection to first working-tree entry (e.g. leaving PR mode). */
     selectFirstFromWorkingTree() {
       const next = workingTree.firstEntry();
+
       if (!next) {
         this.clear();
+
         return;
       }
+
       this.select(next.path, next.section);
     },
 
@@ -172,6 +195,7 @@ export const SelectionModel = createModel(({ workingTree, activePR }) => {
     refetch() {
       const file = this.activeFile.value;
       const section = this.activeSection.value;
+
       if (!file) return;
       this.activeDiff.value = null;
       requestDiff(file, section);

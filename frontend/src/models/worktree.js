@@ -1,5 +1,5 @@
 import { createModel, signal, computed, effect } from '@preact/signals';
-import { api } from '../wails.js';
+import { api as defaultApi } from '../wails.js';
 
 /**
  * @typedef {{ path: string, branch: string, head: string, isMain: boolean, isCurrent: boolean }} WorktreeEntry
@@ -16,7 +16,7 @@ import { api } from '../wails.js';
  *   onError?: (title: string, message: string) => void,
  * }} [opts]
  */
-export const WorktreeModel = createModel(({ currentPath: externalCurrentPath, onError } = {}) => {
+export const WorktreeModel = createModel(({ currentPath: externalCurrentPath, onError, api = defaultApi } = {}) => {
   const currentPath = externalCurrentPath ?? signal('');
   const entries = signal(/** @type {WorktreeEntry[]} */ ([]));
   const previewPath = signal('');
@@ -37,6 +37,7 @@ export const WorktreeModel = createModel(({ currentPath: externalCurrentPath, on
       previewPath.value = '';
       previewHash.value = '';
       previewLoading.value = false;
+
       return;
     }
 

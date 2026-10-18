@@ -93,9 +93,11 @@ function checksView(summary) {
       body: 'error',
     };
   }
+
   if (!summary) {
     return { status: 'none', title: 'Loading CI status…', short: 'CI …', body: 'empty' };
   }
+
   switch (summary.status) {
     case 'running':
       return {

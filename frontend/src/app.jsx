@@ -85,8 +85,9 @@ export function App() {
   // Bridge remaining PR useState into a live signal for SelectionModel.
   // Keep writes synchronous so selection's diff-fetch effect never sees a stale PR.
   const activePRSignal = useSignal(/** @type {number|null} */ (null));
+
   const setActivePRBoth = useCallback((next) => {
-    const value = typeof next === 'function' ? next(activePRSignal.peek()) : next;
+    const value = next instanceof Function ? next(activePRSignal.peek()) : next;
     activePRSignal.value = value;
     setActivePR(value);
   }, [activePRSignal]);
@@ -157,12 +158,14 @@ export function App() {
       onPRFilesUpdated: (data) => {
         const number = data?.number;
         const files = data?.files ?? [];
+
         if (number == null) return;
         setPrList((prev) =>
           prev.map((pr) =>
             pr.number === number ? { ...pr, files } : pr
           )
         );
+
         if (
           activePRSignalRef.current.peek() === number &&
           !selectionRef.current.activeFile.peek() &&
@@ -193,14 +196,17 @@ export function App() {
       },
       onError: (data) => {
         selectionRef.current.diffLoading.value = false;
+
         if (prCheckoutPendingRef.current) {
           setPrCheckoutPending(null);
         }
+
         const toast = {
           id: Date.now().toString(),
           title: data?.title ?? 'Error',
           message: data?.message ?? '',
         };
+
         setToasts((prev) => [...prev, toast]);
       },
       onOpenPreferences: () => {
@@ -235,6 +241,7 @@ export function App() {
     getPlatform().then((platform) => {
       if (!cancelled) setPlatform(platform);
     });
+
     return () => {
       cancelled = true;
     };
@@ -244,12 +251,15 @@ export function App() {
   useEffect(() => {
     function onKey(e) {
       if (isTerminalFocusTarget(e.target)) return;
+
       if ((e.metaKey || e.ctrlKey) && e.key === ',') {
         e.preventDefault();
         setPreferencesOpen((open) => !open);
       }
     }
+
     document.addEventListener('keydown', onKey);
+
     return () => document.removeEventListener('keydown', onKey);
   }, []);
 
@@ -257,15 +267,20 @@ export function App() {
   // (Cmd+R). Skip the terminal so readline reverse-i-search still works.
   useEffect(() => {
     if (platform !== 'linux' && platform !== 'windows') return;
+
     function onKey(e) {
       if (e.key !== 'r' && e.key !== 'R') return;
+
       if (!e.ctrlKey || e.metaKey || e.altKey || e.shiftKey) return;
+
       if (isTerminalFocusTarget(e.target)) return;
       e.preventDefault();
       e.stopPropagation();
       api.refresh();
     }
+
     document.addEventListener('keydown', onKey, true);
+
     return () => document.removeEventListener('keydown', onKey, true);
   }, [platform]);
 
@@ -279,10 +294,13 @@ export function App() {
         if (open && document.activeElement && isTerminalFocusTarget(document.activeElement)) {
           document.activeElement.blur();
         }
+
         return !open;
       });
     }
+
     document.addEventListener('keydown', onKey, true);
+
     return () => document.removeEventListener('keydown', onKey, true);
   }, []);
 
@@ -290,11 +308,16 @@ export function App() {
   useEffect(() => {
     api.getTerminalPrefs().then((prefs) => {
       if (prefs?.terminalHeight) setTerminalHeight(prefs.terminalHeight);
-      if (typeof prefs?.terminalOpen === 'boolean') setTerminalOpen(prefs.terminalOpen);
+
+      if (prefs?.terminalOpen === true || prefs?.terminalOpen === false) {
+        setTerminalOpen(prefs.terminalOpen);
+      }
+
       terminalPrefsReady.current = true;
     });
     api.getCIPrefs().then((prefs) => {
       const mode = prefs?.mode;
+
       if (mode === 'off' || mode === 'all' || mode === 'workflow') {
         setCiNotifyMode(mode);
       }
@@ -303,9 +326,11 @@ export function App() {
 
   useEffect(() => {
     if (!terminalPrefsReady.current) return;
+
     const t = setTimeout(() => {
       api.setTerminalPrefs(terminalOpenRef.current, terminalHeightRef.current);
     }, 200);
+
     return () => clearTimeout(t);
   }, [terminalOpen, terminalHeight]);
 
@@ -353,10 +378,13 @@ export function App() {
     if (!isPRMode || activePR == null) {
       setPrChecksSummary(null);
       api.stopPRChecksMonitor();
+
       return;
     }
+
     setPrChecksSummary(null);
     api.startPRChecksMonitor(activePR);
+
     return () => {
       api.stopPRChecksMonitor();
     };
@@ -409,6 +437,7 @@ export function App() {
     if (branch) {
       api.switchBranch(branch);
     }
+
     if (isPRMode) {
       setActivePRBoth(null);
       selection.clear();
@@ -417,12 +446,15 @@ export function App() {
 
   const handleStage = useCallback((path) => {
     const conflictFile = workingTree.conflicts.peek().find((f) => f.path === path);
+
     if (conflictFile) {
       setPendingConfirmFile(path);
       setConfirmKind('stage-conflict');
       setConfirmOpen(true);
+
       return;
     }
+
     workingTree.stage(path);
   }, [workingTree]);
 
@@ -452,19 +484,24 @@ export function App() {
         api.terminalStop(sessionId).catch(() => {});
       });
       worktree.remove(worktreePath);
+
       return;
     }
 
     if (kind === 'stage-conflict') {
       if (!path) return;
       workingTree.stage(path);
+
       return;
     }
+
     if (kind === 'discard') {
       if (!path) return;
       workingTree.discard(path);
+
       return;
     }
+
     if (kind === 'discard-all') {
       workingTree.discardAll();
     }

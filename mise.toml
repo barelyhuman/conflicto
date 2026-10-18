@@ -80,6 +80,15 @@ depends = ["install:frontend"]
 dir = "frontend"
 run = "pnpm test"
 
+[tasks.'lint:frontend']
+description = "Lint frontend (ESLint + anti-slop via Oxlint)"
+depends = ["install:frontend"]
+dir = "frontend"
+run = """
+pnpm lint
+pnpm lint:slop
+"""
+
 [tasks.test]
 description = "Run Go + frontend tests"
 depends = ["test:frontend", "build:frontend"]

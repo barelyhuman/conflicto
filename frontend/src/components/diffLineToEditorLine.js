@@ -15,9 +15,11 @@
  */
 export function mapDiffLineToEditorLine(props) {
   const lineNumber = props?.lineNumber;
+
   if (!Number.isFinite(lineNumber) || lineNumber < 1) return null;
 
   const lineType = props.lineType;
+
   const isDeletion =
     lineType === 'change-deletion' ||
     (lineType !== 'change-addition' &&
@@ -30,6 +32,7 @@ export function mapDiffLineToEditorLine(props) {
   }
 
   const nearest = nearestNonDeletionLine(props.lineElement);
+
   if (nearest != null) return nearest;
 
   return Math.floor(lineNumber);
@@ -43,6 +46,7 @@ function nearestNonDeletionLine(lineElement) {
   if (!(lineElement instanceof HTMLElement)) return null;
 
   const forward = scanSiblingLines(lineElement, 'nextElementSibling');
+
   if (forward != null) return forward;
 
   return scanSiblingLines(lineElement, 'previousElementSibling');
@@ -55,14 +59,18 @@ function nearestNonDeletionLine(lineElement) {
  */
 function scanSiblingLines(start, direction) {
   let el = start[direction];
+
   while (el) {
     if (el instanceof HTMLElement && el.dataset.line != null) {
       if (el.dataset.lineType !== 'change-deletion') {
         const n = parseInt(el.dataset.line, 10);
+
         if (Number.isFinite(n) && n >= 1) return n;
       }
     }
+
     el = el[direction];
   }
+
   return null;
 }

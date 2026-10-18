@@ -93,6 +93,7 @@ describe('terminalStore scoping', () => {
     const layout = store
       .getTerminalStoreSnapshot()
       .layouts.find((l) => l.paneIds.includes(b1));
+
     const sessionIds = store.removeLayout(layout.layoutId);
     expect(sessionIds).toEqual(['term-2']);
     expect(store.getTerminalStoreSnapshot().panes.some((p) => p.localId === b2)).toBe(false);

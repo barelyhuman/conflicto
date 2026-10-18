@@ -1,3 +1,4 @@
+import { Signal } from '@preact/signals';
 import { Show } from '@preact/signals/utils';
 import { SidebarToggle } from './SidebarToggle.jsx';
 import { DiffExpandToggle } from './DiffExpandToggle.jsx';
@@ -10,6 +11,7 @@ import { splitPath } from './ChangeTree.jsx';
 function absoluteFilePath(projectRoot, relativePath) {
   if (!projectRoot) return relativePath;
   const base = projectRoot.replace(/\/$/, '');
+
   return `${base}/${relativePath}`;
 }
 
@@ -56,9 +58,10 @@ export function IslandHeader({
   showCIMonitor = false,
   prChecksSummary = null,
 }) {
-  const fullDiff = typeof showFullDiff === 'boolean' ? showFullDiff : showFullDiff.value;
-  const editable = typeof canEdit === 'boolean' ? canEdit : canEdit.value;
+  const fullDiff = showFullDiff instanceof Signal ? showFullDiff.value : showFullDiff;
+  const editable = canEdit instanceof Signal ? canEdit.value : canEdit;
   const mode = viewMode?.value ?? 'diff';
+
   return (
     <div class="island-header">
       <SidebarToggle open={sidebarOpen} onToggle={onToggleSidebar} />
@@ -70,6 +73,7 @@ export function IslandHeader({
         {(path) => {
           const { name, dir } = splitPath(path);
           const fullPath = absoluteFilePath(projectPath, path);
+
           return (
             <div class="island-header-file" title={fullPath}>
               <Show when={dirty}>

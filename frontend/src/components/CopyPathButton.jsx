@@ -23,6 +23,7 @@ export function CopyPathButton({ absolutePath, relativePath, className = '' }) {
 
   async function copyPath(path, label) {
     const copiedToClipboard = await api.copyToClipboard(path);
+
     if (!copiedToClipboard || !triggerRef.current) return;
 
     setOpen(false);
