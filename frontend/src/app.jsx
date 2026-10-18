@@ -8,6 +8,7 @@ import { SelectionModel } from './models/selection.js';
 import { SyncModel } from './models/sync.js';
 import { WorktreeModel } from './models/worktree.js';
 import { WorkspaceIndexModel } from './models/workspaceIndex.js';
+import { ReviewModel } from './models/review.js';
 import { ThemeProvider } from './theme/ThemeProvider.jsx';
 import { EditProvider } from './components/EditProvider.jsx';
 import { FileTree } from './components/FileTree.jsx';
@@ -112,6 +113,13 @@ export function App() {
     },
   }));
 
+  const review = useModel(() => new ReviewModel({
+    onError: (title, message) => {
+      setToasts((prev) => [...prev, { id: Date.now().toString(), title, message }]);
+    },
+  }));
+  const reviewRef = useRef(review);
+
   const selection = useModel(() => new SelectionModel({
     workingTree,
     activePR: activePRSignal,
@@ -175,6 +183,10 @@ export function App() {
             pr.number === number ? { ...pr, files } : pr
           )
         );
+
+        if (activePRSignalRef.current.peek() === number) {
+          reviewRef.current.load(number);
+        }
 
         if (
           activePRSignalRef.current.peek() === number &&
@@ -377,14 +389,16 @@ export function App() {
     return () => cleanup();
   }, [isMacOS]);
 
-  // Fetch PR comments when active PR changes
+  // Fetch PR comments (and persisted pending-review drafts) when active PR changes
   useEffect(() => {
     if (isPRMode && activePR != null) {
       api.getPRComments(activePR);
+      review.load(activePR);
     } else {
       setPrComments([]);
+      review.load(null);
     }
-  }, [isPRMode, activePR]);
+  }, [isPRMode, activePR, projectPath, review]);
 
   // Poll CI checks while a PR is open in review mode
   useEffect(() => {
@@ -643,6 +657,7 @@ export function App() {
                       onCreatePR={() => setCreatePROpen(true)}
                       showCIMonitor={isPRMode}
                       prChecksSummary={prChecksSummary}
+                      review={review}
                     />
                     <Show
                       when={selection.activeFile}
@@ -665,6 +680,8 @@ export function App() {
                                   showFullDiff={selection.showFullDiff}
                                   comments={isPRMode ? prComments : []}
                                   onPostComment={handlePostComment}
+                                  review={review}
+                                  onSelectFile={(path) => selection.select(path, 'pr')}
                                   canOpenInEditor={selection.canEdit}
                                   onOpenLineInEditor={(line) => selection.openEditorAtLine(line)}
                                 />
