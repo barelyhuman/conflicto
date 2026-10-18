@@ -864,6 +864,7 @@ export function App() {
             onRefreshGH={() => api.detectGH()}
             ciNotifyMode={ciNotifyMode}
             onCINotifyModeChange={setCiNotifyMode}
+            isMac={isMacOS}
           />
 
           <CreatePRModal

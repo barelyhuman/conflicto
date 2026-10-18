@@ -2,6 +2,53 @@ import { useState, useEffect } from 'preact/hooks';
 import { IconX } from '@tabler/icons-preact';
 import { GHSettings } from './GHSettings.jsx';
 import { CISettings } from './CISettings.jsx';
+import { SHORTCUTS } from '../keymap/shortcuts.js';
+
+const SHORTCUT_SCOPES = [
+  ['global', 'Everywhere'],
+  ['palette', 'Command palette'],
+  ['home', 'Home screen'],
+  ['editor', 'Editor'],
+  ['diff', 'Changes panel'],
+  ['review', 'Review comments'],
+  ['search', 'Search'],
+  ['terminal', 'Terminal'],
+];
+
+/**
+ * Read-only keyboard shortcut reference, generated from keymap/shortcuts.js.
+ *
+ * @param {Object} props
+ * @param {boolean} props.isMac
+ */
+function ShortcutsSettings({ isMac }) {
+  return (
+    <div class="shortcuts-settings">
+      <h2 class="shortcuts-heading">Keyboard shortcuts</h2>
+      <p class="shortcuts-desc">Reference only. Shown for {isMac ? 'macOS' : 'Linux and Windows'}.</p>
+
+      {SHORTCUT_SCOPES.map(([scope, label]) => {
+        const rows = SHORTCUTS.filter((s) => s.scope === scope && (isMac ? s.mac : s.other));
+
+        if (rows.length === 0) return null;
+
+        return (
+          <section class="shortcuts-group" key={scope}>
+            <h3 class="shortcuts-group-title">{label}</h3>
+            <ul class="shortcuts-list">
+              {rows.map((s) => (
+                <li class="shortcuts-row" key={s.id}>
+                  <span class="shortcuts-desc-text">{s.description}</span>
+                  <kbd class="shortcuts-kbd">{isMac ? s.mac : s.other}</kbd>
+                </li>
+              ))}
+            </ul>
+          </section>
+        );
+      })}
+    </div>
+  );
+}
 
 /**
  * @param {Object} props
@@ -11,8 +58,9 @@ import { CISettings } from './CISettings.jsx';
  * @param {() => void} props.onRefreshGH
  * @param {'off' | 'all' | 'workflow'} props.ciNotifyMode
  * @param {(mode: 'off' | 'all' | 'workflow') => void} props.onCINotifyModeChange
+ * @param {boolean} [props.isMac] platform for the shortcut reference (app.jsx resolves it via getPlatform)
  */
-export function PreferencesPage({ open, onClose, ghStatus, onRefreshGH, ciNotifyMode, onCINotifyModeChange }) {
+export function PreferencesPage({ open, onClose, ghStatus, onRefreshGH, ciNotifyMode, onCINotifyModeChange, isMac = false }) {
   const [activeTab, setActiveTab] = useState('github');
 
   // Close on Escape
@@ -58,6 +106,13 @@ export function PreferencesPage({ open, onClose, ghStatus, onRefreshGH, ciNotify
             >
               GitHub
             </button>
+            <button
+              type="button"
+              class={`prefs-tab${activeTab === 'shortcuts' ? ' active' : ''}`}
+              onClick={() => setActiveTab('shortcuts')}
+            >
+              Shortcuts
+            </button>
           </aside>
 
           <main class="prefs-content">
@@ -65,6 +120,7 @@ export function PreferencesPage({ open, onClose, ghStatus, onRefreshGH, ciNotify
               <CISettings mode={ciNotifyMode} onChange={onCINotifyModeChange} />
             )}
             {activeTab === 'github' && <GHSettings ghStatus={ghStatus} onRefresh={onRefreshGH} />}
+            {activeTab === 'shortcuts' && <ShortcutsSettings isMac={isMac} />}
           </main>
         </div>
       </div>
@@ -161,6 +217,60 @@ export function PreferencesPage({ open, onClose, ghStatus, onRefreshGH, ciNotify
           flex: 1;
           overflow-y: auto;
           padding: 8px 24px 24px;
+        }
+        .shortcuts-settings {
+          font-family: var(--font-sans);
+          color: var(--text);
+        }
+        .shortcuts-heading {
+          font-size: 14px;
+          font-weight: 600;
+          color: var(--text-h);
+          margin: 8px 0 4px;
+        }
+        .shortcuts-desc {
+          font-size: 12px;
+          color: var(--text-muted);
+          margin: 0 0 16px;
+        }
+        .shortcuts-group {
+          margin-bottom: 18px;
+        }
+        .shortcuts-group-title {
+          font-size: 11px;
+          font-weight: 500;
+          text-transform: uppercase;
+          letter-spacing: 0.06em;
+          color: var(--text-muted);
+          margin: 0 0 6px;
+        }
+        .shortcuts-list {
+          list-style: none;
+          margin: 0;
+          padding: 0;
+        }
+        .shortcuts-row {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 16px;
+          padding: 5px 0;
+          font-size: 13px;
+        }
+        .shortcuts-desc-text {
+          color: var(--text);
+        }
+        .shortcuts-kbd {
+          flex-shrink: 0;
+          font-family: var(--font-mono, ui-monospace, monospace);
+          font-size: 11px;
+          line-height: 1;
+          padding: 3px 6px;
+          border-radius: 4px;
+          border: 1px solid var(--border, rgba(127, 127, 127, 0.3));
+          color: var(--text-muted);
+          background: transparent;
+          white-space: nowrap;
         }
         .prefs-empty-tab {
           display: flex;
