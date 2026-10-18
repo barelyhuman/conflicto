@@ -87,9 +87,16 @@ export function SearchPanel({ model }) {
       }
     }
 
-    if (e.key === 'Enter') {
+    if (e.key === 'Enter' && e.target.tagName === 'INPUT') {
       e.preventDefault();
       model.runNow();
+    } else if (e.key === 'ArrowDown' && e.target.tagName === 'INPUT') {
+      const first = e.currentTarget.querySelector('.result-row');
+
+      if (first) {
+        e.preventDefault();
+        first.focus();
+      }
     } else if (e.key === 'Escape') {
       e.currentTarget.blur?.();
     }
