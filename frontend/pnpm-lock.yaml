@@ -39,6 +39,9 @@ importers:
       '@oxlint/plugins':
         specifier: 1.78.0
         version: 1.78.0
+      '@playwright/test':
+        specifier: ^1.64.1
+        version: 1.64.1
       '@preact/eslint-plugin-signals':
         specifier: ^0.3.0
         version: 0.3.0
@@ -395,6 +398,11 @@ packages:
         optional: true
       shiki:
         optional: true
+
+  '@playwright/test@1.64.1':
+    resolution: {integrity: sha512-IaYGml/nSOiZWROfPtuIL7neuu9qDOZ3TNvNljUIrhDMxiGTgPjzj/g9p9RxpS2tSepPDRY+UwAaEeiKtUvIAg==, tarball: https://registry.npmjs.org/@playwright/test/-/test-1.64.1.tgz}
+    engines: {node: '>=20'}
+    hasBin: true
 
   '@preachjs/popper@0.0.6':
     resolution: {integrity: sha512-CUWN0/UEFCtseOWJlS0emzZs8qfmrHlJ7EtyrBCaTeEpahcQeZkEqwlb7keBhs6Dlxs6qEOJrJpXGGm1qFO9eA==}
@@ -1517,6 +1525,16 @@ packages:
     resolution: {integrity: sha512-RvwwcruNjI1ncT5xRakeyS9Lf8lcItv34KD+aif+VH9kduAyfYBipGh12274xtenIPZ119/R9BdTBa8gAwSh0A==}
     engines: {node: '>=12'}
 
+  playwright-core@1.64.1:
+    resolution: {integrity: sha512-BC4s8y6SEVA6Q1rSxZTto8hI1KUI3xXlHGZgvGqP4IqPdI/a6FX9H29IDNz7vKo9l21b6LfYosScPL6M3xxyDQ==, tarball: https://registry.npmjs.org/playwright-core/-/playwright-core-1.64.1.tgz}
+    engines: {node: '>=20'}
+    hasBin: true
+
+  playwright@1.64.1:
+    resolution: {integrity: sha512-HCrVhHr5QQuwYoswEUGTb7gGp522yflbv/ST8nF4sFWGuLjQCt17Q/EubpGGSNKYn1tsTCPZxqHhHCfVURu7UA==, tarball: https://registry.npmjs.org/playwright/-/playwright-1.64.1.tgz}
+    engines: {node: '>=20'}
+    hasBin: true
+
   possible-typed-array-names@1.1.0:
     resolution: {integrity: sha512-/+5VFTchJDoVj3bhoqi6UeymcD00DAwb1nJwamzPvHEszJ4FpF6SNNbUbOS8yI56qHzdV8eK0qEfOSiodkTdxg==}
     engines: {node: '>= 0.4'}
@@ -2222,6 +2240,10 @@ snapshots:
       react: 19.2.8
       react-dom: 19.2.8(react@19.2.8)
       shiki: 3.23.0
+
+  '@playwright/test@1.64.1':
+    dependencies:
+      playwright: 1.64.1
 
   '@preachjs/popper@0.0.6': {}
 
@@ -3493,6 +3515,12 @@ snapshots:
   picomatch@2.3.2: {}
 
   picomatch@4.0.5: {}
+
+  playwright-core@1.64.1: {}
+
+  playwright@1.64.1:
+    dependencies:
+      playwright-core: 1.64.1
 
   possible-typed-array-names@1.1.0: {}
 

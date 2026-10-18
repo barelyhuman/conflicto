@@ -58,6 +58,16 @@ description = "Run frontend dev server only (Vite)"
 dir = "frontend"
 run = "pnpm dev"
 
+[tasks.'dev:e2e']
+description = "Wails dev for Playwright (backend + browser-reachable dev server on :34115)"
+depends = ["icon"]
+run = '$WAILS dev -devserver localhost:34115 -wailsjsdir "${TMPDIR:-/tmp}/conflicto-e2e-wailsjs" $(uname -s | grep -qi linux && printf "%s" "-tags webkit2_41")'
+
+[tasks.'test:e2e']
+description = "Run Playwright E2E tests against wails dev"
+dir = "frontend"
+run = "pnpm test:e2e"
+
 [tasks.'install:frontend']
 description = "Install frontend dependencies (frozen lockfile)"
 dir = "frontend"

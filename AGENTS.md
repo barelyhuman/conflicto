@@ -27,6 +27,13 @@ Toolchain: `mise install` (Go, Node, pnpm versions pinned in `mise.toml`).
 - `pnpm lint` in `frontend/` runs ESLint on `src`.
 - `mise run test` runs **test:frontend → build:frontend → go test**. Order matters: Go tests need `frontend/dist` to exist because the binary embeds it (`//go:embed all:frontend/dist`).
 
+### E2E (Playwright)
+
+- `mise run test:e2e` — Playwright (Chromium) against the **real Go backend**. `wails dev` also serves the app at `localhost:34115`, and a browser tab there gets the real `window.go` bindings over `/wails/ipc`. Playwright's `webServer` starts it via `mise run dev:e2e` (reuses a running one locally).
+- Specs live in `frontend/e2e/` (not `src/`, so Vitest ignores them). `fixtures.js` gives each test a throwaway git repo (`repo`) and a page with it opened (`app`, via `SwitchProject`). Assert on the repo state with `repo.git(...)`.
+- Not covered: the native webview (WKWebView), native dialogs, window chrome, menus. `wails dev` still opens a native window (needs a display; CI uses `xvfb-run`).
+- `wails dev` flips file modes on `frontend/src/wailsjs/runtime/*`; `git checkout` them if they show as modified.
+
 ### Preact Signals — Critical
 
 Signals are the primary state layer. The repo includes local OpenCode skills under `.agents/skills/` and `.claude/skills/` for signal correctness.

@@ -29,3 +29,6 @@ secrets.yml
 
 # IDE
 .zed
+
+frontend/playwright-report/
+frontend/test-results/
