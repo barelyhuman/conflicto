@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, useRef } from 'preact/hooks';
-import { useModel, useSignal } from '@preact/signals';
+import { useModel, useSignal, useComputed } from '@preact/signals';
 import { Show } from '@preact/signals/utils';
 import './app.css';
 import { setupWailsEvents, api, watchFullscreen, getPlatform } from './wails.js';
@@ -27,6 +27,9 @@ import { setTerminalScope, removeTerminalScope } from './components/terminal/ter
 import { SidebarActions } from './components/SidebarActions.jsx';
 import { IslandHeader } from './components/IslandHeader.jsx';
 import { WorktreesPanel } from './components/WorktreesPanel.jsx';
+import { SearchPanel, SidebarViewSwitch } from './components/search/SearchPanel.jsx';
+import { searchModel, resetLspForProject } from './lsp/index.js';
+import { useCodeShortcuts } from './lsp/useCodeShortcuts.js';
 import { CommandPalette } from './components/palette/CommandPalette.jsx';
 import { HomeScreen } from './components/home/HomeScreen.jsx';
 
@@ -150,6 +153,17 @@ export function App() {
   const isPRMode = activePR != null;
   const currentPR = isPRMode ? prList.find((p) => p.number === activePR) : null;
 
+  // Sidebar view: Changes (file tree) or Search. Derived classes keep App from re-rendering on switch.
+  const asideClass = useComputed(() =>
+    searchModel.mode.value === 'search' ? 'sidebar is-searching' : 'sidebar'
+  );
+  const changesViewClass = useComputed(() =>
+    searchModel.mode.value === 'search' ? 'sidebar-view hidden' : 'sidebar-view'
+  );
+  const searchMode = useComputed(() => searchModel.mode.value === 'search');
+  const openSidebar = useCallback(() => setSidebarOpen(true), []);
+  useCodeShortcuts({ isMac: isMacOS, onOpenSearch: openSidebar });
+
   // Terminal links (and future palette/search) open files through the navigation seam.
   const currentPRFilesRef = useRef(EMPTY_FILES);
   currentPRFilesRef.current = currentPR?.files ?? EMPTY_FILES;
@@ -272,6 +286,7 @@ export function App() {
         worktreeRef.current.setCurrentPath(data.path ?? '');
         selectionRef.current.clear();
         tabs.setScope(data.path ?? '');
+        resetLspForProject(data.path ?? '');
         // PR-diff tabs only make sense while a PR is being reviewed.
         tabs.closeWhere((t) => t.kind === 'diff' && t.mode === 'pr');
         activePRSignalRef.current.value = null;
@@ -673,7 +688,7 @@ export function App() {
         <div class={shellClass}>
           <div class="window">
             <div class={`window-body${sidebarOpen ? '' : ' sidebar-collapsed'}`}>
-              <aside class="sidebar" aria-hidden={!sidebarOpen}>
+              <aside class={asideClass} aria-hidden={!sidebarOpen}>
                 <div class="sidebar-project">
                   <ProjectPicker
                     currentName={projectName}
@@ -698,6 +713,9 @@ export function App() {
                   onRemove={handleRemoveWorktree}
                 />
 
+                <SidebarViewSwitch model={searchModel} />
+
+                <div class={changesViewClass}>
                 <FileTree
                   workingTree={workingTree}
                   activeTab={tabs.activeTab}
@@ -714,6 +732,11 @@ export function App() {
                   onDiscardAll={handleDiscardAll}
                   onCommit={(message) => workingTree.commit(message)}
                 />
+                </div>
+
+                <Show when={searchMode}>
+                  <SearchPanel model={searchModel} />
+                </Show>
               </aside>
 
               <div class="content-well">
