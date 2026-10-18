@@ -10,6 +10,8 @@ export function Commit(arg1:string):Promise<void>;
 
 export function CreatePR(arg1:string,arg2:string,arg3:string,arg4:boolean):Promise<void>;
 
+export function DeleteReviewDraft(arg1:number,arg2:string):Promise<void>;
+
 export function DetectGH():Promise<void>;
 
 export function DiscardFile(arg1:string):Promise<void>;
@@ -39,6 +41,10 @@ export function GetPRFiles(arg1:number):Promise<void>;
 export function GetPRList():Promise<void>;
 
 export function GetRecentProjects():Promise<Array<main.RecentProject>>;
+
+export function GetReviewDrafts(arg1:number):Promise<Array<main.ReviewDraft>>;
+
+export function GetReviewState(arg1:number):Promise<main.ReviewState>;
 
 export function GetTerminalPrefs():Promise<Record<string, any>>;
 
@@ -72,6 +78,8 @@ export function RefreshWorkspaceIndex():Promise<void>;
 
 export function RemoveWorktree(arg1:string):Promise<void>;
 
+export function SaveReviewDraft(arg1:number,arg2:main.ReviewDraft):Promise<main.ReviewDraft>;
+
 export function SearchPRList(arg1:number,arg2:string):Promise<Array<Record<string, any>>>;
 
 export function SearchText(arg1:main.SearchOpts):Promise<Array<main.SearchMatch>>;
@@ -85,6 +93,8 @@ export function StageFile(arg1:string):Promise<void>;
 export function StartPRChecksMonitor(arg1:number):Promise<void>;
 
 export function StopPRChecksMonitor():Promise<void>;
+
+export function SubmitReview(arg1:number,arg2:string,arg3:string):Promise<void>;
 
 export function SwitchBranch(arg1:string):Promise<void>;
 
