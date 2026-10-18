@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/wailsapp/wails/v2/pkg/runtime"
@@ -42,6 +43,9 @@ type App struct {
 	prCache  map[int]PRCache
 	prChecks *prChecksMonitor
 	terms    *terminalManager
+
+	wsIndex    *workspaceIndex
+	wsInitOnce sync.Once
 }
 
 // NewApp creates a new App application struct
@@ -970,54 +974,13 @@ func (a *App) CheckoutPRToWorktree(number int, hash string) error {
 	}
 	repoName := filepath.Base(mainRepo)
 
-	var worktreePath string
-	if hash != "" {
-		worktreePath, err = a.git.WorktreePathForHash(hash)
-		if err != nil {
-			a.EmitEvent("error", map[string]string{
-				"title":   "Worktree Error",
-				"message": err.Error(),
-			})
-			return err
-		}
-		baseDir, baseErr := a.git.WorktreeBaseDir()
-		if baseErr != nil {
-			return baseErr
-		}
-		if mkdirErr := os.MkdirAll(baseDir, 0o755); mkdirErr != nil {
-			a.EmitEvent("error", map[string]string{
-				"title":   "Worktree Error",
-				"message": mkdirErr.Error(),
-			})
-			return mkdirErr
-		}
-	} else {
-		var pathErr error
-		worktreePath, hash, pathErr = a.git.NewWorktreePath()
-		if pathErr != nil {
-			a.EmitEvent("error", map[string]string{
-				"title":   "Worktree Error",
-				"message": pathErr.Error(),
-			})
-			return pathErr
-		}
-	}
-
-	localBranch := fmt.Sprintf("pr-wt-%s", hash)
-
-	if err := a.git.FetchPRHead(number, localBranch); err != nil {
+	worktreePath, err := createPRWorktree(a.git, number, hash, func(title string, err error) {
 		a.EmitEvent("error", map[string]string{
-			"title":   "PR Fetch Error",
+			"title":   title,
 			"message": err.Error(),
 		})
-		return err
-	}
-
-	if err := a.git.AddWorktree(worktreePath, localBranch); err != nil {
-		a.EmitEvent("error", map[string]string{
-			"title":   "Worktree Error",
-			"message": err.Error(),
-		})
+	})
+	if err != nil {
 		return err
 	}
 
@@ -1082,6 +1045,7 @@ func (a *App) RemoveWorktree(path string) error {
 
 // emitWorktreesUpdated emits the current list of worktrees.
 func (a *App) emitWorktreesUpdated() {
+	defer a.emitWorkspaceIndex()
 	if a.git == nil || !a.git.IsRepo() {
 		a.EmitEvent("worktreesUpdated", map[string]interface{}{
 			"worktrees": []WorktreeInfo{},

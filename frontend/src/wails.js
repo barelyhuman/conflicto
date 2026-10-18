@@ -78,6 +78,9 @@ export function setupWailsEvents(callbacks) {
   window.runtime.EventsOn('worktreesUpdated', (data) => {
     callbacks.onWorktreesUpdated?.(data);
   });
+  window.runtime.EventsOn('workspace:index-updated', (data) => {
+    callbacks.onWorkspaceIndexUpdated?.(data);
+  });
   window.runtime.EventsOn('refreshCompleted', () => {
     callbacks.onRefreshCompleted?.();
   });
@@ -154,6 +157,12 @@ export const api = {
   getWorktrees: () => window.go.main.App.GetWorktrees(),
 
   removeWorktree: (path) => window.go.main.App.RemoveWorktree(path),
+
+  getWorkspaceIndex: () => window.go.main.App.GetWorkspaceIndex(),
+
+  refreshWorkspaceIndex: () => window.go.main.App.RefreshWorkspaceIndex(),
+
+  openWorkspace: (id) => window.go.main.App.OpenWorkspace(id),
 
   getCurrentProject: () => window.go.main.App.GetCurrentProject(),
 
