@@ -1034,12 +1034,8 @@ func (a *App) GetWorktrees() ([]WorktreeInfo, error) {
 
 // RemoveWorktree removes a worktree at the given path.
 func (a *App) RemoveWorktree(path string) error {
-	if a.git == nil || !a.git.IsRepo() {
-		return fmt.Errorf("no git repository")
-	}
-
 	// If removing the active project, switch back to the main repo first.
-	if a.git.path == path {
+	if a.git != nil && a.git.IsRepo() && a.git.path == path {
 		mainRepo, err := a.git.MainRepoPath()
 		if err != nil {
 			return err
