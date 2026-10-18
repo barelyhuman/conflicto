@@ -5,6 +5,20 @@ import { ClipboardSetText } from './wailsjs/runtime/runtime.js';
 const terminalDataListeners = new Set();
 const terminalExitListeners = new Set();
 
+// LSP event fan-out (the LSP client subscribes via api.onLSPMessage/Status)
+const lspMessageListeners = new Set();
+const lspStatusListeners = new Set();
+
+function fanOut(listeners, data) {
+  listeners.forEach((fn) => {
+    try {
+      fn(data);
+    } catch {
+      // ignore listener errors
+    }
+  });
+}
+
 function emitTerminalData(data) {
   terminalDataListeners.forEach((fn) => {
     try {
@@ -91,6 +105,13 @@ export function setupWailsEvents(callbacks) {
     emitTerminalExit(data);
   });
 
+  window.runtime.EventsOn('lsp:message', (data) => {
+    fanOut(lspMessageListeners, data);
+  });
+  window.runtime.EventsOn('lsp:status', (data) => {
+    fanOut(lspStatusListeners, data);
+  });
+
   // Request initial data via the public Refresh method
   // (private Go methods like emitFileStatus are not bound to JS)
   window.go.main.App.Refresh();
@@ -113,6 +134,8 @@ export const api = {
 
   getFileContents: (path, staged = false) =>
     window.go.main.App.GetFileContents(path, !!staged),
+
+  filesExist: (paths) => window.go.main.App.FilesExist(paths),
 
   getConflictFile: (path) => window.go.main.App.GetConflictFile(path),
 
@@ -138,6 +161,18 @@ export const api = {
 
   postPRComment: (number, path, body, line, side, startLine, startSide) =>
     window.go.main.App.PostPRComment(number, path, body, line, side, startLine, startSide),
+
+  getReviewState: (number) => window.go.main.App.GetReviewState(number),
+
+  getReviewDrafts: (number) => window.go.main.App.GetReviewDrafts(number),
+
+  saveReviewDraft: (number, draft) => window.go.main.App.SaveReviewDraft(number, draft),
+
+  deleteReviewDraft: (number, id) => window.go.main.App.DeleteReviewDraft(number, id),
+
+  submitReview: (number, event, body) => window.go.main.App.SubmitReview(number, event, body),
+
+  clipboardGetText: () => window.runtime.ClipboardGetText(),
 
   checkoutPR: (number) => window.go.main.App.CheckoutPR(number),
 
@@ -185,6 +220,28 @@ export const api = {
   startPRChecksMonitor: (number) => window.go.main.App.StartPRChecksMonitor(number),
 
   stopPRChecksMonitor: () => window.go.main.App.StopPRChecksMonitor(),
+
+  lspServers: () => window.go.main.App.LSPServers(),
+
+  lspStart: (id) => window.go.main.App.LSPStart(id),
+
+  lspSend: (id, message) => window.go.main.App.LSPSend(id, message),
+
+  lspStop: (id) => window.go.main.App.LSPStop(id),
+
+  searchText: (opts) => window.go.main.App.SearchText(opts),
+
+  onLSPMessage: (fn) => {
+    lspMessageListeners.add(fn);
+
+    return () => lspMessageListeners.delete(fn);
+  },
+
+  onLSPStatus: (fn) => {
+    lspStatusListeners.add(fn);
+
+    return () => lspStatusListeners.delete(fn);
+  },
 
   onTerminalData: (fn) => {
     terminalDataListeners.add(fn);

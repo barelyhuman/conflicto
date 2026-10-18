@@ -44,6 +44,14 @@ type App struct {
 	prChecks *prChecksMonitor
 	terms    *terminalManager
 
+	reviews    *reviewDraftStore
+	reviewOnce sync.Once
+
+	lsp          *lspManager
+	lspOnce      sync.Once
+	searchMu     sync.Mutex
+	searchCancel context.CancelFunc
+
 	wsIndex    *workspaceIndex
 	wsInitOnce sync.Once
 }
@@ -102,6 +110,7 @@ func (a *App) shutdown(ctx context.Context) {
 	if a.terms != nil {
 		a.terms.stopAll()
 	}
+	a.lspManager().stopAll(true)
 	a.StopPRChecksMonitor()
 	if runtime.IsNotificationAvailable(ctx) {
 		runtime.CleanupNotifications(ctx)
@@ -391,6 +400,15 @@ func (a *App) GetConflictFile(path string) (*ConflictFile, error) {
 		return nil, fmt.Errorf("no repository open")
 	}
 	return a.git.GetConflictFile(path)
+}
+
+// FilesExist reports which repo-relative paths exist as regular files in the
+// active repository (used to validate terminal file links).
+func (a *App) FilesExist(paths []string) map[string]bool {
+	if a.git == nil || !a.git.IsRepo() {
+		return map[string]bool{}
+	}
+	return a.git.FilesExist(paths)
 }
 
 // WriteFile writes content to a worktree file and refreshes git status.
@@ -1133,6 +1151,9 @@ func (a *App) switchToProject(path string) error {
 	if err != nil {
 		return err
 	}
+
+	// Only the active worktree's language servers run.
+	a.lspManager().switchRoot(a.git.path)
 
 	// Update recents
 	if a.recents != nil {

@@ -4,6 +4,14 @@ import { FitAddon } from '@xterm/addon-fit';
 import '@xterm/xterm/css/xterm.css';
 import { api } from '../../wails.js';
 import { terminalTheme } from './terminalTheme.js';
+import { BrowserOpenURL } from '../../wailsjs/runtime/runtime.js';
+import { openFileAt } from '../../models/navigation.js';
+import { createExistenceCache, registerTerminalLinks } from './terminalLinkProvider.js';
+
+const IS_MAC = typeof navigator !== 'undefined' && /Mac/i.test(navigator.platform ?? '');
+
+/** Shared across panes: file-existence lookups for link candidates (batched + TTL cached). */
+const existenceCache = createExistenceCache({ check: (paths) => api.filesExist(paths) });
 
 function decodeTerminalPayload(payload) {
   const raw = payload?.data ?? '';
@@ -31,6 +39,9 @@ function decodeTerminalPayload(payload) {
 export function TerminalPane({
   sessionId,
   focused,
+  root,
+  cwd,
+  onOutput,
   onFocus,
   onExit,
   onCwdChange,
@@ -44,6 +55,12 @@ export function TerminalPane({
   const onCwdChangeRef = useRef(onCwdChange);
   const onTitleChangeRef = useRef(onTitleChange);
   const disposedRef = useRef(false);
+  const rootRef = useRef(root);
+  const cwdRef = useRef(cwd);
+  const onOutputRef = useRef(onOutput);
+  rootRef.current = root;
+  cwdRef.current = cwd;
+  onOutputRef.current = onOutput;
 
   useEffect(() => {
     sessionIdRef.current = sessionId;
@@ -148,11 +165,22 @@ export function TerminalPane({
       onTitleChangeRef.current?.(sessionIdRef.current, title);
     });
 
+    // Cmd/Ctrl+click: file:line[:col] -> open in conflicto, http(s) -> system browser.
+    const linksDisp = registerTerminalLinks(term, {
+      getRoot: () => rootRef.current,
+      getCwd: () => cwdRef.current,
+      exists: existenceCache,
+      openFile: (path, line, col) => openFileAt(path, line, col),
+      openUrl: (url) => BrowserOpenURL(url),
+      isMac: IS_MAC,
+    });
+
     const offData = api.onTerminalData((payload) => {
       if (!payload || payload.id !== sessionIdRef.current) return;
 
       if (disposedRef.current) return;
       term.write(decodeTerminalPayload(payload));
+      onOutputRef.current?.(payload.id);
     });
 
     const offExit = api.onTerminalExit((payload) => {
@@ -197,6 +225,7 @@ export function TerminalPane({
       onDataDisp.dispose();
       osc7Disp.dispose();
       titleDisp.dispose();
+      linksDisp.dispose();
       // Do NOT call terminalStop — hide must keep PTY alive.
       term.dispose();
       termRef.current = null;

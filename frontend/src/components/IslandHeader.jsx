@@ -7,6 +7,7 @@ import { CopyPathButton } from './CopyPathButton.jsx';
 import { ViewModeToggle } from './ViewModeToggle.jsx';
 import { PRPicker } from './PRPicker.jsx';
 import { PRChecksStatus } from './PRChecksStatus.jsx';
+import { ReviewBar } from './ReviewBar.jsx';
 import { splitPath } from './ChangeTree.jsx';
 
 function absoluteFilePath(projectRoot, relativePath) {
@@ -38,6 +39,7 @@ function absoluteFilePath(projectRoot, relativePath) {
  * @param {() => void} props.onCreatePR
  * @param {() => void} [props.onShowHome]
  * @param {boolean} [props.showCIMonitor]
+ * @param {InstanceType<typeof import('../models/review.js').ReviewModel>} [props.review]
  * @param {{ status?: string, pending?: number, pass?: number, fail?: number, total?: number, checks?: unknown[], error?: string }|null} [props.prChecksSummary]
  */
 export function IslandHeader({
@@ -60,6 +62,7 @@ export function IslandHeader({
   onShowHome,
   showCIMonitor = false,
   prChecksSummary = null,
+  review,
 }) {
   const fullDiff = showFullDiff instanceof Signal ? showFullDiff.value : showFullDiff;
   const editable = canEdit instanceof Signal ? canEdit.value : canEdit;
@@ -116,6 +119,7 @@ export function IslandHeader({
 
       <div class="island-header-actions">
         <PRChecksStatus active={showCIMonitor} summary={prChecksSummary} />
+        {isPRMode && review ? <ReviewBar review={review} /> : null}
         <button
           type="button"
           class="create-pr-trigger"
