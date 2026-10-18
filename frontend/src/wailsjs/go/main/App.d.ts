@@ -18,6 +18,8 @@ export function EmitEvent(arg1:string,arg2:any):Promise<void>;
 
 export function Fetch():Promise<void>;
 
+export function FilesExist(arg1:Array<string>):Promise<Record<string, boolean>>;
+
 export function GetCIPrefs():Promise<Record<string, any>>;
 
 export function GetConflictFile(arg1:string):Promise<main.ConflictFile>;

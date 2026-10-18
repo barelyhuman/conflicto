@@ -111,6 +111,8 @@ export const api = {
   getFileContents: (path, staged = false) =>
     window.go.main.App.GetFileContents(path, !!staged),
 
+  filesExist: (paths) => window.go.main.App.FilesExist(paths),
+
   getConflictFile: (path) => window.go.main.App.GetConflictFile(path),
 
   writeFile: (path, content) => window.go.main.App.WriteFile(path, content),

@@ -34,6 +34,10 @@ export function Fetch() {
   return window['go']['main']['App']['Fetch']();
 }
 
+export function FilesExist(arg1) {
+  return window['go']['main']['App']['FilesExist'](arg1);
+}
+
 export function GetCIPrefs() {
   return window['go']['main']['App']['GetCIPrefs']();
 }

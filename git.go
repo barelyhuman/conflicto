@@ -489,6 +489,27 @@ func (gs *GitService) GetFileContents(path string, staged bool) (*FileContentsRe
 	return res, nil
 }
 
+// FilesExist reports which repo-relative paths are existing regular files
+// inside the repository root. Paths escaping the root are reported false.
+func (gs *GitService) FilesExist(paths []string) map[string]bool {
+	out := make(map[string]bool, len(paths))
+	if gs.path == "" {
+		return out
+	}
+	root := filepath.Clean(gs.path)
+	sep := string(os.PathSeparator)
+	for _, p := range paths {
+		full := filepath.Clean(filepath.Join(root, p))
+		if full != root && !strings.HasPrefix(full, root+sep) {
+			out[p] = false
+			continue
+		}
+		info, err := os.Stat(full)
+		out[p] = err == nil && info.Mode().IsRegular()
+	}
+	return out
+}
+
 // WriteFile writes content to a worktree path relative to the repo root.
 func (gs *GitService) WriteFile(path string, content string) error {
 	if gs.path == "" {

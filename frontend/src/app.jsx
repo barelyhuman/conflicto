@@ -5,6 +5,7 @@ import './app.css';
 import { setupWailsEvents, api, watchFullscreen, getPlatform } from './wails.js';
 import { WorkingTreeModel } from './models/workingTree.js';
 import { SelectionModel } from './models/selection.js';
+import { createNavigator, registerNavigator } from './models/navigation.js';
 import { SyncModel } from './models/sync.js';
 import { WorktreeModel } from './models/worktree.js';
 import { ThemeProvider } from './theme/ThemeProvider.jsx';
@@ -126,6 +127,21 @@ export function App() {
 
   const isPRMode = activePR != null;
   const currentPR = isPRMode ? prList.find((p) => p.number === activePR) : null;
+
+  // Terminal links (and future palette/search) open files through the navigation seam.
+  const currentPRFilesRef = useRef(EMPTY_FILES);
+  currentPRFilesRef.current = currentPR?.files ?? EMPTY_FILES;
+  useEffect(
+    () =>
+      registerNavigator(
+        createNavigator({
+          selection,
+          workingTree,
+          isPRFile: (path) => currentPRFilesRef.current.some((f) => f.path === path),
+        })
+      ),
+    [selection, workingTree]
+  );
 
   // Setup Wails events
   useEffect(() => {
