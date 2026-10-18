@@ -109,6 +109,44 @@ export namespace main {
 	        this.cwd = source["cwd"];
 	    }
 	}
+	export class WorkspaceEntry {
+	    kind: string;
+	    id: string;
+	    title: string;
+	    subtitle: string;
+	    repoPath: string;
+	    repoName: string;
+	    path: string;
+	    prNumber: number;
+	    prState: string;
+	    branch: string;
+	    hasWorktree: boolean;
+	    stale: boolean;
+	    active: boolean;
+	    updatedAt: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new WorkspaceEntry(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.kind = source["kind"];
+	        this.id = source["id"];
+	        this.title = source["title"];
+	        this.subtitle = source["subtitle"];
+	        this.repoPath = source["repoPath"];
+	        this.repoName = source["repoName"];
+	        this.path = source["path"];
+	        this.prNumber = source["prNumber"];
+	        this.prState = source["prState"];
+	        this.branch = source["branch"];
+	        this.hasWorktree = source["hasWorktree"];
+	        this.stale = source["stale"];
+	        this.active = source["active"];
+	        this.updatedAt = source["updatedAt"];
+	    }
+	}
 	export class WorktreeInfo {
 	    path: string;
 	    branch: string;

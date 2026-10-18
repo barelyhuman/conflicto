@@ -44,6 +44,9 @@ type App struct {
 	prChecks *prChecksMonitor
 	terms    *terminalManager
 
+	reviews    *reviewDraftStore
+	reviewOnce sync.Once
+
 	wsIndex    *workspaceIndex
 	wsInitOnce sync.Once
 }

@@ -82,12 +82,20 @@ export function GetTerminalPrefs() {
   return window['go']['main']['App']['GetTerminalPrefs']();
 }
 
+export function GetWorkspaceIndex() {
+  return window['go']['main']['App']['GetWorkspaceIndex']();
+}
+
 export function GetWorktrees() {
   return window['go']['main']['App']['GetWorktrees']();
 }
 
 export function OpenProject() {
   return window['go']['main']['App']['OpenProject']();
+}
+
+export function OpenWorkspace(arg1) {
+  return window['go']['main']['App']['OpenWorkspace'](arg1);
 }
 
 export function PostPRComment(arg1, arg2, arg3, arg4, arg5, arg6, arg7) {
@@ -108,6 +116,10 @@ export function Push() {
 
 export function Refresh() {
   return window['go']['main']['App']['Refresh']();
+}
+
+export function RefreshWorkspaceIndex() {
+  return window['go']['main']['App']['RefreshWorkspaceIndex']();
 }
 
 export function RemoveWorktree(arg1) {

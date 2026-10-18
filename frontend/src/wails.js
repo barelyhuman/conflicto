@@ -141,6 +141,18 @@ export const api = {
   postPRComment: (number, path, body, line, side, startLine, startSide) =>
     window.go.main.App.PostPRComment(number, path, body, line, side, startLine, startSide),
 
+  getReviewState: (number) => window.go.main.App.GetReviewState(number),
+
+  getReviewDrafts: (number) => window.go.main.App.GetReviewDrafts(number),
+
+  saveReviewDraft: (number, draft) => window.go.main.App.SaveReviewDraft(number, draft),
+
+  deleteReviewDraft: (number, id) => window.go.main.App.DeleteReviewDraft(number, id),
+
+  submitReview: (number, event, body) => window.go.main.App.SubmitReview(number, event, body),
+
+  clipboardGetText: () => window.runtime.ClipboardGetText(),
+
   checkoutPR: (number) => window.go.main.App.CheckoutPR(number),
 
   previewWorktreePath: () => window.go.main.App.PreviewWorktreePath(),
