@@ -5,6 +5,7 @@ import { DiffViewer } from '../DiffViewer.jsx';
 import { ConflictViewer } from '../ConflictViewer.jsx';
 import { ConfirmDialog } from '../ConfirmDialog.jsx';
 import { openFileAt } from '../../models/navigation.js';
+import { ReferencesPanel } from '../search/ReferencesPanel.jsx';
 import { FileTabEditor } from './FileTabEditor.jsx';
 import { useTabShortcuts } from './useTabShortcuts.js';
 
@@ -125,6 +126,7 @@ export function EditorArea({
         }}
       </Show>
 
+      <ReferencesPanel />
       <PendingCloseDialog tabs={tabs} path={pendingClose} />
     </>
   );

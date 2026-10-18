@@ -136,6 +136,21 @@ export function consumePendingReveal(ctx) {
   return pending ?? null;
 }
 
+/** @type {Set<(ctx: EditorContext) => void>} */
+const savedListeners = new Set();
+
+/** Subscribe to successful saves of file tabs. Returns unsubscribe. */
+export function onFileSaved(fn) {
+  savedListeners.add(fn);
+
+  return () => savedListeners.delete(fn);
+}
+
+/** The host calls this after a file tab was written to disk. */
+export function notifyFileSaved(ctx) {
+  for (const fn of savedListeners) fn(ctx);
+}
+
 /** Forget a view (tab closed / worktree removed). Destroys the view. */
 export function disposeView(scope, tabId) {
   const key = keyOf(scope, tabId);

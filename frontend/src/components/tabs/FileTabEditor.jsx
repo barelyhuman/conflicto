@@ -7,9 +7,12 @@ import { tabsStore } from '../../models/tabs.js';
 import {
   consumePendingReveal,
   getView,
+  notifyFileSaved,
   registerView,
   revealInView,
 } from '../../models/editorRegistry.js';
+import { LspStatusPill } from './LspStatusPill.jsx';
+import { lspLanguageId } from '../../lsp/languageId.js';
 import './tabs.css';
 
 async function readFile(path) {
@@ -58,6 +61,7 @@ export function FileTabEditor({ tabId, path, scope, onError }) {
       try {
         await api.writeFile(path, text);
         handle.markSaved();
+        notifyFileSaved(ctx);
       } catch (err) {
         onErrorRef.current?.('Save Error', err?.message ?? String(err));
       }
@@ -148,6 +152,7 @@ export function FileTabEditor({ tabId, path, scope, onError }) {
         <div class="file-tab-status">{message}</div>
       </Show>
       <div class="file-tab-host" ref={host} />
+      {lspLanguageId(path) ? <LspStatusPill path={path} /> : null}
     </div>
   );
 }

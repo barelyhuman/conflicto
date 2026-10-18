@@ -22,6 +22,8 @@ import {
   forEachView,
   resolveEditorExtensions,
 } from '../../../models/editorRegistry.js';
+// Side effect: registers the LSP editor extension (hover, goto, completion, diagnostics).
+import './lsp.js';
 
 /** Marks transactions that load disk contents (never counted as user edits). */
 const External = Annotation.define();
