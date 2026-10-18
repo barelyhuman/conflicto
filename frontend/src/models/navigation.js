@@ -54,7 +54,8 @@ export function createNavigator({
     // PR review shows the PR's diff for files that are part of it; anything
     // else exists on disk in the worktree and opens as source.
     if (activePR.peek() != null) {
-      return isPRFile(path) ? openDiff(path, 'pr', { preview: false }) : openFile(path, line, col);
+      // A line target (goto-def, search hit, terminal link) needs the file tab to reveal it.
+      return isPRFile(path) && line == null ? openDiff(path, 'pr', { preview: false }) : openFile(path, line, col);
     }
 
     const inList = (list) => list.peek().some((f) => f.path === path);

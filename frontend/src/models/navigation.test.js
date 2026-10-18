@@ -92,8 +92,10 @@ describe('navigation', () => {
   it('PR mode opens PR files as pr diffs and others as file tabs', () => {
     activePR.value = 7;
     prFiles = ['pr.go'];
-    nav.openFileAt('pr.go', 10);
+    nav.openFileAt('pr.go');
     expect(active()).toMatchObject({ kind: 'diff', mode: 'pr', path: 'pr.go' });
+    nav.openFileAt('pr.go', 10);
+    expect(active()).toMatchObject({ kind: 'file', path: 'pr.go' });
     nav.openFileAt('other.go', 2);
     expect(active()).toMatchObject({ kind: 'file', path: 'other.go' });
   });
