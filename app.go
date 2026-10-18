@@ -47,6 +47,11 @@ type App struct {
 	reviews    *reviewDraftStore
 	reviewOnce sync.Once
 
+	lsp          *lspManager
+	lspOnce      sync.Once
+	searchMu     sync.Mutex
+	searchCancel context.CancelFunc
+
 	wsIndex    *workspaceIndex
 	wsInitOnce sync.Once
 }
@@ -105,6 +110,7 @@ func (a *App) shutdown(ctx context.Context) {
 	if a.terms != nil {
 		a.terms.stopAll()
 	}
+	a.lspManager().stopAll(true)
 	a.StopPRChecksMonitor()
 	if runtime.IsNotificationAvailable(ctx) {
 		runtime.CleanupNotifications(ctx)
@@ -1145,6 +1151,9 @@ func (a *App) switchToProject(path string) error {
 	if err != nil {
 		return err
 	}
+
+	// Only the active worktree's language servers run.
+	a.lspManager().switchRoot(a.git.path)
 
 	// Update recents
 	if a.recents != nil {

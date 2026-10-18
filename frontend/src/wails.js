@@ -5,6 +5,20 @@ import { ClipboardSetText } from './wailsjs/runtime/runtime.js';
 const terminalDataListeners = new Set();
 const terminalExitListeners = new Set();
 
+// LSP event fan-out (the LSP client subscribes via api.onLSPMessage/Status)
+const lspMessageListeners = new Set();
+const lspStatusListeners = new Set();
+
+function fanOut(listeners, data) {
+  listeners.forEach((fn) => {
+    try {
+      fn(data);
+    } catch {
+      // ignore listener errors
+    }
+  });
+}
+
 function emitTerminalData(data) {
   terminalDataListeners.forEach((fn) => {
     try {
@@ -89,6 +103,13 @@ export function setupWailsEvents(callbacks) {
   });
   window.runtime.EventsOn('terminal:exit', (data) => {
     emitTerminalExit(data);
+  });
+
+  window.runtime.EventsOn('lsp:message', (data) => {
+    fanOut(lspMessageListeners, data);
+  });
+  window.runtime.EventsOn('lsp:status', (data) => {
+    fanOut(lspStatusListeners, data);
   });
 
   // Request initial data via the public Refresh method
@@ -199,6 +220,28 @@ export const api = {
   startPRChecksMonitor: (number) => window.go.main.App.StartPRChecksMonitor(number),
 
   stopPRChecksMonitor: () => window.go.main.App.StopPRChecksMonitor(),
+
+  lspServers: () => window.go.main.App.LSPServers(),
+
+  lspStart: (id) => window.go.main.App.LSPStart(id),
+
+  lspSend: (id, message) => window.go.main.App.LSPSend(id, message),
+
+  lspStop: (id) => window.go.main.App.LSPStop(id),
+
+  searchText: (opts) => window.go.main.App.SearchText(opts),
+
+  onLSPMessage: (fn) => {
+    lspMessageListeners.add(fn);
+
+    return () => lspMessageListeners.delete(fn);
+  },
+
+  onLSPStatus: (fn) => {
+    lspStatusListeners.add(fn);
+
+    return () => lspStatusListeners.delete(fn);
+  },
 
   onTerminalData: (fn) => {
     terminalDataListeners.add(fn);

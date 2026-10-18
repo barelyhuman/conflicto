@@ -40,6 +40,30 @@ export namespace main {
 	        this.hasNew = source["hasNew"];
 	    }
 	}
+	export class LSPServerInfo {
+	    id: string;
+	    languages: string[];
+	    command: string;
+	    available: boolean;
+	    status: string;
+	    error: string;
+	    rootUri: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new LSPServerInfo(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.languages = source["languages"];
+	        this.command = source["command"];
+	        this.available = source["available"];
+	        this.status = source["status"];
+	        this.error = source["error"];
+	        this.rootUri = source["rootUri"];
+	    }
+	}
 	export class RecentProject {
 	    path: string;
 	    name: string;
@@ -74,6 +98,46 @@ export namespace main {
 		    }
 		    return a;
 		}
+	}
+	export class SearchMatch {
+	    path: string;
+	    line: number;
+	    col: number;
+	    text: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new SearchMatch(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.path = source["path"];
+	        this.line = source["line"];
+	        this.col = source["col"];
+	        this.text = source["text"];
+	    }
+	}
+	export class SearchOpts {
+	    query: string;
+	    regex: boolean;
+	    caseSensitive: boolean;
+	    wholeWord: boolean;
+	    glob: string;
+	    limit: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new SearchOpts(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.query = source["query"];
+	        this.regex = source["regex"];
+	        this.caseSensitive = source["caseSensitive"];
+	        this.wholeWord = source["wholeWord"];
+	        this.glob = source["glob"];
+	        this.limit = source["limit"];
+	    }
 	}
 	export class TerminalStartOpts {
 	    cwd: string;

@@ -90,6 +90,22 @@ export function GetWorktrees() {
   return window['go']['main']['App']['GetWorktrees']();
 }
 
+export function LSPSend(arg1, arg2) {
+  return window['go']['main']['App']['LSPSend'](arg1, arg2);
+}
+
+export function LSPServers() {
+  return window['go']['main']['App']['LSPServers']();
+}
+
+export function LSPStart(arg1) {
+  return window['go']['main']['App']['LSPStart'](arg1);
+}
+
+export function LSPStop(arg1) {
+  return window['go']['main']['App']['LSPStop'](arg1);
+}
+
 export function OpenProject() {
   return window['go']['main']['App']['OpenProject']();
 }
@@ -128,6 +144,10 @@ export function RemoveWorktree(arg1) {
 
 export function SearchPRList(arg1, arg2) {
   return window['go']['main']['App']['SearchPRList'](arg1, arg2);
+}
+
+export function SearchText(arg1) {
+  return window['go']['main']['App']['SearchText'](arg1);
 }
 
 export function SetCIPrefs(arg1) {

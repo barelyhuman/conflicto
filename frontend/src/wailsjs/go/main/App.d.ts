@@ -46,6 +46,14 @@ export function GetWorkspaceIndex():Promise<Array<main.WorkspaceEntry>>;
 
 export function GetWorktrees():Promise<Array<main.WorktreeInfo>>;
 
+export function LSPSend(arg1:string,arg2:string):Promise<void>;
+
+export function LSPServers():Promise<Array<main.LSPServerInfo>>;
+
+export function LSPStart(arg1:string):Promise<main.LSPServerInfo>;
+
+export function LSPStop(arg1:string):Promise<void>;
+
 export function OpenProject():Promise<string>;
 
 export function OpenWorkspace(arg1:string):Promise<void>;
@@ -65,6 +73,8 @@ export function RefreshWorkspaceIndex():Promise<void>;
 export function RemoveWorktree(arg1:string):Promise<void>;
 
 export function SearchPRList(arg1:number,arg2:string):Promise<Array<Record<string, any>>>;
+
+export function SearchText(arg1:main.SearchOpts):Promise<Array<main.SearchMatch>>;
 
 export function SetCIPrefs(arg1:string):Promise<void>;
 
