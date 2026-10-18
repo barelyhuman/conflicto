@@ -84,9 +84,6 @@ export function setupWailsEvents(callbacks) {
   window.runtime.EventsOn('refreshCompleted', () => {
     callbacks.onRefreshCompleted?.();
   });
-  window.runtime.EventsOn('workspace:index-updated', (data) => {
-    callbacks.onWorkspaceIndexUpdated?.(data);
-  });
   window.runtime.EventsOn('terminal:data', (data) => {
     emitTerminalData(data);
   });
@@ -168,21 +165,6 @@ export const api = {
   openWorkspace: (id) => window.go.main.App.OpenWorkspace(id),
 
   getCurrentProject: () => window.go.main.App.GetCurrentProject(),
-
-  getWorkspaceIndex: () =>
-    window.go?.main?.App?.GetWorkspaceIndex
-      ? window.go.main.App.GetWorkspaceIndex()
-      : Promise.resolve([]),
-
-  refreshWorkspaceIndex: () =>
-    window.go?.main?.App?.RefreshWorkspaceIndex
-      ? window.go.main.App.RefreshWorkspaceIndex()
-      : Promise.resolve(),
-
-  openWorkspace: (id) =>
-    window.go?.main?.App?.OpenWorkspace
-      ? window.go.main.App.OpenWorkspace(id)
-      : Promise.reject(new Error('Workspace index is not available')),
 
   terminalStart: (opts = {}) => window.go.main.App.TerminalStart(opts),
 

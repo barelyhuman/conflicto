@@ -54,16 +54,15 @@ func TestBuildWorkspaceEntries(t *testing.T) {
 	for _, e := range entries {
 		byID[e.ID] = e
 	}
-	// 1 repo + 3 worktrees + 2 PRs
-	if len(entries) != 6 {
+	// 1 repo + 2 worktrees (open PR 1's worktree folds into its PR entry) + 2 PRs
+	if len(entries) != 5 {
 		t.Fatalf("got %d entries", len(entries))
 	}
 	if e := byID["repo:/r/app"]; e.Kind != "repo" || e.Active || e.Path != "/r/app" {
 		t.Errorf("repo entry %+v", e)
 	}
-	wt1 := byID["wt:/w/app/aa"]
-	if wt1.PRNumber != 1 || wt1.PRState != "OPEN" || wt1.Stale || !wt1.Active || wt1.Title != "One" {
-		t.Errorf("wt1 %+v", wt1)
+	if _, ok := byID["wt:/w/app/aa"]; ok {
+		t.Error("open PR's worktree should not get its own entry")
 	}
 	wt2 := byID["wt:/w/app/bb"]
 	if wt2.PRNumber != 2 || wt2.PRState != "MERGED" || !wt2.Stale {
@@ -204,8 +203,8 @@ func TestWorkspaceIndexIntegration(t *testing.T) {
 	for _, e := range entries {
 		byID[e.ID] = e
 	}
-	if e := byID["wt:"+p1]; e.PRState != "OPEN" || e.Stale || !e.Active {
-		t.Errorf("wt1 %+v", e)
+	if _, ok := byID["wt:"+p1]; ok {
+		t.Error("open PR's worktree should not get its own entry")
 	}
 	if e := byID["wt:"+p2]; e.PRState != "MERGED" || !e.Stale {
 		t.Errorf("wt2 %+v", e)
@@ -216,7 +215,7 @@ func TestWorkspaceIndexIntegration(t *testing.T) {
 	if e := byID["pr:"+repo+"#9"]; e.HasWorktree || e.Path != "" {
 		t.Errorf("pr9 %+v", e)
 	}
-	if e := byID["pr:"+repo+"#1"]; !e.HasWorktree || e.Path != p1 {
+	if e := byID["pr:"+repo+"#1"]; !e.HasWorktree || e.Path != p1 || !e.Active {
 		t.Errorf("pr1 %+v", e)
 	}
 }

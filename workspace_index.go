@@ -245,12 +245,9 @@ func buildWorkspaceEntries(snaps []repoSnapshot, cache workspaceCache, activePat
 				e.PRState = prStateFor(rc, n)
 				e.Stale = isStaleState(e.PRState)
 				e.Subtitle = fmt.Sprintf("%s · #%d", s.Name, n)
-				if pr, ok := prByNum[n]; ok {
-					e.Title = pr.Title
-					e.Subtitle += " · @" + pr.Author
-					if e.UpdatedAt == "" {
-						e.UpdatedAt = pr.UpdatedAt
-					}
+				// An open PR's entry already carries this worktree's path.
+				if _, ok := prByNum[n]; ok {
+					continue
 				}
 				if e.Stale {
 					e.Subtitle += " · " + strings.ToLower(e.PRState)
