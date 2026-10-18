@@ -393,6 +393,15 @@ func (a *App) GetConflictFile(path string) (*ConflictFile, error) {
 	return a.git.GetConflictFile(path)
 }
 
+// FilesExist reports which repo-relative paths exist as regular files in the
+// active repository (used to validate terminal file links).
+func (a *App) FilesExist(paths []string) map[string]bool {
+	if a.git == nil || !a.git.IsRepo() {
+		return map[string]bool{}
+	}
+	return a.git.FilesExist(paths)
+}
+
 // WriteFile writes content to a worktree file and refreshes git status.
 func (a *App) WriteFile(path string, content string) error {
 	if a.git == nil || !a.git.IsRepo() {

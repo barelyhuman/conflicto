@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'preact/hooks';
+import { useComputed } from '@preact/signals';
+import { Show } from '@preact/signals/utils';
 import { api } from '../../wails.js';
 import { TerminalPane } from './TerminalPane.jsx';
 import {
@@ -16,6 +18,8 @@ import {
   layoutTitle,
   updatePaneCwdBySessionId,
   updatePaneTitleBySessionId,
+  markSessionOutput,
+  backgroundTerminals,
 } from './terminalStore.js';
 import './terminal.css';
 
@@ -32,18 +36,46 @@ function useTerminalStore() {
   return snap;
 }
 
+/** Subtle hint that other worktrees have running terminals (dot lights up on new output). */
+function BackgroundActivity() {
+  const any = useComputed(() => backgroundTerminals.value.length > 0);
+  const unread = useComputed(() => backgroundTerminals.value.some((b) => b.unread));
+  const label = useComputed(() => {
+    const list = backgroundTerminals.value;
+    const n = list.length;
+
+    return `${n} other worktree${n === 1 ? '' : 's'}`;
+  });
+  const title = useComputed(() =>
+    backgroundTerminals.value
+      .map((b) => `${b.scopePath.split('/').pop()}: ${b.sessions} running${b.unread ? ' (new output)' : ''}`)
+      .join('\n')
+  );
+  const cls = useComputed(() => `terminal-bg${unread.value ? ' unread' : ''}`);
+
+  return (
+    <Show when={any}>
+      {() => (
+        <span class={cls} title={title}>
+          <span class="terminal-bg-dot" />
+          {label}
+        </span>
+      )}
+    </Show>
+  );
+}
+
 /**
  * Contained bottom terminal dock. When closed, collapses via CSS but keeps
  * pane hosts mounted — across all project scopes — so PTY + scrollback survive.
  * Tabs/visible panes reflect the current project/worktree scope only.
  */
 export function TerminalDock({ open, height, onHeightChange, onRequestOpen, onTabClosed }) {
-  const { panes, layouts, activeLayoutId, activeLocalId, splitLocalIds, splitRatio } = useTerminalStore();
+  const { panes, layouts, activeLayoutId, activeLocalId, splitLocalIds, splitRatio, scopePath } = useTerminalStore();
   const [dragging, setDragging] = useState(false);
   const dragRef = useRef(null);
   const splitDragRef = useRef(null);
   const bodyRef = useRef(null);
-  const bootstrapping = useRef(false);
 
   const ensureSession = useCallback(async (localId) => {
     const snap = getTerminalStoreSnapshot();
@@ -66,6 +98,8 @@ export function TerminalDock({ open, height, onHeightChange, onRequestOpen, onTa
     }
   }, []);
 
+  // Dock open (or worktree switched while open): bind pending panes, and
+  // auto-start a first terminal (cwd = worktree path) if this scope has none.
   useEffect(() => {
     if (!open) return;
 
@@ -78,13 +112,10 @@ export function TerminalDock({ open, height, onHeightChange, onRequestOpen, onTa
       return;
     }
 
-    if (bootstrapping.current) return;
-    bootstrapping.current = true;
+    // createTabPlaceholder is synchronous, so hasTabs() is true on any re-run.
     const localId = createTabPlaceholder('Terminal');
-    void ensureSession(localId).finally(() => {
-      bootstrapping.current = false;
-    });
-  }, [open, ensureSession]);
+    void ensureSession(localId);
+  }, [open, scopePath, ensureSession]);
 
   useEffect(() => {
     panes.forEach((t) => {
@@ -262,6 +293,7 @@ export function TerminalDock({ open, height, onHeightChange, onRequestOpen, onTa
           ))}
         </div>
         <div class="terminal-dock-actions">
+          <BackgroundActivity />
           <button type="button" class="terminal-action" onClick={handleNewTab} title="New terminal (⌃⇧`)">
             +
           </button>
@@ -310,6 +342,9 @@ export function TerminalDock({ open, height, onHeightChange, onRequestOpen, onTa
                   <TerminalPane
                     sessionId={pane.sessionId}
                     focused={open && visible && pane.localId === activeLocalId}
+                    root={pane.scopePath}
+                    cwd={pane.cwd || pane.scopePath}
+                    onOutput={markSessionOutput}
                     onFocus={() => setActivePane(pane.localId)}
                     onExit={handleExit}
                     onCwdChange={updatePaneCwdBySessionId}

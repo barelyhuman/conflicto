@@ -229,4 +229,87 @@ describe('terminalStore scoping', () => {
     store.setTerminalScope('/p2');
     expect(listener).toHaveBeenCalledTimes(1);
   });
+
+  it('snapshot exposes the active scope path', () => {
+    store.setTerminalScope('/p1');
+    expect(store.getTerminalStoreSnapshot().scopePath).toBe('/p1');
+    store.setTerminalScope('/p2');
+    expect(store.getTerminalStoreSnapshot().scopePath).toBe('/p2');
+  });
+
+  it('a worktree with no tabs reports hasTabs=false so the dock can auto-start', () => {
+    store.setTerminalScope('/a');
+    const a = store.createTabPlaceholder();
+    store.bindSession(a, 'term-1', '/a');
+    store.setTerminalScope('/b');
+    expect(store.hasTabs()).toBe(false);
+    const b = store.createTabPlaceholder();
+    expect(store.getTerminalStoreSnapshot().panes.find((p) => p.localId === b).scopePath).toBe('/b');
+    expect(store.getTerminalStoreSnapshot().layouts).toHaveLength(1);
+    store.setTerminalScope('/a');
+    expect(store.getTerminalStoreSnapshot().layouts).toHaveLength(1);
+    expect(store.getTerminalStoreSnapshot().panes).toHaveLength(2);
+  });
+
+  it('removeTerminalScope returns only that scope\'s sessions and leaves others intact', () => {
+    store.setTerminalScope('/a');
+    const a = store.createTabPlaceholder();
+    store.bindSession(a, 'term-1', '/a');
+    store.setTerminalScope('/b');
+    const b = store.createTabPlaceholder();
+    store.bindSession(b, 'term-2', '/b');
+    store.splitRight();
+    store.bindSession(store.getTerminalStoreSnapshot().activeLocalId, 'term-3', '/b');
+    store.setTerminalScope('/a');
+
+    expect(store.removeTerminalScope('/b').sort()).toEqual(['term-2', 'term-3']);
+    const snap = store.getTerminalStoreSnapshot();
+    expect(snap.panes.map((p) => p.sessionId)).toEqual(['term-1']);
+    expect(store.backgroundTerminals.value).toEqual([]);
+  });
+
+  it('keeps background sessions alive and flags new output only for non-active scopes', () => {
+    store.setTerminalScope('/a');
+    const a = store.createTabPlaceholder();
+    store.bindSession(a, 'term-1', '/a');
+    store.setTerminalScope('/b');
+    const b = store.createTabPlaceholder();
+    store.bindSession(b, 'term-2', '/b');
+
+    // /b is active: /a is background, quiet
+    expect(store.backgroundTerminals.value).toEqual([{ scopePath: '/a', sessions: 1, unread: false }]);
+
+    store.markSessionOutput('term-2'); // foreground output: ignored
+    expect(store.backgroundTerminals.value[0].unread).toBe(false);
+
+    const listener = vi.fn();
+    store.subscribeTerminalStore(listener);
+    store.markSessionOutput('term-1');
+    store.markSessionOutput('term-1'); // repeat chunks do not re-notify
+    expect(listener).toHaveBeenCalledTimes(1);
+    expect(store.backgroundTerminals.value).toEqual([{ scopePath: '/a', sessions: 1, unread: true }]);
+
+    // Returning to /a clears its unread and makes /b the background scope
+    store.setTerminalScope('/a');
+    expect(store.backgroundTerminals.value).toEqual([{ scopePath: '/b', sessions: 1, unread: false }]);
+    expect(store.getTerminalStoreSnapshot().panes.every((p) => !p.unread)).toBe(true);
+  });
+
+  it('ignores output for unknown sessions and unbound panes do not count as running', () => {
+    store.setTerminalScope('/a');
+    store.createTabPlaceholder();
+    store.setTerminalScope('/b');
+    expect(() => store.markSessionOutput('nope')).not.toThrow();
+    expect(store.backgroundTerminals.value).toEqual([]);
+  });
+
+  it('a pane that exits in a background scope is removed and the badge updates', () => {
+    store.setTerminalScope('/a');
+    const a = store.createTabPlaceholder();
+    store.bindSession(a, 'term-1', '/a');
+    store.setTerminalScope('/b');
+    expect(store.backgroundTerminals.value).toHaveLength(1);
+    store.removePaneBySessionId('term-1');
+    expect(store.backgroundTerminals.value).toEqual([]);
+  });
 });
