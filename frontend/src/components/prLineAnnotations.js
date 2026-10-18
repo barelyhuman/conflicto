@@ -27,3 +27,45 @@ export function buildPRLineAnnotations({ isPRMode, comments, filename }) {
 
   return mapped.length ? mapped : undefined;
 }
+
+/**
+ * Full annotation list for a PR file: posted comments, pending drafts and the
+ * open composer. Kind is carried in metadata so one renderer can switch.
+ *
+ * @param {{
+ *   isPRMode: boolean, comments?: object[], drafts?: object[],
+ *   composer?: { path: string, editId: string|null, loc: { line: number, side: string }, rev: number }|null,
+ *   filename: string, outdatedIds?: Set<string>,
+ * }} args
+ */
+export function buildReviewAnnotations({
+  isPRMode,
+  comments,
+  drafts,
+  composer,
+  filename,
+  outdatedIds,
+}) {
+  if (!isPRMode || !filename) return undefined;
+
+  const out = [...(buildPRLineAnnotations({ isPRMode, comments, filename }) ?? [])];
+
+  for (const d of drafts ?? []) {
+    if (d.path !== filename || composer?.editId === d.id) continue;
+    out.push({
+      lineNumber: d.line,
+      side: toPierreSide(d.side),
+      metadata: { kind: 'draft', draft: d, outdated: !!outdatedIds?.has(d.id) },
+    });
+  }
+
+  if (composer && composer.path === filename) {
+    out.push({
+      lineNumber: composer.loc.line,
+      side: toPierreSide(composer.loc.side),
+      metadata: { kind: 'composer', composerRev: composer.rev },
+    });
+  }
+
+  return out.length ? out : undefined;
+}
