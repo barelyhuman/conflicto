@@ -1,100 +1,35 @@
 import { useEffect, useRef } from 'preact/hooks';
 import { useComputed, useSignal, useSignalEffect } from '@preact/signals';
 import { For, Show } from '@preact/signals/utils';
-import { IconFolder, IconGitBranch, IconGitPullRequest, IconLoader2, IconSearch } from '@tabler/icons-preact';
+import { IconSearch } from '@tabler/icons-preact';
 import { getPlatform } from '../../wails.js';
 import { filterEntries } from './fuzzy.js';
+import { WorkspaceRow } from './WorkspaceRow.jsx';
 import './palette.css';
 
 const MAX_RESULTS = 100;
 
-function KindIcon({ kind }) {
-  if (kind === 'pr') return <IconGitPullRequest size={16} stroke={1.5} />;
+const HOME_ENTRY = {
+  kind: 'home', id: 'home:', title: 'Home', subtitle: 'Browse all repos, PRs and worktrees',
+  prState: '', hasWorktree: false, stale: false, active: false,
+};
 
-  if (kind === 'worktree') return <IconGitBranch size={16} stroke={1.5} />;
+/** Home is offered for an empty query, or one that is part of the word "home". */
+function matchesHome(query) {
+  const q = query.trim().toLowerCase();
 
-  return <IconFolder size={16} stroke={1.5} />;
+  return q === '' || 'home'.includes(q);
 }
 
-/** Split text into plain / highlighted runs from sorted char indices. */
-function Highlighted({ text, indices }) {
-  if (!indices.length) return text;
-  const set = new Set(indices);
-  const parts = [];
-  let run = '';
-  let runOn = false;
-
-  for (let i = 0; i < text.length; i++) {
-    const on = set.has(i);
-
-    if (on !== runOn && run) {
-      parts.push(runOn ? <mark key={i}>{run}</mark> : run);
-      run = '';
-    }
-
-    runOn = on;
-    run += text[i];
-  }
-
-  if (run) parts.push(runOn ? <mark key="end">{run}</mark> : run);
-
-  return parts;
-}
-
-function Row({ item, selected, opening, onPick, onHover }) {
-  const { entry, indices, pos } = item;
-  const className = useComputed(
-    () => `palette-row${selected.value === pos ? ' selected' : ''}`
-  );
-  const isSelected = useComputed(() => (selected.value === pos ? 'true' : 'false'));
-  const pending = useComputed(() => opening.value === entry.id);
-  const isPR = entry.kind === 'pr';
-  const hasWt = entry.kind === 'worktree' || entry.hasWorktree;
-  const remoteOnly = isPR && !entry.hasWorktree;
-  const showHint = useComputed(() => remoteOnly && selected.value === pos && !pending.value);
-
-  return (
-    <div
-      id={`palette-opt-${pos}`}
-      role="option"
-      class={className}
-      aria-selected={isSelected}
-      onMouseMove={() => onHover(pos)}
-      onClick={() => onPick(entry)}
-    >
-      <span class="palette-glyph"><KindIcon kind={entry.kind} /></span>
-      <span class="palette-text">
-        <span class="palette-title"><Highlighted text={entry.title} indices={indices} /></span>
-        <Show when={() => Boolean(entry.subtitle)}>
-          <span class="palette-sub">{entry.subtitle}</span>
-        </Show>
-      </span>
-      <span class="palette-badges">
-        <Show when={showHint}>
-          <span class="palette-hint">Enter: create worktree</span>
-        </Show>
-        <Show when={pending}>
-          <span class="palette-spinner" role="status" aria-label="Opening">
-            <IconLoader2 size={14} stroke={1.5} />
-          </span>
-        </Show>
-        {hasWt && <span class="palette-badge">worktree</span>}
-        {isPR && entry.prState && (
-          <span class={`palette-badge pr-${entry.prState.toLowerCase()}`}>{entry.prState.toLowerCase()}</span>
-        )}
-        {entry.stale && <span class="palette-badge stale">stale</span>}
-        {entry.active && <span class="palette-badge active">active</span>}
-      </span>
-    </div>
-  );
-}
-
-function PaletteDialog({ index, onClose }) {
+function PaletteDialog({ index, onClose, onHome }) {
   const query = useSignal('');
   const selected = useSignal(0);
   const inputRef = useRef(null);
   const results = useComputed(() =>
-    filterEntries(index.entries.value, query.value, MAX_RESULTS).map((r, pos) => ({ ...r, pos }))
+    [
+      ...(onHome && matchesHome(query.value) ? [{ entry: HOME_ENTRY, score: 0, indices: [] }] : []),
+      ...filterEntries(index.entries.value, query.value, MAX_RESULTS),
+    ].map((r, pos) => ({ ...r, pos }))
   );
   const count = useComputed(() => results.value.length);
   const empty = useComputed(() => results.value.length === 0);
@@ -119,6 +54,13 @@ function PaletteDialog({ index, onClose }) {
 
   async function pick(entry) {
     if (!entry) return;
+
+    if (entry.kind === 'home') {
+      onClose();
+      onHome();
+
+      return;
+    }
 
     if (await index.open(entry.id)) onClose();
   }
@@ -178,7 +120,7 @@ function PaletteDialog({ index, onClose }) {
         <div id="palette-listbox" class="palette-list" role="listbox" aria-label="Workspaces">
           <For each={results}>
             {(item) => (
-              <Row
+              <WorkspaceRow
                 key={item.entry.id}
                 item={item}
                 selected={selected}
@@ -202,8 +144,9 @@ function PaletteDialog({ index, onClose }) {
  *
  * @param {Object} props
  * @param {InstanceType<typeof import('../../models/workspaceIndex.js').WorkspaceIndexModel>} props.index
+ * @param {() => void} [props.onHome] shows the home screen; enables the "Home" result
  */
-export function CommandPalette({ index }) {
+export function CommandPalette({ index, onHome }) {
   const open = useSignal(false);
   const isMac = useRef(typeof navigator !== 'undefined' && /Mac/i.test(navigator.platform ?? ''));
 
@@ -239,7 +182,7 @@ export function CommandPalette({ index }) {
 
   return (
     <Show when={open}>
-      {() => <PaletteDialog index={index} onClose={() => { open.value = false; }} />}
+      {() => <PaletteDialog index={index} onHome={onHome} onClose={() => { open.value = false; }} />}
     </Show>
   );
 }

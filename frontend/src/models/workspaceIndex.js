@@ -21,6 +21,8 @@ import { api as defaultApi } from '../wails.js';
 export const WorkspaceIndexModel = createModel(({ onError, api = defaultApi } = {}) => {
   const entries = signal(/** @type {WorkspaceEntry[]} */ ([]));
   const loading = signal(false);
+  /** ms epoch of the last index received (0 = never). */
+  const fetchedAt = signal(0);
   /** Id currently being opened ('' when idle). */
   const opening = signal('');
 
@@ -31,11 +33,13 @@ export const WorkspaceIndexModel = createModel(({ onError, api = defaultApi } = 
   return {
     entries,
     loading,
+    fetchedAt,
     opening,
 
     /** Mirror `workspace:index-updated` from Go. */
     applyIndex(data) {
       this.entries.value = Array.isArray(data) ? data : [];
+      this.fetchedAt.value = Date.now();
     },
 
     /** Load the cached index and ask Go to refresh in the background. */
