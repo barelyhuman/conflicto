@@ -765,7 +765,6 @@
   align-items: center;
   gap: 8px;
   padding: 0 14px;
-  border-bottom: 1px solid var(--light-grey);
   --wails-draggable: drag;
   min-height: 44px;
   height: 44px;
