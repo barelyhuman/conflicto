@@ -44,6 +44,14 @@ export function GetTerminalPrefs():Promise<Record<string, any>>;
 
 export function GetWorktrees():Promise<Array<main.WorktreeInfo>>;
 
+export function LSPSend(arg1:string,arg2:string):Promise<void>;
+
+export function LSPServers():Promise<Array<main.LSPServerInfo>>;
+
+export function LSPStart(arg1:string):Promise<main.LSPServerInfo>;
+
+export function LSPStop(arg1:string):Promise<void>;
+
 export function OpenProject():Promise<string>;
 
 export function PostPRComment(arg1:number,arg2:string,arg3:string,arg4:number,arg5:string,arg6:number,arg7:string):Promise<void>;
@@ -59,6 +67,8 @@ export function Refresh():Promise<void>;
 export function RemoveWorktree(arg1:string):Promise<void>;
 
 export function SearchPRList(arg1:number,arg2:string):Promise<Array<Record<string, any>>>;
+
+export function SearchText(arg1:main.SearchOpts):Promise<Array<main.SearchMatch>>;
 
 export function SetCIPrefs(arg1:string):Promise<void>;
 
