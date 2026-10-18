@@ -47,7 +47,9 @@ func main() {
 
 	// Window Menu
 	WindowMenu := AppMenu.AddSubmenu("Window")
-	WindowMenu.AddText("Close", keys.CmdOrCtrl("w"), nil)
+	WindowMenu.AddText("Close Tab", keys.CmdOrCtrl("w"), func(cd *menu.CallbackData) {
+		app.EmitEvent("menu:close-tab", nil)
+	})
 
 	// Help Menu
 	HelpMenu := AppMenu.AddSubmenu("Help")

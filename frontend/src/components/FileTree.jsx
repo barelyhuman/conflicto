@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'preact/hooks';
+import { useState, useCallback, useMemo } from 'preact/hooks';
 import { useComputed } from '@preact/signals';
 import { Show } from '@preact/signals/utils';
 import {
@@ -9,6 +9,7 @@ import {
 import { ChangeTree } from './ChangeTree.jsx';
 import { CommitPanel } from './CommitPanel.jsx';
 import { ChangeSection } from './ChangeSection.jsx';
+import { highlightedPath } from '../models/tabsSelection.js';
 
 /**
  * Sidebar file list: PR mode is a single tree; otherwise Conflicts / Staged / Unstaged sections.
@@ -16,7 +17,9 @@ import { ChangeSection } from './ChangeSection.jsx';
  *
  * @param {Object} props
  * @param {InstanceType<typeof import('../models/workingTree.js').WorkingTreeModel>} props.workingTree
- * @param {InstanceType<typeof import('../models/selection.js').SelectionModel>} props.selection
+ * @param {import('@preact/signals-core').ReadonlySignal<import('../models/tabs.js').Tab|null>} props.activeTab
+ * @param {(path: string, section: string, opts?: { pin?: boolean }) => void} props.onOpenDiff
+ * @param {(path: string) => void} [props.onEditFile] open the file in an editor tab
  * @param {{ path: string, status: string }[]} props.prFiles
  * @param {boolean} props.isPRMode
  * @param {string} [props.currentBranch]
@@ -30,7 +33,9 @@ import { ChangeSection } from './ChangeSection.jsx';
  */
 export function FileTree({
   workingTree,
-  selection,
+  activeTab,
+  onOpenDiff,
+  onEditFile,
   prFiles,
   isPRMode,
   currentBranch = 'main',
@@ -46,25 +51,15 @@ export function FileTree({
   const [stagedOpen, setStagedOpen] = useState(true);
   const [unstagedOpen, setUnstagedOpen] = useState(true);
 
-  const selectConflict = useCallback(
-    (path) => selection.select(path, 'conflict'),
-    [selection]
+  // Single click opens a preview diff tab; double click (detail >= 2) pins it.
+  const openIn = useCallback(
+    (section) => (path, opts) => onOpenDiff(path, section, opts),
+    [onOpenDiff]
   );
-
-  const selectStaged = useCallback(
-    (path) => selection.select(path, 'staged'),
-    [selection]
-  );
-
-  const selectUnstaged = useCallback(
-    (path) => selection.select(path, 'unstaged'),
-    [selection]
-  );
-
-  const selectPR = useCallback(
-    (path) => selection.select(path, 'pr'),
-    [selection]
-  );
+  const selectConflict = useMemo(() => openIn('conflict'), [openIn]);
+  const selectStaged = useMemo(() => openIn('staged'), [openIn]);
+  const selectUnstaged = useMemo(() => openIn('unstaged'), [openIn]);
+  const selectPR = useMemo(() => openIn('pr'), [openIn]);
 
   const hasConflicts = useComputed(() => workingTree.conflicts.value.length > 0);
   const conflictsCount = useComputed(() => workingTree.conflicts.value.length);
@@ -82,7 +77,7 @@ export function FileTree({
               <SignalChangeTree
                 filesSignal={null}
                 files={prFiles}
-                selection={selection}
+                activeTab={activeTab}
                 section="pr"
                 onSelect={selectPR}
               />
@@ -106,7 +101,8 @@ export function FileTree({
             >
               <SignalChangeTree
                 filesSignal={workingTree.conflicts}
-                selection={selection}
+                activeTab={activeTab}
+                onEdit={onEditFile}
                 section="conflict"
                 onSelect={selectConflict}
                 flat
@@ -134,7 +130,8 @@ export function FileTree({
             {() => (
               <SignalChangeTree
                 filesSignal={workingTree.staged}
-                selection={selection}
+                activeTab={activeTab}
+                onEdit={onEditFile}
                 section="staged"
                 onSelect={selectStaged}
                 flat
@@ -172,7 +169,8 @@ export function FileTree({
             {() => (
               <SignalChangeTree
                 filesSignal={workingTree.unstaged}
-                selection={selection}
+                activeTab={activeTab}
+                onEdit={onEditFile}
                 section="unstaged"
                 onSelect={selectUnstaged}
                 flat
@@ -201,9 +199,10 @@ export function FileTree({
 function SignalChangeTree({
   filesSignal,
   files,
-  selection,
+  activeTab,
   section,
   onSelect,
+  onEdit,
   flat,
   showStage,
   showUnstage,
@@ -214,14 +213,14 @@ function SignalChangeTree({
 }) {
   const list = filesSignal ? filesSignal.value : files;
 
-  const activeFile =
-    selection.activeSection.value === section ? selection.activeFile.value : null;
+  const activeFile = highlightedPath(activeTab.value, section);
 
   return (
     <ChangeTree
       files={list}
       activeFile={activeFile}
       onSelect={onSelect}
+      onEdit={onEdit}
       flat={flat}
       showStage={showStage}
       showUnstage={showUnstage}
