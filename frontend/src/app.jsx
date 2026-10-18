@@ -1,21 +1,20 @@
 import { useState, useCallback, useEffect, useRef } from 'preact/hooks';
 import { useModel, useSignal } from '@preact/signals';
-import { Show } from '@preact/signals/utils';
 import './app.css';
 import { setupWailsEvents, api, watchFullscreen, getPlatform } from './wails.js';
 import { WorkingTreeModel } from './models/workingTree.js';
 import { SelectionModel } from './models/selection.js';
 import { createNavigator, registerNavigator } from './models/navigation.js';
+import { tabsStore as tabs, modeForSection } from './models/tabs.js';
+import { bindTabsToSelection } from './models/tabsSelection.js';
 import { SyncModel } from './models/sync.js';
 import { WorktreeModel } from './models/worktree.js';
 import { WorkspaceIndexModel } from './models/workspaceIndex.js';
 import { ReviewModel } from './models/review.js';
 import { ThemeProvider } from './theme/ThemeProvider.jsx';
-import { EditProvider } from './components/EditProvider.jsx';
 import { FileTree } from './components/FileTree.jsx';
-import { DiffViewer } from './components/DiffViewer.jsx';
-import { FileEditor } from './components/FileEditor.jsx';
-import { ConflictViewer } from './components/ConflictViewer.jsx';
+import { EditorArea } from './components/tabs/EditorArea.jsx';
+import { closeActiveTab } from './components/tabs/useTabShortcuts.js';
 import { ConfirmDialog } from './components/ConfirmDialog.jsx';
 import { ToastContainer } from './components/ToastContainer.jsx';
 import { PreferencesPage } from './components/PreferencesPage.jsx';
@@ -153,22 +152,34 @@ export function App() {
     () =>
       registerNavigator(
         createNavigator({
-          selection,
+          tabs,
           workingTree,
+          activePR: activePRSignal,
           isPRFile: (path) => currentPRFilesRef.current.some((f) => f.path === path),
         })
       ),
-    [selection, workingTree]
+    [activePRSignal, workingTree]
   );
+
+  // The active diff tab drives the selection model (diff fetching + shared viewers).
+  useEffect(() => bindTabsToSelection({ tabs, selection }), [selection]);
 
   // Setup Wails events
   useEffect(() => {
     setupWailsEvents({
       onFileStatusChanged: (data) => {
         const wt = workingTreeRef.current;
-        const sel = selectionRef.current;
         wt.applyStatus(data);
-        sel.selectFirstFromWorkingTreeIfNeeded();
+
+        // First file of a fresh worktree opens as a preview diff tab (once per worktree).
+        if (tabs.canSeed() && activePRSignalRef.current.peek() == null) {
+          const first = wt.firstEntry();
+
+          if (first) {
+            tabs.markSeeded();
+            tabs.open({ kind: 'diff', path: first.path, mode: modeForSection(first.section), preview: true });
+          }
+        }
       },
       onBranchChanged: (data) => {
         setBranches(data);
@@ -206,10 +217,10 @@ export function App() {
 
         if (
           activePRSignalRef.current.peek() === number &&
-          !selectionRef.current.activeFile.peek() &&
+          !tabs.hasTabs.peek() &&
           files.length > 0
         ) {
-          selectionRef.current.select(files[0].path, 'pr');
+          tabs.open({ kind: 'diff', path: files[0].path, mode: 'pr', preview: true });
         }
       },
       onPRCommentsUpdated: (data) => {
@@ -255,6 +266,9 @@ export function App() {
         setProjectPath(data.path ?? '');
         worktreeRef.current.setCurrentPath(data.path ?? '');
         selectionRef.current.clear();
+        tabs.setScope(data.path ?? '');
+        // PR-diff tabs only make sense while a PR is being reviewed.
+        tabs.closeWhere((t) => t.kind === 'diff' && t.mode === 'pr');
         activePRSignalRef.current.value = null;
         setActivePR(null);
         setPrChecksSummary(null);
@@ -269,6 +283,9 @@ export function App() {
       },
       onWorkspaceIndexUpdated: (data) => {
         workspaceIndexRef.current.applyIndex(data);
+      },
+      onMenuCloseTab: () => {
+        closeActiveTab(tabs);
       },
       onRefreshCompleted: () => {
         selectionRef.current.refetch();
@@ -387,6 +404,7 @@ export function App() {
         setProjectPath(proj.path ?? '');
         worktreeRef.current.setCurrentPath(proj.path ?? '');
         setTerminalScope(proj.path ?? '');
+        tabs.setScope(proj.path ?? '');
       }
     });
     api.getRecentProjects().then((list) => {
@@ -441,9 +459,14 @@ export function App() {
       setPrPrompt(pr);
     } else {
       setActivePRBoth(null);
-      selection.selectFirstFromWorkingTree();
+      tabs.closeWhere((t) => t.kind === 'diff' && t.mode === 'pr');
+      const first = workingTree.firstEntry();
+
+      if (first) {
+        tabs.open({ kind: 'diff', path: first.path, mode: modeForSection(first.section), preview: true });
+      }
     }
-  }, [selection, setActivePRBoth]);
+  }, [workingTree, setActivePRBoth]);
 
   function pushToast(title, message) {
     setToasts((prev) => [...prev, { id: Date.now().toString(), title, message }]);
@@ -457,6 +480,7 @@ export function App() {
     setPrPrompt(null);
     // Clear selection before entering PR mode so the diff-fetch effect does not
     // call GetPRFileDiff with a stale working-tree path against an empty cache.
+    tabs.closeWhere((t) => t.kind === 'diff' && t.mode !== 'pr');
     selection.clear();
     setActivePRBoth(pr.number);
     api.getPRFiles(pr.number);
@@ -483,9 +507,19 @@ export function App() {
 
     if (isPRMode) {
       setActivePRBoth(null);
+      tabs.closeWhere((t) => t.kind === 'diff' && t.mode === 'pr');
       selection.clear();
     }
   }, [isPRMode, selection, setActivePRBoth]);
+
+  // Left-list click: preview diff tab; double click (pin) keeps it.
+  const handleOpenDiff = useCallback((path, section, opts) => {
+    tabs.open({ kind: 'diff', path, mode: modeForSection(section), preview: !opts?.pin });
+  }, []);
+
+  const handleEditFile = useCallback((path) => {
+    tabs.open({ kind: 'file', path, preview: false });
+  }, []);
 
   const handleStage = useCallback((path) => {
     const conflictFile = workingTree.conflicts.peek().find((f) => f.path === path);
@@ -523,6 +557,7 @@ export function App() {
 
     if (kind === 'remove-worktree' && worktreePath) {
       // Kill terminals scoped to the removed worktree before the dir goes away.
+      tabs.removeScope(worktreePath);
       removeTerminalScope(worktreePath).forEach((sessionId) => {
         api.terminalStop(sessionId).catch(() => {});
       });
@@ -606,7 +641,6 @@ export function App() {
 
   return (
     <ThemeProvider>
-      <EditProvider>
         <div class={shellClass}>
           <div class="window">
             <div class={`window-body${sidebarOpen ? '' : ' sidebar-collapsed'}`}>
@@ -637,7 +671,9 @@ export function App() {
 
                 <FileTree
                   workingTree={workingTree}
-                  selection={selection}
+                  activeTab={tabs.activeTab}
+                  onOpenDiff={handleOpenDiff}
+                  onEditFile={handleEditFile}
                   prFiles={isPRMode ? (currentPR?.files ?? EMPTY_FILES) : EMPTY_FILES}
                   isPRMode={isPRMode}
                   currentBranch={branches.current}
@@ -657,15 +693,11 @@ export function App() {
                     <IslandHeader
                       sidebarOpen={sidebarOpen}
                       onToggleSidebar={() => setSidebarOpen((open) => !open)}
-                      activeFile={selection.activeFile}
+                      tabs={tabs}
                       projectPath={projectPath}
                       isPRMode={isPRMode}
                       showFullDiff={selection.showFullDiff}
                       onToggleShowFullDiff={() => selection.toggleShowFullDiff()}
-                      canEdit={selection.canEdit}
-                      viewMode={selection.viewMode}
-                      onToggleViewMode={() => selection.toggleViewMode()}
-                      dirty={selection.editorDirty}
                       selectedPR={activePR}
                       currentPR={currentPR}
                       onSelectPR={handleSelectPR}
@@ -675,47 +707,16 @@ export function App() {
                       prChecksSummary={prChecksSummary}
                       review={review}
                     />
-                    <Show
-                      when={selection.activeFile}
-                      fallback={
-                        <div class="diff-empty">Select a file to view changes</div>
-                      }
-                    >
-                      {() => (
-                        <Show
-                          when={selection.isConflict}
-                          fallback={
-                            <Show
-                              when={selection.isEditView}
-                              fallback={
-                                <DiffViewer
-                                  activeDiff={selection.activeDiff}
-                                  loading={selection.diffLoading}
-                                  isPRMode={isPRMode}
-                                  isUnstaged={selection.isUnstaged}
-                                  showFullDiff={selection.showFullDiff}
-                                  comments={isPRMode ? prComments : []}
-                                  onPostComment={handlePostComment}
-                                  review={review}
-                                  onSelectFile={(path) => selection.select(path, 'pr')}
-                                  canOpenInEditor={selection.canEdit}
-                                  onOpenLineInEditor={(line) => selection.openEditorAtLine(line)}
-                                />
-                              }
-                            >
-                              <FileEditor
-                                path={selection.activeFile}
-                                onError={pushToast}
-                                editorDirty={selection.editorDirty}
-                                editorGotoLine={selection.editorGotoLine}
-                              />
-                            </Show>
-                          }
-                        >
-                          <ConflictViewer file={selection.activeFile} />
-                        </Show>
-                      )}
-                    </Show>
+                    <EditorArea
+                      tabs={tabs}
+                      selection={selection}
+                      isPRMode={isPRMode}
+                      isMac={isMacOS}
+                      prComments={prComments}
+                      onPostComment={handlePostComment}
+                      review={review}
+                      onError={pushToast}
+                    />
                   </main>
 
                   <TerminalDock
@@ -817,7 +818,6 @@ export function App() {
             onClose={() => setPrPrompt(null)}
           />
         </div>
-      </EditProvider>
     </ThemeProvider>
   );
 }

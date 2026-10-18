@@ -1,5 +1,5 @@
 import { useMemo, useState, useCallback } from 'preact/hooks';
-import { IconArrowBackUp, IconChevronRight } from '@tabler/icons-preact';
+import { IconArrowBackUp, IconChevronRight, IconPencil } from '@tabler/icons-preact';
 import { conflictKindGlyph, conflictKindLabel } from './conflictView.js';
 
 /**
@@ -162,6 +162,7 @@ export function ChangeTree({
   files,
   activeFile,
   onSelect,
+  onEdit,
   flat = false,
   showStage = false,
   showUnstage = false,
@@ -203,6 +204,7 @@ export function ChangeTree({
               title={file.path}
               active={activeFile === file.path}
               onSelect={onSelect}
+              onEdit={onEdit}
               showStage={showStage}
               showUnstage={showUnstage}
               showDiscard={showDiscard}
@@ -263,6 +265,7 @@ function FileRow({
   title,
   active,
   onSelect,
+  onEdit,
   showStage,
   showUnstage,
   showDiscard,
@@ -283,7 +286,7 @@ function FileRow({
         type="button"
         class="change-tree-file-main"
         title={title}
-        onClick={() => onSelect?.(path)}
+        onClick={(e) => onSelect?.(path, { pin: e.detail >= 2 })}
       >
         <span class={`status-badge ${badge.kind}`}>{badge.glyph}</span>
         <span class="file-name">{name}</span>
@@ -293,6 +296,20 @@ function FileRow({
         {dir != null && <span class="file-path">{dir}</span>}
       </button>
       <div class="row-actions change-tree-actions">
+        {onEdit && status !== 'D' && (
+          <button
+            type="button"
+            class="stage-btn"
+            title="Open file to edit"
+            aria-label="Open file to edit"
+            onClick={(e) => {
+              e.stopPropagation();
+              onEdit(path);
+            }}
+          >
+            <IconPencil size={10} stroke={2.2} />
+          </button>
+        )}
         {showDiscard && (
           <button
             type="button"

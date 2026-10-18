@@ -69,6 +69,9 @@ export function setupWailsEvents(callbacks) {
   window.runtime.EventsOn('openPreferences', () => {
     callbacks.onOpenPreferences?.();
   });
+  window.runtime.EventsOn('menu:close-tab', () => {
+    callbacks.onMenuCloseTab?.();
+  });
   window.runtime.EventsOn('projectChanged', (data) => {
     callbacks.onProjectChanged?.(data);
   });
