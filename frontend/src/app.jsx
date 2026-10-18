@@ -1,5 +1,6 @@
 import { useState, useCallback, useEffect, useRef } from 'preact/hooks';
 import { useModel, useSignal } from '@preact/signals';
+import { Show } from '@preact/signals/utils';
 import './app.css';
 import { setupWailsEvents, api, watchFullscreen, getPlatform } from './wails.js';
 import { WorkingTreeModel } from './models/workingTree.js';
