@@ -156,3 +156,28 @@
 @media (prefers-reduced-motion: reduce) {
   .palette-spinner svg { animation: none; }
 }
+
+.palette-row.stale .palette-text,
+.palette-row.stale .palette-glyph {
+  opacity: 0.6;
+}
+
+.palette-remove {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-muted);
+  font: inherit;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.palette-remove:hover,
+.palette-remove:focus-visible {
+  color: var(--text);
+  border-color: var(--text-muted);
+}

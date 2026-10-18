@@ -18,6 +18,10 @@ export function CreatePR(arg1, arg2, arg3, arg4) {
   return window['go']['main']['App']['CreatePR'](arg1, arg2, arg3, arg4);
 }
 
+export function DeleteReviewDraft(arg1, arg2) {
+  return window['go']['main']['App']['DeleteReviewDraft'](arg1, arg2);
+}
+
 export function DetectGH() {
   return window['go']['main']['App']['DetectGH']();
 }
@@ -78,6 +82,14 @@ export function GetRecentProjects() {
   return window['go']['main']['App']['GetRecentProjects']();
 }
 
+export function GetReviewDrafts(arg1) {
+  return window['go']['main']['App']['GetReviewDrafts'](arg1);
+}
+
+export function GetReviewState(arg1) {
+  return window['go']['main']['App']['GetReviewState'](arg1);
+}
+
 export function GetTerminalPrefs() {
   return window['go']['main']['App']['GetTerminalPrefs']();
 }
@@ -88,6 +100,22 @@ export function GetWorkspaceIndex() {
 
 export function GetWorktrees() {
   return window['go']['main']['App']['GetWorktrees']();
+}
+
+export function LSPSend(arg1, arg2) {
+  return window['go']['main']['App']['LSPSend'](arg1, arg2);
+}
+
+export function LSPServers() {
+  return window['go']['main']['App']['LSPServers']();
+}
+
+export function LSPStart(arg1) {
+  return window['go']['main']['App']['LSPStart'](arg1);
+}
+
+export function LSPStop(arg1) {
+  return window['go']['main']['App']['LSPStop'](arg1);
 }
 
 export function OpenProject() {
@@ -126,8 +154,16 @@ export function RemoveWorktree(arg1) {
   return window['go']['main']['App']['RemoveWorktree'](arg1);
 }
 
+export function SaveReviewDraft(arg1, arg2) {
+  return window['go']['main']['App']['SaveReviewDraft'](arg1, arg2);
+}
+
 export function SearchPRList(arg1, arg2) {
   return window['go']['main']['App']['SearchPRList'](arg1, arg2);
+}
+
+export function SearchText(arg1) {
+  return window['go']['main']['App']['SearchText'](arg1);
 }
 
 export function SetCIPrefs(arg1) {
@@ -148,6 +184,10 @@ export function StartPRChecksMonitor(arg1) {
 
 export function StopPRChecksMonitor() {
   return window['go']['main']['App']['StopPRChecksMonitor']();
+}
+
+export function SubmitReview(arg1, arg2, arg3) {
+  return window['go']['main']['App']['SubmitReview'](arg1, arg2, arg3);
 }
 
 export function SwitchBranch(arg1) {
