@@ -1049,7 +1049,12 @@ func (a *App) RemoveWorktree(path string) error {
 		}
 	}
 
-	if err := a.git.RemoveWorktree(path); err != nil {
+	// The worktree may belong to any recent repo, not just the active one.
+	var recents []RecentProject
+	if a.recents != nil {
+		recents = a.recents.List()
+	}
+	if err := removeWorktreeFromOwner(path, recents); err != nil {
 		a.EmitEvent("error", map[string]string{
 			"title":   "Remove Worktree Error",
 			"message": err.Error(),
