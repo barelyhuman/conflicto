@@ -26,6 +26,7 @@ import { SidebarActions } from './components/SidebarActions.jsx';
 import { IslandHeader } from './components/IslandHeader.jsx';
 import { WorktreesPanel } from './components/WorktreesPanel.jsx';
 import { CommandPalette } from './components/palette/CommandPalette.jsx';
+import { HomeScreen } from './components/home/HomeScreen.jsx';
 
 /** Stable empty list so FileTree does not remount on unrelated App re-renders. */
 const EMPTY_FILES = [];
@@ -71,6 +72,9 @@ export function App() {
   const [prCheckoutPending, setPrCheckoutPending] = useState(/** @type {null | 'local' | 'worktree'} */ (null));
   // Create PR modal
   const [createPROpen, setCreatePROpen] = useState(false);
+
+  // Home screen (full-size workspace index). Shown at launch when no project is open.
+  const homeOpen = useSignal(false);
 
   // Sidebar visibility (toggled from the content island)
   const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -232,6 +236,8 @@ export function App() {
         setPrChecksSummary(null);
         api.stopPRChecksMonitor();
         setTerminalScope(data.path ?? '');
+
+        if (data.path) homeOpen.value = false;
       },
       onRecentProjectsUpdated: (data) => {
         setRecentProjects(data.projects ?? []);
@@ -246,7 +252,7 @@ export function App() {
         selectionRef.current.refetch();
       },
     });
-  }, [sync]);
+  }, [sync, homeOpen]);
 
   // Resolve platform via the Wails runtime (GOOS)
   useEffect(() => {
@@ -275,6 +281,25 @@ export function App() {
 
     return () => document.removeEventListener('keydown', onKey);
   }, []);
+
+  // Cmd/Ctrl+Shift+H toggles the home screen. Capture phase so the terminal cannot swallow it.
+  useEffect(() => {
+    function onKey(e) {
+      if (e.key !== 'h' && e.key !== 'H') return;
+
+      if (!e.shiftKey || e.altKey) return;
+      const mod = isMacOS ? e.metaKey && !e.ctrlKey : e.ctrlKey && !e.metaKey;
+
+      if (!mod) return;
+      e.preventDefault();
+      e.stopPropagation();
+      homeOpen.value = !homeOpen.peek();
+    }
+
+    document.addEventListener('keydown', onKey, true);
+
+    return () => document.removeEventListener('keydown', onKey, true);
+  }, [isMacOS, homeOpen]);
 
   // Ctrl+R refresh on Linux/Windows. macOS keeps the View → Reload menu accel
   // (Cmd+R). Skip the terminal so readline reverse-i-search still works.
@@ -354,17 +379,19 @@ export function App() {
   // Seed initial project state
   useEffect(() => {
     api.getCurrentProject().then((proj) => {
-      if (proj) {
+      if (proj?.path) {
         setProjectName(proj.name ?? '');
         setProjectPath(proj.path ?? '');
         worktreeRef.current.setCurrentPath(proj.path ?? '');
         setTerminalScope(proj.path ?? '');
+      } else {
+        homeOpen.value = true;
       }
     });
     api.getRecentProjects().then((list) => {
       setRecentProjects(list ?? []);
     });
-  }, []);
+  }, [homeOpen]);
 
   // macOS titlebar: watch fullscreen state once we know we're on macOS
   useEffect(() => {
@@ -496,6 +523,7 @@ export function App() {
       removeTerminalScope(worktreePath).forEach((sessionId) => {
         api.terminalStop(sessionId).catch(() => {});
       });
+      // Go re-emits the workspace index after a successful removal.
       worktree.remove(worktreePath);
 
       return;
@@ -638,6 +666,7 @@ export function App() {
                       dirty={selection.editorDirty}
                       selectedPR={activePR}
                       currentPR={currentPR}
+                      onShowHome={() => { homeOpen.value = true; }}
                       onSelectPR={handleSelectPR}
                       onError={pushToast}
                       onCreatePR={() => setCreatePROpen(true)}
@@ -699,6 +728,18 @@ export function App() {
                 </div>
               </div>
             </div>
+
+            <Show when={homeOpen}>
+              {() => (
+                <HomeScreen
+                  index={workspaceIndex}
+                  ghStatus={ghStatus}
+                  onClose={projectPath ? () => { homeOpen.value = false; } : null}
+                  onRemoveWorktree={handleRemoveWorktree}
+                  onOpenProject={handleOpenProject}
+                />
+              )}
+            </Show>
           </div>
 
           <ConfirmDialog
@@ -751,7 +792,7 @@ export function App() {
             onCancel={handleCancelConfirm}
           />
 
-          <CommandPalette index={workspaceIndex} />
+          <CommandPalette index={workspaceIndex} onHome={() => { homeOpen.value = true; }} />
 
           <ToastContainer
             toasts={toasts}

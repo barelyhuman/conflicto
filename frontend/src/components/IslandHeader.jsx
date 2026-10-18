@@ -1,4 +1,5 @@
 import { Signal } from '@preact/signals';
+import { IconHome } from '@tabler/icons-preact';
 import { Show } from '@preact/signals/utils';
 import { SidebarToggle } from './SidebarToggle.jsx';
 import { DiffExpandToggle } from './DiffExpandToggle.jsx';
@@ -35,6 +36,7 @@ function absoluteFilePath(projectRoot, relativePath) {
  * @param {(pr: { number: number, title: string, author: string, baseBranch: string } | null) => void} props.onSelectPR
  * @param {(title: string, message: string) => void} [props.onError]
  * @param {() => void} props.onCreatePR
+ * @param {() => void} [props.onShowHome]
  * @param {boolean} [props.showCIMonitor]
  * @param {{ status?: string, pending?: number, pass?: number, fail?: number, total?: number, checks?: unknown[], error?: string }|null} [props.prChecksSummary]
  */
@@ -55,6 +57,7 @@ export function IslandHeader({
   onSelectPR,
   onError,
   onCreatePR,
+  onShowHome,
   showCIMonitor = false,
   prChecksSummary = null,
 }) {
@@ -65,6 +68,17 @@ export function IslandHeader({
   return (
     <div class="island-header">
       <SidebarToggle open={sidebarOpen} onToggle={onToggleSidebar} />
+      {onShowHome && (
+        <button
+          type="button"
+          class="sidebar-toggle"
+          title="Home"
+          aria-label="Home"
+          onClick={onShowHome}
+        >
+          <IconHome size={16} stroke={1.75} />
+        </button>
+      )}
 
       <Show
         when={activeFile}
