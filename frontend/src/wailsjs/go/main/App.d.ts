@@ -26,6 +26,12 @@ export function FilesExist(arg1:Array<string>):Promise<Record<string, boolean>>;
 
 export function GetCIPrefs():Promise<Record<string, any>>;
 
+export function GetCompareFileContents(arg1:string,arg2:string,arg3:string):Promise<main.FileContentsResult>;
+
+export function GetCompareFilePatch(arg1:string,arg2:string,arg3:string,arg4:boolean):Promise<main.FileDiff>;
+
+export function GetCompareFiles(arg1:string,arg2:boolean):Promise<main.CompareResult>;
+
 export function GetConflictFile(arg1:string):Promise<main.ConflictFile>;
 
 export function GetCurrentProject():Promise<Record<string, string>>;
@@ -71,6 +77,8 @@ export function LSPServers():Promise<Array<main.LSPServerInfo>>;
 export function LSPStart(arg1:string):Promise<main.LSPServerInfo>;
 
 export function LSPStop(arg1:string):Promise<void>;
+
+export function ListRefs():Promise<Array<main.GitRef>>;
 
 export function OpenPRLocally(arg1:number):Promise<string>;
 

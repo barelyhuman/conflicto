@@ -50,6 +50,18 @@ export function GetCIPrefs() {
   return window['go']['main']['App']['GetCIPrefs']();
 }
 
+export function GetCompareFileContents(arg1, arg2, arg3) {
+  return window['go']['main']['App']['GetCompareFileContents'](arg1, arg2, arg3);
+}
+
+export function GetCompareFilePatch(arg1, arg2, arg3, arg4) {
+  return window['go']['main']['App']['GetCompareFilePatch'](arg1, arg2, arg3, arg4);
+}
+
+export function GetCompareFiles(arg1, arg2) {
+  return window['go']['main']['App']['GetCompareFiles'](arg1, arg2);
+}
+
 export function GetConflictFile(arg1) {
   return window['go']['main']['App']['GetConflictFile'](arg1);
 }
@@ -140,6 +152,10 @@ export function LSPStart(arg1) {
 
 export function LSPStop(arg1) {
   return window['go']['main']['App']['LSPStop'](arg1);
+}
+
+export function ListRefs() {
+  return window['go']['main']['App']['ListRefs']();
 }
 
 export function OpenPRLocally(arg1) {

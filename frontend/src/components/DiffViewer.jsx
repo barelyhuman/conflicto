@@ -136,6 +136,8 @@ const diffViewerStyles = `
  * @param {(lineNumber: number) => void} [props.onOpenLineInEditor]
  * @param {InstanceType<typeof import('../models/review.js').ReviewModel>} [props.review] pending-review model (PR mode)
  * @param {(path: string) => void} [props.onSelectFile] navigate to another PR file
+ * @param {(path: string) => Promise<any>} [props.loadContents] both sides of a file for expanding
+ *   context (GetFileContents shape); defaults to index/HEAD vs worktree
  */
 export function DiffViewer({
   activeDiff,
@@ -148,6 +150,7 @@ export function DiffViewer({
   onOpenLineInEditor,
   review,
   onSelectFile,
+  loadContents,
 }) {
   const { theme, themeType } = useTheme();
   const isLoading = loading instanceof Signal ? loading.value : loading;
@@ -347,8 +350,9 @@ export function DiffViewer({
             : undefined,
           lineHoverHighlight: openInEditor ? 'line' : undefined,
           loadDiffFiles: loadDiffFilesForDiff(isPRMode, async (meta) => {
-            const staged = !unstaged;
-            const res = await api.getFileContents(meta.name, staged);
+            const res = loadContents
+              ? await loadContents(meta.name)
+              : await api.getFileContents(meta.name, !unstaged);
 
             return mapFileContentsToDiffFiles(meta, res);
           }),

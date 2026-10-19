@@ -12,15 +12,20 @@ import { createModel, signal, computed, batch } from '@preact/signals';
  *  - `file`: an editable source file (CodeMirror).
  *  - `pr`: a pull request (`pr:<number>`), never a preview tab. Its state lives
  *    in the PR tab registry (models/prTab.js), keyed by scope + number.
+ *  - `compare`: the working tree diffed against a ref (`compare:<ref>`, or
+ *    `compare:<ref>...` from the merge base), never a preview tab. Its state
+ *    lives in the compare tab registry (models/compareTab.js).
  * Identity is kind + path, so re-opening focuses the existing tab.
  *
  * @typedef {'working' | 'staged' | 'conflict'} DiffMode
  * @typedef {{
  *   id: string,
- *   kind: 'diff' | 'file' | 'pr',
+ *   kind: 'diff' | 'file' | 'pr' | 'compare',
  *   path: string,
  *   mode?: DiffMode,
  *   number?: number,
+ *   ref?: string,
+ *   mergeBase?: boolean,
  *   title?: string,
  *   preview: boolean,
  *   dirty: boolean,
@@ -56,8 +61,18 @@ export function prTabTitle(number, title) {
   return title ? `#${number} ${title}` : `#${number}`;
 }
 
+/** Path (identity) of a compare tab; `...` marks a merge-base compare, as in `git diff main...`. */
+export function compareTabPath(ref, mergeBase = false) {
+  return mergeBase ? `${ref}...` : ref;
+}
+
+/** Strip title for a compare tab. */
+export function compareTabTitle(ref, mergeBase = false) {
+  return `vs ${compareTabPath(ref, mergeBase)}`;
+}
+
 /**
- * @param {'diff' | 'file' | 'pr'} kind
+ * @param {'diff' | 'file' | 'pr' | 'compare'} kind
  * @param {string} path
  */
 export function tabId(kind, path) {
@@ -200,13 +215,22 @@ export const TabsModel = createModel(() => {
 
     /**
      * Open (or focus) a tab.
-     * @param {{ kind: 'diff' | 'file' | 'pr', path?: string, number?: number, title?: string, mode?: DiffMode, preview?: boolean, activate?: boolean }} spec
+     * @param {{ kind: 'diff' | 'file' | 'pr' | 'compare', path?: string, number?: number, ref?: string, mergeBase?: boolean, title?: string, mode?: DiffMode, preview?: boolean, activate?: boolean }} spec
      * @returns {Tab | null}
      */
-    open({ kind, path, number, title, mode = 'working', preview = false, activate = true }) {
+    open({ kind, path, number, ref, mergeBase = false, title, mode = 'working', preview = false, activate = true }) {
       if (kind === 'pr') {
         if (!Number.isInteger(number) || number <= 0) return null;
         path = String(number);
+        preview = false;
+      }
+
+      if (kind === 'compare') {
+        ref = (ref ?? '').trim();
+
+        if (!ref) return null;
+        mergeBase = Boolean(mergeBase);
+        path = compareTabPath(ref, mergeBase);
         preview = false;
       }
 
@@ -239,6 +263,12 @@ export const TabsModel = createModel(() => {
       if (kind === 'pr') {
         tab.number = number;
         tab.title = title || prTabTitle(number);
+      }
+
+      if (kind === 'compare') {
+        tab.ref = ref;
+        tab.mergeBase = mergeBase;
+        tab.title = compareTabTitle(ref, mergeBase);
       }
 
       let next = cur.tabs.slice();
@@ -413,6 +443,8 @@ export const TabsModel = createModel(() => {
         kind: tab.kind,
         path: tab.path,
         number: tab.number,
+        ref: tab.ref,
+        mergeBase: tab.mergeBase,
         title: tab.title,
         mode: tab.mode,
         preview: false,

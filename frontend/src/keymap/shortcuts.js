@@ -25,7 +25,7 @@
  */
 export const SHORTCUTS = Object.freeze([
   // Global
-  { id: 'palette.toggle', mac: '⌘K', other: 'Ctrl+K', description: 'Open command palette (repos, PRs, worktrees)', scope: 'global' },
+  { id: 'palette.toggle', mac: '⌘K', other: 'Ctrl+K', description: 'Open command palette (repos, PRs, worktrees, diff against ref)', scope: 'global' },
   { id: 'home.toggle', mac: '⌘⇧H', other: 'Ctrl+Shift+H', description: 'Toggle home screen', scope: 'global' },
   { id: 'prefs.open', mac: '⌘,', other: 'Ctrl+,', description: 'Preferences', scope: 'global' },
   { id: 'terminal.toggle', mac: '⌃`', other: 'Ctrl+`', description: 'Show or hide terminal dock', scope: 'global' },
@@ -95,6 +95,6 @@ export const SHORTCUTS = Object.freeze([
   { id: 'palette.open', mac: '↵', other: '↵', description: 'Open selected entry', scope: 'palette' },
   { id: 'palette.close', mac: 'Esc', other: 'Esc', description: 'Close palette', scope: 'palette' },
   { id: 'palette.prMode', mac: '#', other: '#', description: 'Browse pull requests (# as first character)', scope: 'palette' },
-  { id: 'palette.openLocally', mac: '⌘↵', other: 'Ctrl+Enter', description: 'Open PR locally (creates or links its worktree)', scope: 'palette' },
+  { id: 'palette.openLocally', mac: '⌘↵', other: 'Ctrl+Enter', description: 'Open PR locally (creates or links its worktree); in "Diff against ref", diff from the merge base', scope: 'palette' },
   { id: 'palette.prState', mac: '⌥⇥', other: 'Alt+Tab', description: 'Cycle PR state filter: open, merged, closed, all (PR mode)', scope: 'palette' },
 ]);

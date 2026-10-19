@@ -3,7 +3,7 @@ import { useComputed, useSignal, useSignalEffect } from '@preact/signals';
 import { For, Show } from '@preact/signals/utils';
 import { IconLoader2, IconSearch } from '@tabler/icons-preact';
 import { api, getPlatform } from '../../wails.js';
-import { openPR } from '../../models/navigation.js';
+import { openCompare, openPR } from '../../models/navigation.js';
 import { tabsStore } from '../../models/tabs.js';
 import { filterEntries } from './fuzzy.js';
 import {
@@ -11,7 +11,6 @@ import {
   activeRepo,
   cachedPREntries,
   isCancellation,
-  matchesBrowse,
   mergePRItems,
   nextPRState,
   parsePaletteInput,
@@ -19,6 +18,8 @@ import {
   prEntryFromSummary,
   prSearchKey,
 } from './prBrowser.js';
+import { filterRefItems } from './refBrowser.js';
+import { BROWSE_ACTION, COMPARE_ACTION, HOME_ACTION, paletteItems } from './actions.js';
 import { WorkspaceRow } from './WorkspaceRow.jsx';
 import { OPEN_PALETTE_EVENT } from './openPalette.js';
 import './palette.css';
@@ -27,24 +28,7 @@ const MAX_RESULTS = 100;
 const PR_LIMIT = 30;
 const SEARCH_DEBOUNCE_MS = 200;
 
-const HOME_ENTRY = {
-  kind: 'home', id: 'home:', title: 'Home', subtitle: 'Browse all repos, PRs and worktrees',
-  prState: '', hasWorktree: false, stale: false, active: false,
-};
-
-const BROWSE_ENTRY = {
-  kind: 'browse', id: 'browse:prs', title: 'Browse pull requests', subtitle: 'Search PRs of this repo',
-  prState: '', hasWorktree: false, stale: false, active: false,
-};
-
 const STATE_LABELS = { open: 'Open', merged: 'Merged', closed: 'Closed', all: 'All' };
-
-/** Home is offered for an empty query, or one that is part of the word "home". */
-function matchesHome(query) {
-  const q = query.trim().toLowerCase();
-
-  return q === '' || 'home'.includes(q);
-}
 
 /** One segment of the PR state filter. `current` is the state signal; the option only re-renders on its own change. */
 function StateButton({ state, current, onPick }) {
@@ -69,6 +53,11 @@ function StateButton({ state, current, onPick }) {
 function PaletteDialog({ index, onClose, onHome, isMac }) {
   const query = useSignal('');
   const prMode = useSignal(false);
+  /** Ref picker for "Diff against ref…" (exclusive with PR mode). */
+  const refMode = useSignal(false);
+  const refs = useSignal(/** @type {any[]} */ ([]));
+  const refsLoading = useSignal(false);
+  const refsError = useSignal('');
   const prState = useSignal('open');
   const selected = useSignal(0);
   /** Id of the row whose PR is being opened ('' when idle). */
@@ -83,9 +72,11 @@ function PaletteDialog({ index, onClose, onHome, isMac }) {
   const repo = useComputed(() => activeRepo(index.entries.value));
   const chipText = useComputed(() => {
     const name = repo.value.repoName;
+    const label = refMode.value ? 'Diff' : 'PRs';
 
-    return name ? `PRs · ${name}` : 'PRs';
+    return name ? `${label} · ${name}` : label;
   });
+  const chipShown = useComputed(() => prMode.value || refMode.value);
   const parsed = useComputed(() => parsePRQuery(query.value));
   const liveKey = useComputed(() => prSearchKey(prState.value, query.value));
 
@@ -113,27 +104,43 @@ function PaletteDialog({ index, onClose, onHome, isMac }) {
 
   const prItems = useComputed(() => mergePRItems(liveItems.value, cachedItems.value));
 
-  const normalItems = useComputed(() => [
-    ...(onHome && matchesHome(query.value) ? [{ entry: HOME_ENTRY, score: 0, indices: [] }] : []),
-    ...(matchesBrowse(query.value) ? [{ entry: BROWSE_ENTRY, score: 0, indices: [] }] : []),
-    ...filterEntries(index.entries.value, query.value, MAX_RESULTS),
+  const refItems = useComputed(() => (refMode.value ? filterRefItems(refs.value, query.value, MAX_RESULTS) : []));
+
+  // Diffing needs an open project; Home needs a home screen to show.
+  const actions = useComputed(() => [
+    ...(onHome ? [HOME_ACTION] : []),
+    BROWSE_ACTION,
+    ...(repo.value.repoPath ? [COMPARE_ACTION] : []),
   ]);
 
-  const items = useComputed(() =>
-    (prMode.value ? prItems.value : normalItems.value).map((r, pos) => ({ ...r, pos }))
+  const normalItems = useComputed(() =>
+    paletteItems(actions.value, index.entries.value, query.value, MAX_RESULTS)
   );
+
+  const items = useComputed(() => {
+    const list = refMode.value ? refItems.value : prMode.value ? prItems.value : normalItems.value;
+
+    return list.map((r, pos) => ({ ...r, pos }));
+  });
   const count = useComputed(() => items.value.length);
   const empty = useComputed(() => items.value.length === 0);
-  const emptyText = useComputed(() => (prMode.value ? 'No pull requests' : 'No matches'));
+  const emptyText = useComputed(() => {
+    if (refMode.value) return refsLoading.value ? 'Loading refs…' : 'No refs';
+
+    return prMode.value ? 'No pull requests' : 'No matches';
+  });
   const activeDesc = useComputed(() => (count.value ? `palette-opt-${selected.value}` : undefined));
-  const placeholder = useComputed(() =>
-    (prMode.value ? 'Search pull requests by number, title or author' : 'Search repos, PRs and worktrees')
-  );
+  const placeholder = useComputed(() => {
+    if (refMode.value) return 'Branch, tag, SHA or HEAD~n to diff the working tree against';
+
+    return prMode.value ? 'Search pull requests by number, title or author' : 'Search repos, PRs and worktrees';
+  });
   const opening = useComputed(() => busyId.value || index.opening.value);
 
   // Inline notice: an action error, or a failed live search (cached rows still shown).
   const notice = useComputed(() => {
     if (actionError.value) return actionError.value;
+    if (refMode.value) return refsError.value ? `Could not list refs: ${refsError.value}` : '';
     if (!prMode.value) return '';
     const live = liveResult.value;
 
@@ -144,9 +151,13 @@ function PaletteDialog({ index, onClose, onHome, isMac }) {
       : `PR search failed: ${live.error}`;
   });
 
-  const footerText = isMac.current
+  const prFooter = isMac.current
     ? '↵ open · ⌘↵ open locally · ⌥⇥ state'
     : '↵ open · Ctrl+↵ open locally · Alt+Tab state';
+  const refFooter = isMac.current
+    ? '↵ diff with working tree · ⌘↵ from merge base'
+    : '↵ diff with working tree · Ctrl+↵ from merge base';
+  const footerText = useComputed(() => (refMode.value ? refFooter : prFooter));
 
   useEffect(() => {
     inputRef.current?.focus();
@@ -157,6 +168,7 @@ function PaletteDialog({ index, onClose, onHome, isMac }) {
   useSignalEffect(() => {
     query.value;
     prMode.value;
+    refMode.value;
     prState.value;
     selected.value = 0;
   });
@@ -214,6 +226,35 @@ function PaletteDialog({ index, onClose, onHome, isMac }) {
     query.value = '';
   }
 
+  function resetInput() {
+    query.value = '';
+
+    if (inputRef.current) {
+      inputRef.current.value = '';
+      inputRef.current.focus();
+    }
+  }
+
+  async function enterRefMode() {
+    refMode.value = true;
+    resetInput();
+    refsLoading.value = true;
+    refsError.value = '';
+
+    try {
+      refs.value = (await api.listRefs()) ?? [];
+    } catch (err) {
+      refsError.value = err?.message ?? String(err);
+    } finally {
+      refsLoading.value = false;
+    }
+  }
+
+  function exitRefMode() {
+    refMode.value = false;
+    query.value = '';
+  }
+
   /** Open a PR tab; `locally` also creates or links its worktree. Switches repo first when needed. */
   async function openPull(entry, locally) {
     if (busyId.peek()) return;
@@ -261,6 +302,19 @@ function PaletteDialog({ index, onClose, onHome, isMac }) {
       return;
     }
 
+    if (entry.kind === 'compare') {
+      enterRefMode();
+
+      return;
+    }
+
+    if (entry.kind === 'ref') {
+      if (openCompare(entry.ref, { mergeBase: locally })) onClose();
+      else actionError.value = 'Open a project to diff against a ref';
+
+      return;
+    }
+
     if (await index.open(entry.id)) onClose();
   }
 
@@ -275,7 +329,7 @@ function PaletteDialog({ index, onClose, onHome, isMac }) {
     const el = e.currentTarget;
 
     // A leading # switches to PR mode; the rest of the input becomes the PR query.
-    if (!prMode.peek() && el.value.startsWith('#')) {
+    if (!prMode.peek() && !refMode.peek() && el.value.startsWith('#')) {
       const { query: rest } = parsePaletteInput(el.value);
 
       prMode.value = true;
@@ -309,6 +363,9 @@ function PaletteDialog({ index, onClose, onHome, isMac }) {
     } else if (e.key === 'Backspace' && prMode.peek() && query.peek() === '') {
       e.preventDefault();
       exitPRMode();
+    } else if (e.key === 'Backspace' && refMode.peek() && query.peek() === '') {
+      e.preventDefault();
+      exitRefMode();
     } else if (e.key === 'Tab') {
       e.preventDefault();
     }
@@ -324,7 +381,7 @@ function PaletteDialog({ index, onClose, onHome, isMac }) {
       <div class="palette" role="dialog" aria-modal="true" aria-label="Command palette">
         <div class="palette-input-row">
           <IconSearch size={16} stroke={1.5} />
-          <Show when={prMode}>{() => <span class="palette-chip">{chipText}</span>}</Show>
+          <Show when={chipShown}>{() => <span class="palette-chip">{chipText}</span>}</Show>
           <input
             ref={inputRef}
             class="palette-input"
@@ -386,7 +443,7 @@ function PaletteDialog({ index, onClose, onHome, isMac }) {
             <div class="palette-empty">{emptyText}</div>
           </Show>
         </div>
-        <Show when={prMode}>{() => <div class="palette-footer">{footerText}</div>}</Show>
+        <Show when={chipShown}>{() => <div class="palette-footer">{footerText}</div>}</Show>
       </div>
     </div>
   );

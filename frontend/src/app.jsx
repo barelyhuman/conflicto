@@ -12,6 +12,7 @@ import { SyncModel } from './models/sync.js';
 import { WorktreeModel } from './models/worktree.js';
 import { WorkspaceIndexModel } from './models/workspaceIndex.js';
 import { prTabs } from './models/prTab.js';
+import { compareTabs } from './models/compareTab.js';
 import { ThemeProvider } from './theme/ThemeProvider.jsx';
 import { FileTree } from './components/FileTree.jsx';
 import { EditorArea } from './components/tabs/EditorArea.jsx';
@@ -30,6 +31,13 @@ import { resetLspForProject } from './lsp/index.js';
 import { useCodeShortcuts } from './lsp/useCodeShortcuts.js';
 import { CommandPalette } from './components/palette/CommandPalette.jsx';
 import { HomeScreen } from './components/home/HomeScreen.jsx';
+
+/** The visible compare tab follows working-tree changes (background refresh). */
+function refreshActiveCompare() {
+  const tab = tabs.activeTab.peek();
+
+  if (tab?.kind === 'compare') compareTabs.peek(tabs.currentScope(), tab.path)?.refresh({ silent: true });
+}
 
 export function App() {
   const [branches, setBranches] = useState({ current: 'main', local: [], remote: [] });
@@ -137,6 +145,8 @@ export function App() {
     return prTabs.bindTabs(tabs);
   }, []);
 
+  useEffect(() => compareTabs.bindTabs(tabs), []);
+
   // Only the visible PR tab polls checks; the backend monitor also drives CI notifications.
   const activePRKey = useComputed(() => {
     const tab = tabs.activeTab.value;
@@ -164,6 +174,7 @@ export function App() {
       onFileStatusChanged: (data) => {
         const wt = workingTreeRef.current;
         wt.applyStatus(data);
+        refreshActiveCompare();
 
         // First file of a fresh worktree opens as a preview diff tab (once per worktree).
         if (tabs.canSeed()) {
@@ -233,6 +244,7 @@ export function App() {
       },
       onRefreshCompleted: () => {
         selectionRef.current.refetch();
+        refreshActiveCompare();
       },
     });
   }, [sync, homeOpen]);

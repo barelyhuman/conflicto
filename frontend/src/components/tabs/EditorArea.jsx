@@ -6,6 +6,7 @@ import { ConflictViewer } from '../ConflictViewer.jsx';
 import { ConfirmDialog } from '../ConfirmDialog.jsx';
 import { openFileAt } from '../../models/navigation.js';
 import { PRView } from '../pr/PRView.jsx';
+import { CompareView } from '../compare/CompareView.jsx';
 import { ReferencesPanel } from '../search/ReferencesPanel.jsx';
 import { FileTabEditor } from './FileTabEditor.jsx';
 import { useTabShortcuts } from './useTabShortcuts.js';
@@ -44,6 +45,12 @@ export function EditorArea({ tabs, selection, isMac, onError }) {
 
     return tab?.kind === 'pr' ? `${scope}${SEP}${tab.number}` : null;
   });
+  const compareTarget = useComputed(() => {
+    const tab = tabs.activeTab.value;
+    const scope = tabs.scope.value ?? '';
+
+    return tab?.kind === 'compare' ? `${scope}${SEP}${tab.id}` : null;
+  });
   const hasDiffTab = useComputed(() => tabs.activeKind.value === 'diff');
   const isConflict = useComputed(() => selection.isConflict.value);
   const canOpenInEditor = useComputed(() => {
@@ -70,6 +77,9 @@ export function EditorArea({ tabs, selection, isMac, onError }) {
 
   return (
     <>
+      <Show
+        when={compareTarget}
+        fallback={
       <Show
         when={prTarget}
         fallback={
@@ -127,6 +137,17 @@ export function EditorArea({ tabs, selection, isMac, onError }) {
               number={Number(target.slice(cut + 1))}
             />
           );
+        }}
+      </Show>
+        }
+      >
+        {(target) => {
+          const cut = target.indexOf(SEP);
+          const scope = target.slice(0, cut) || null;
+          const id = target.slice(cut + 1);
+          const tab = tabs.tabs.peek().find((t) => t.id === id);
+
+          return tab ? <CompareView key={target} tabs={tabs} tab={tab} scope={scope} /> : null;
         }}
       </Show>
 

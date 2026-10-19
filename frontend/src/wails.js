@@ -177,6 +177,17 @@ export const api = {
 
   openPRLocally: (number) => window.go.main.App.OpenPRLocally(number),
 
+  // Compare tabs: the working tree against any ref (see compare.go).
+  listRefs: () => window.go.main.App.ListRefs(),
+
+  getCompareFiles: (ref, mergeBase = false) => window.go.main.App.GetCompareFiles(ref, mergeBase),
+
+  getCompareFilePatch: (base, path, oldPath = '', untracked = false) =>
+    window.go.main.App.GetCompareFilePatch(base, path, oldPath, untracked),
+
+  getCompareFileContents: (base, path, oldPath = '') =>
+    window.go.main.App.GetCompareFileContents(base, path, oldPath),
+
   postPRComment: (number, path, body, line, side, startLine, startSide) =>
     window.go.main.App.PostPRComment(number, path, body, line, side, startLine, startSide),
 

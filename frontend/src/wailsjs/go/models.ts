@@ -1,5 +1,63 @@
 export namespace main {
 	
+	export class CompareFile {
+	    path: string;
+	    oldPath?: string;
+	    status: string;
+	    additions: number;
+	    deletions: number;
+	    untracked?: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new CompareFile(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.path = source["path"];
+	        this.oldPath = source["oldPath"];
+	        this.status = source["status"];
+	        this.additions = source["additions"];
+	        this.deletions = source["deletions"];
+	        this.untracked = source["untracked"];
+	    }
+	}
+	export class CompareResult {
+	    ref: string;
+	    mergeBase: boolean;
+	    baseSHA: string;
+	    files: CompareFile[];
+	
+	    static createFrom(source: any = {}) {
+	        return new CompareResult(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.ref = source["ref"];
+	        this.mergeBase = source["mergeBase"];
+	        this.baseSHA = source["baseSHA"];
+	        this.files = this.convertValues(source["files"], CompareFile);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
 	export class ConflictFile {
 	    worktree: string;
 	    hasWorktree: boolean;
@@ -52,6 +110,26 @@ export namespace main {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.path = source["path"];
 	        this.patch = source["patch"];
+	    }
+	}
+	export class GitRef {
+	    name: string;
+	    kind: string;
+	    sha: string;
+	    subject: string;
+	    date: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new GitRef(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.name = source["name"];
+	        this.kind = source["kind"];
+	        this.sha = source["sha"];
+	        this.subject = source["subject"];
+	        this.date = source["date"];
 	    }
 	}
 	export class LSPServerInfo {

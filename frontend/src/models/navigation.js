@@ -5,7 +5,7 @@ import { prTabs as defaultPRTabs } from './prTab.js';
 /**
  * Narrow "go to code" seam. Anything that wants to show a file (terminal
  * links, palette, search, LSP goto-definition, review comments) calls
- * `openFileAt` / `openDiff` / `openPR`. The implementation below sits on the editor tabs.
+ * `openFileAt` / `openDiff` / `openPR` / `openCompare`. The implementation below sits on the editor tabs.
  */
 
 const hasLineNumber = (line) => Number.isFinite(line) && line >= 1;
@@ -24,6 +24,7 @@ const hasLineNumber = (line) => Number.isFinite(line) && line >= 1;
  *   openDiff: (path: string, mode?: import('./tabs.js').DiffMode, opts?: { preview?: boolean }) => boolean,
  *   openPR: (number: number, opts?: { locally?: boolean }) => Promise<boolean>,
  *   openPRLocally: (number: number) => Promise<boolean>,
+ *   openCompare: (ref: string, opts?: { mergeBase?: boolean }) => boolean,
  * }}
  */
 export function createNavigator({
@@ -108,7 +109,12 @@ export function createNavigator({
     return locally ? openPRLocally(number) : true;
   }
 
-  return { openFileAt, openDiff, openPR, openPRLocally };
+  /** Open or focus the compare tab for `ref` in the current scope. */
+  function openCompare(ref, { mergeBase = false } = {}) {
+    return tabs.open({ kind: 'compare', ref, mergeBase }) != null;
+  }
+
+  return { openFileAt, openDiff, openPR, openPRLocally, openCompare };
 }
 
 /** @type {ReturnType<typeof createNavigator> | null} */
@@ -147,6 +153,15 @@ export function openDiff(path, mode = 'working', opts) {
  */
 export function openPR(number, opts) {
   return navigator ? navigator.openPR(number, opts) : Promise.resolve(false);
+}
+
+/**
+ * Diff the working tree against `ref` (branch, tag, SHA, HEAD~3, …); with
+ * `mergeBase`, against the merge base of HEAD and `ref`.
+ * @returns {boolean}
+ */
+export function openCompare(ref, opts) {
+  return navigator ? navigator.openCompare(ref, opts) : false;
 }
 
 /** "Open locally" / "Go to worktree" for an already open PR tab. @returns {Promise<boolean>} */

@@ -3,9 +3,12 @@ import { Show, useLiveSignal } from '@preact/signals/utils';
 import {
   IconFolder,
   IconGitBranch,
+  IconGitCommit,
+  IconGitCompare,
   IconGitPullRequest,
   IconHome,
   IconLoader2,
+  IconTag,
   IconTrash,
 } from '@tabler/icons-preact';
 import { Highlighted } from '../Highlighted.jsx';
@@ -13,8 +16,16 @@ import './palette.css';
 
 export { Highlighted };
 
-function KindIcon({ kind }) {
+function KindIcon({ kind, refKind }) {
   if (kind === 'pr' || kind === 'browse') return <IconGitPullRequest size={16} stroke={1.5} />;
+
+  if (kind === 'compare') return <IconGitCompare size={16} stroke={1.5} />;
+
+  if (kind === 'ref') {
+    if (refKind === 'tag') return <IconTag size={16} stroke={1.5} />;
+
+    return refKind ? <IconGitBranch size={16} stroke={1.5} /> : <IconGitCommit size={16} stroke={1.5} />;
+  }
 
   if (kind === 'worktree') return <IconGitBranch size={16} stroke={1.5} />;
 
@@ -62,7 +73,7 @@ export function WorkspaceRow({ item, selected, opening, onPick, onHover, idPrefi
       onMouseMove={() => onHover(pos)}
       onClick={() => onPick(entry)}
     >
-      <span class="palette-glyph"><KindIcon kind={entry.kind} /></span>
+      <span class="palette-glyph"><KindIcon kind={entry.kind} refKind={entry.refKind} /></span>
       <span class="palette-text">
         <span class="palette-title"><Highlighted text={entry.title} indices={indices} /></span>
         <Show when={() => Boolean(entry.subtitle)}>
@@ -82,6 +93,7 @@ export function WorkspaceRow({ item, selected, opening, onPick, onHover, idPrefi
         {entry.prState && entry.kind !== 'repo' && (
           <span class={`palette-badge pr-${entry.prState.toLowerCase()}`}>{entry.prState.toLowerCase()}</span>
         )}
+        {entry.refKind && <span class="palette-badge">{entry.refKind}</span>}
         {entry.stale && <span class="palette-badge stale">stale</span>}
         {entry.active && <span class="palette-badge active">active</span>}
         {onRemove && entry.stale && entry.path && (

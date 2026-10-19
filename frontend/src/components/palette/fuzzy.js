@@ -4,7 +4,7 @@
  * Query syntax
  * - Space-separated tokens; ALL tokens must match (AND).
  * - A token fuzzy-matches (in-order subsequence) a haystack built from
- *   "repoName title branch #<prNumber> kind". Bonuses: word starts, camelCase
+ *   "repoName title branch #<prNumber> kind keywords". Bonuses: word starts, camelCase
  *   humps, contiguous runs; small penalty for gaps and late starts.
  * - Numeric token (`36` or `#36`): exact PR number match gets a very strong
  *   bonus; a PR number that merely starts with the digits gets a medium one
@@ -170,6 +170,7 @@ function haystackOf(entry) {
       entry.branch,
       entry.prNumber ? `#${entry.prNumber}` : '',
       entry.kind,
+      entry.keywords,
     ].filter(Boolean).join(' ');
     h = { text, lower: text.toLowerCase() };
     haystackCache.set(entry, h);

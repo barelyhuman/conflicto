@@ -1,10 +1,8 @@
-import { fuzzyMatch } from './fuzzy.js';
-
 /**
  * Pure logic for the command palette's PR browser mode (no Preact, no Wails).
  *
  * Entering PR mode: the query starts with `#` (the rest is the PR query), or the
- * "Browse pull requests" item is picked. Results are the cached open PRs of the
+ * "Browse pull requests" action is picked. Results are the cached open PRs of the
  * active repo (from the workspace index) merged with live `gh` search results.
  */
 
@@ -42,13 +40,6 @@ export function parsePRQuery(query) {
   const m = /^(\d+)$/.exec(text);
 
   return { text, number: m ? Number(m[1]) : null };
-}
-
-/** Does the bare query ask for the "Browse pull requests" item? Empty counts too. */
-export function matchesBrowse(query) {
-  const q = (query ?? '').trim().toLowerCase();
-
-  return q === '' || fuzzyMatch(q, 'pull requests') !== null;
 }
 
 /** Superseded `searchPRs` calls reject with a "context canceled" error. */

@@ -20,7 +20,9 @@ function TabItem({ tab, tabs, dragRef }) {
   const name = useComputed(() => {
     const t = live.value;
 
-    return t.kind === 'pr' ? (t.title ?? `#${t.number}`) : splitPath(t.path).name;
+    if (t.kind === 'pr') return t.title ?? `#${t.number}`;
+
+    return t.kind === 'compare' ? t.title : splitPath(t.path).name;
   });
   const cls = useComputed(() => {
     const t = live.value;
@@ -38,6 +40,12 @@ function TabItem({ tab, tabs, dragRef }) {
     const t = live.value;
 
     if (t.kind === 'pr') return t.title ?? `#${t.number}`;
+
+    if (t.kind === 'compare') {
+      return t.mergeBase
+        ? `Working tree vs merge base of HEAD and ${t.ref}`
+        : `Working tree vs ${t.ref}`;
+    }
 
     return `${t.path}${t.kind === 'diff' ? ` (${t.mode} diff)` : ''}`;
   });

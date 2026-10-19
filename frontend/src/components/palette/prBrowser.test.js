@@ -3,7 +3,6 @@ import {
   activeRepo,
   cachedPREntries,
   isCancellation,
-  matchesBrowse,
   matchesPRState,
   mergePRItems,
   nextPRState,
@@ -50,15 +49,6 @@ describe('nextPRState', () => {
 
   it('restarts at open for unknown states', () => {
     expect(nextPRState('bogus')).toBe('open');
-  });
-});
-
-describe('matchesBrowse', () => {
-  it('offers the item for an empty query and pr/pull prefixes', () => {
-    expect(matchesBrowse('')).toBe(true);
-    expect(matchesBrowse('pr')).toBe(true);
-    expect(matchesBrowse('pull')).toBe(true);
-    expect(matchesBrowse('conflicto')).toBe(false);
   });
 });
 
