@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, useRef } from 'preact/hooks';
-import { useModel, useSignal, useComputed } from '@preact/signals';
+import { useModel, useSignal, useComputed, useSignalEffect } from '@preact/signals';
 import { Show } from '@preact/signals/utils';
 import './app.css';
 import { setupWailsEvents, api, watchFullscreen, getPlatform } from './wails.js';
@@ -11,7 +11,7 @@ import { bindTabsToSelection } from './models/tabsSelection.js';
 import { SyncModel } from './models/sync.js';
 import { WorktreeModel } from './models/worktree.js';
 import { WorkspaceIndexModel } from './models/workspaceIndex.js';
-import { ReviewModel } from './models/review.js';
+import { prTabs } from './models/prTab.js';
 import { ThemeProvider } from './theme/ThemeProvider.jsx';
 import { FileTree } from './components/FileTree.jsx';
 import { EditorArea } from './components/tabs/EditorArea.jsx';
@@ -20,7 +20,6 @@ import { ConfirmDialog } from './components/ConfirmDialog.jsx';
 import { ToastContainer } from './components/ToastContainer.jsx';
 import { PreferencesPage } from './components/PreferencesPage.jsx';
 import { ProjectPicker } from './components/ProjectPicker.jsx';
-import { PRCheckoutPrompt } from './components/PRCheckoutPrompt.jsx';
 import { CreatePRModal } from './components/CreatePRModal.jsx';
 import { TerminalDock, isTerminalFocusTarget } from './components/terminal/TerminalDock.jsx';
 import { setTerminalScope, removeTerminalScope } from './components/terminal/terminalStore.js';
@@ -33,11 +32,7 @@ import { useCodeShortcuts } from './lsp/useCodeShortcuts.js';
 import { CommandPalette } from './components/palette/CommandPalette.jsx';
 import { HomeScreen } from './components/home/HomeScreen.jsx';
 
-/** Stable empty list so FileTree does not remount on unrelated App re-renders. */
-const EMPTY_FILES = [];
-
 export function App() {
-  const [activePR, setActivePR] = useState(null);
   const [branches, setBranches] = useState({ current: 'main', local: [], remote: [] });
   // Confirmation dialog state
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -53,6 +48,8 @@ export function App() {
 
   // Toast notifications
   const [toasts, setToasts] = useState([]);
+  const pushToastRef = useRef(pushToast);
+  pushToastRef.current = pushToast;
 
   // Preferences state
   const [preferencesOpen, setPreferencesOpen] = useState(false);
@@ -69,12 +66,7 @@ export function App() {
 
   // GitHub / PR state
   const [ghStatus, setGhStatus] = useState({ installed: false, version: '', user: '' });
-  const [prList, setPrList] = useState([]);
-  const [prComments, setPrComments] = useState([]);
-  const [prChecksSummary, setPrChecksSummary] = useState(null);
   const [ciNotifyMode, setCiNotifyMode] = useState(/** @type {'off' | 'all' | 'workflow'} */ ('off'));
-  const [prPrompt, setPrPrompt] = useState(null);
-  const [prCheckoutPending, setPrCheckoutPending] = useState(/** @type {null | 'local' | 'worktree'} */ (null));
   // Create PR modal
   const [createPROpen, setCreatePROpen] = useState(false);
 
@@ -92,16 +84,6 @@ export function App() {
   const terminalHeightRef = useRef(terminalHeight);
   useEffect(() => { terminalOpenRef.current = terminalOpen; }, [terminalOpen]);
   useEffect(() => { terminalHeightRef.current = terminalHeight; }, [terminalHeight]);
-
-  // Bridge remaining PR useState into a live signal for SelectionModel.
-  // Keep writes synchronous so selection's diff-fetch effect never sees a stale PR.
-  const activePRSignal = useSignal(/** @type {number|null} */ (null));
-
-  const setActivePRBoth = useCallback((next) => {
-    const value = next instanceof Function ? next(activePRSignal.peek()) : next;
-    activePRSignal.value = value;
-    setActivePR(value);
-  }, [activePRSignal]);
 
   const workingTree = useModel(() => new WorkingTreeModel({
     onError: (title, message) => {
@@ -121,37 +103,17 @@ export function App() {
     },
   }));
 
-  const review = useModel(() => new ReviewModel({
-    onError: (title, message) => {
-      setToasts((prev) => [...prev, { id: Date.now().toString(), title, message }]);
-    },
-  }));
-  const reviewRef = useRef(review);
+  const selection = useModel(() => new SelectionModel({ workingTree }));
 
-  const selection = useModel(() => new SelectionModel({
-    workingTree,
-    activePR: activePRSignal,
-  }));
-
-  // Models / PR bridge are stable for App lifetime; keep refs for the mount-once event effect.
+  // Models are stable for App lifetime; keep refs for the mount-once event effect.
   const workingTreeRef = useRef(workingTree);
   const worktreeRef = useRef(worktree);
   const selectionRef = useRef(selection);
   const workspaceIndexRef = useRef(workspaceIndex);
-  const activePRSignalRef = useRef(activePRSignal);
   workingTreeRef.current = workingTree;
   worktreeRef.current = worktree;
   selectionRef.current = selection;
   workspaceIndexRef.current = workspaceIndex;
-  activePRSignalRef.current = activePRSignal;
-
-  const activePRRef = useRef(activePR);
-  const prCheckoutPendingRef = useRef(prCheckoutPending);
-  useEffect(() => { activePRRef.current = activePR; }, [activePR]);
-  useEffect(() => { prCheckoutPendingRef.current = prCheckoutPending; }, [prCheckoutPending]);
-
-  const isPRMode = activePR != null;
-  const currentPR = isPRMode ? prList.find((p) => p.number === activePR) : null;
 
   // Sidebar view: Changes (file tree) or Search. Derived classes keep App from re-rendering on switch.
   const asideClass = useComputed(() =>
@@ -164,21 +126,44 @@ export function App() {
   const openSidebar = useCallback(() => setSidebarOpen(true), []);
   useCodeShortcuts({ isMac: isMacOS, onOpenSearch: openSidebar });
 
-  // Terminal links (and future palette/search) open files through the navigation seam.
-  const currentPRFilesRef = useRef(EMPTY_FILES);
-  currentPRFilesRef.current = currentPR?.files ?? EMPTY_FILES;
+  // Terminal links, palette, search and PR browsing open things through the navigation seam.
   useEffect(
     () =>
       registerNavigator(
         createNavigator({
           tabs,
           workingTree,
-          activePR: activePRSignal,
-          isPRFile: (path) => currentPRFilesRef.current.some((f) => f.path === path),
+          prTabs,
+          onError: (title, message) => pushToastRef.current(title, message),
         })
       ),
-    [activePRSignal, workingTree]
+    [workingTree]
   );
+
+  // PR tab state follows the tab lifecycle; its errors surface as toasts.
+  useEffect(() => {
+    prTabs.setOnError((title, message) => pushToastRef.current(title, message));
+
+    return prTabs.bindTabs(tabs);
+  }, []);
+
+  // Only the visible PR tab polls checks; the backend monitor also drives CI notifications.
+  const activePRKey = useComputed(() => {
+    const tab = tabs.activeTab.value;
+    const scope = tabs.scope.value ?? '';
+
+    return tab?.kind === 'pr' ? `${scope}\u0000${tab.number}` : null;
+  });
+  useSignalEffect(() => {
+    const key = activePRKey.value;
+
+    if (!key) return undefined;
+    api.startPRChecksMonitor(Number(key.slice(key.indexOf('\u0000') + 1)));
+
+    return () => {
+      api.stopPRChecksMonitor();
+    };
+  });
 
   // The active diff tab drives the selection model (diff fetching + shared viewers).
   useEffect(() => bindTabsToSelection({ tabs, selection }), [selection]);
@@ -191,7 +176,7 @@ export function App() {
         wt.applyStatus(data);
 
         // First file of a fresh worktree opens as a preview diff tab (once per worktree).
-        if (tabs.canSeed() && activePRSignalRef.current.peek() == null) {
+        if (tabs.canSeed()) {
           const first = wt.firstEntry();
 
           if (first) {
@@ -212,62 +197,15 @@ export function App() {
       onGHStatusChanged: (data) => {
         setGhStatus(data ?? { installed: false, version: '', user: '' });
       },
-      onPRListUpdated: (data) => {
-        setPrList(data?.prs ?? []);
-      },
       onPRChecksUpdated: (data) => {
-        if (activePRRef.current == null || data?.number !== activePRRef.current) return;
-        setPrChecksSummary(data);
-      },
-      onPRFilesUpdated: (data) => {
-        const number = data?.number;
-        const files = data?.files ?? [];
-
-        if (number == null) return;
-        setPrList((prev) =>
-          prev.map((pr) =>
-            pr.number === number ? { ...pr, files } : pr
-          )
-        );
-
-        if (activePRSignalRef.current.peek() === number) {
-          reviewRef.current.load(number);
-        }
-
-        if (
-          activePRSignalRef.current.peek() === number &&
-          !tabs.hasTabs.peek() &&
-          files.length > 0
-        ) {
-          tabs.open({ kind: 'diff', path: files[0].path, mode: 'pr', preview: true });
-        }
-      },
-      onPRCommentsUpdated: (data) => {
-        try {
-          const raw = JSON.parse(data?.raw ?? '[]');
-          setPrComments(Array.isArray(raw) ? raw : []);
-        } catch {
-          setPrComments([]);
-        }
-      },
-      onPRCommentPosted: () => {
-        if (activePRRef.current != null) {
-          api.getPRComments(activePRRef.current);
-        }
-      },
-      onPRCheckoutCompleted: () => {
-        setPrCheckoutPending(null);
-        setPrPrompt(null);
+        // Monitor events carry the PR number; only the open tab for it cares.
+        prTabs.peek(tabs.currentScope(), data?.number)?.applyChecks(data);
       },
       onPRCreated: () => {
         setCreatePROpen(false);
       },
       onError: (data) => {
         selectionRef.current.diffLoading.value = false;
-
-        if (prCheckoutPendingRef.current) {
-          setPrCheckoutPending(null);
-        }
 
         const toast = {
           id: Date.now().toString(),
@@ -287,12 +225,6 @@ export function App() {
         selectionRef.current.clear();
         tabs.setScope(data.path ?? '');
         resetLspForProject(data.path ?? '');
-        // PR-diff tabs only make sense while a PR is being reviewed.
-        tabs.closeWhere((t) => t.kind === 'diff' && t.mode === 'pr');
-        activePRSignalRef.current.value = null;
-        setActivePR(null);
-        setPrChecksSummary(null);
-        api.stopPRChecksMonitor();
         setTerminalScope(data.path ?? '');
 
         if (data.path) homeOpen.value = false;
@@ -466,51 +398,6 @@ export function App() {
     return () => cleanup();
   }, [isMacOS]);
 
-  // Fetch PR comments (and persisted pending-review drafts) when active PR changes
-  useEffect(() => {
-    if (isPRMode && activePR != null) {
-      api.getPRComments(activePR);
-      review.load(activePR);
-    } else {
-      setPrComments([]);
-      review.load(null);
-    }
-  }, [isPRMode, activePR, projectPath, review]);
-
-  // Poll CI checks while a PR is open in review mode
-  useEffect(() => {
-    if (!isPRMode || activePR == null) {
-      setPrChecksSummary(null);
-      api.stopPRChecksMonitor();
-
-      return;
-    }
-
-    setPrChecksSummary(null);
-    api.startPRChecksMonitor(activePR);
-
-    return () => {
-      api.stopPRChecksMonitor();
-    };
-  }, [isPRMode, activePR]);
-
-  const handleSelectPR = useCallback((pr) => {
-    if (pr) {
-      setPrList((prev) =>
-        prev.some((p) => p.number === pr.number) ? prev : [...prev, pr]
-      );
-      setPrPrompt(pr);
-    } else {
-      setActivePRBoth(null);
-      tabs.closeWhere((t) => t.kind === 'diff' && t.mode === 'pr');
-      const first = workingTree.firstEntry();
-
-      if (first) {
-        tabs.open({ kind: 'diff', path: first.path, mode: modeForSection(first.section), preview: true });
-      }
-    }
-  }, [workingTree, setActivePRBoth]);
-
   function pushToast(title, message) {
     setToasts((prev) => [...prev, { id: Date.now().toString(), title, message }]);
   }
@@ -519,41 +406,11 @@ export function App() {
     setToasts((prev) => prev.filter((t) => t.id !== id));
   }
 
-  const handleViewPRDiff = useCallback((pr) => {
-    setPrPrompt(null);
-    // Clear selection before entering PR mode so the diff-fetch effect does not
-    // call GetPRFileDiff with a stale working-tree path against an empty cache.
-    tabs.closeWhere((t) => t.kind === 'diff' && t.mode !== 'pr');
-    selection.clear();
-    setActivePRBoth(pr.number);
-    api.getPRFiles(pr.number);
-  }, [selection, setActivePRBoth]);
-
-  const handleCheckoutPRLocal = useCallback((pr) => {
-    setPrCheckoutPending('local');
-    api.checkoutPR(pr.number).catch(() => {
-      setPrCheckoutPending(null);
-    });
-  }, []);
-
-  const handleCheckoutPRWorktree = useCallback((pr, hash) => {
-    setPrCheckoutPending('worktree');
-    api.checkoutPRToWorktree(pr.number, hash).catch(() => {
-      setPrCheckoutPending(null);
-    });
-  }, []);
-
   const handleSelectBranch = useCallback((branch) => {
     if (branch) {
       api.switchBranch(branch);
     }
-
-    if (isPRMode) {
-      setActivePRBoth(null);
-      tabs.closeWhere((t) => t.kind === 'diff' && t.mode === 'pr');
-      selection.clear();
-    }
-  }, [isPRMode, selection, setActivePRBoth]);
+  }, []);
 
   // Left-list click: preview diff tab; double click (pin) keeps it.
   const handleOpenDiff = useCallback((path, section, opts) => {
@@ -638,13 +495,6 @@ export function App() {
 
 
 
-  const handlePostComment = useCallback((path, body, line, side) => {
-    if (activePR == null) return;
-    api.postPRComment(activePR, path, body, line, side, 0, '').catch((err) => {
-      pushToast('Comment Error', err.message);
-    });
-  }, [activePR]);
-
   const handleCreatePR = useCallback((title, body, baseBranch, draft) => {
     api.createPR(title, body, baseBranch, draft).catch((err) => {
       pushToast('Create PR Error', err.message);
@@ -721,8 +571,6 @@ export function App() {
                   activeTab={tabs.activeTab}
                   onOpenDiff={handleOpenDiff}
                   onEditFile={handleEditFile}
-                  prFiles={isPRMode ? (currentPR?.files ?? EMPTY_FILES) : EMPTY_FILES}
-                  isPRMode={isPRMode}
                   currentBranch={branches.current}
                   onStage={handleStage}
                   onUnstage={(path) => workingTree.unstage(path)}
@@ -747,27 +595,15 @@ export function App() {
                       onToggleSidebar={() => setSidebarOpen((open) => !open)}
                       tabs={tabs}
                       projectPath={projectPath}
-                      isPRMode={isPRMode}
                       showFullDiff={selection.showFullDiff}
                       onToggleShowFullDiff={() => selection.toggleShowFullDiff()}
-                      selectedPR={activePR}
-                      currentPR={currentPR}
                       onShowHome={() => { homeOpen.value = true; }}
-                      onSelectPR={handleSelectPR}
-                      onError={pushToast}
                       onCreatePR={() => setCreatePROpen(true)}
-                      showCIMonitor={isPRMode}
-                      prChecksSummary={prChecksSummary}
-                      review={review}
                     />
                     <EditorArea
                       tabs={tabs}
                       selection={selection}
-                      isPRMode={isPRMode}
                       isMac={isMacOS}
-                      prComments={prComments}
-                      onPostComment={handlePostComment}
-                      review={review}
                       onError={pushToast}
                     />
                   </main>
@@ -874,15 +710,6 @@ export function App() {
             onSubmit={handleCreatePR}
           />
 
-          <PRCheckoutPrompt
-            pr={prPrompt}
-            worktree={worktree}
-            checkoutPending={prCheckoutPending}
-            onViewDiff={() => handleViewPRDiff(prPrompt)}
-            onCheckoutLocal={() => handleCheckoutPRLocal(prPrompt)}
-            onCheckoutWorktree={(hash) => handleCheckoutPRWorktree(prPrompt, hash)}
-            onClose={() => setPrPrompt(null)}
-          />
         </div>
     </ThemeProvider>
   );

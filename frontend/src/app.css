@@ -592,7 +592,7 @@
   color: var(--text);
 }
 
-/* Nested tree (PR mode) */
+/* Nested tree */
 
 .change-tree-folder {
   width: calc(100% - 8px);
@@ -1045,18 +1045,20 @@
   white-space: nowrap;
 }
 
-/* PR picker compact in island header */
-.island-header-actions .pr-picker .pr-trigger {
+/* PR browser button in island header (opens the command palette) */
+.island-header-actions .pr-browse-trigger {
   height: 24px;
   padding: 0 6px;
+  font-family: var(--font-sans);
   font-size: 11px;
   border-radius: 6px;
   background: transparent;
   border: none;
   color: var(--grey);
+  cursor: pointer;
 }
 
-.island-header-actions .pr-picker .pr-trigger:hover {
+.island-header-actions .pr-browse-trigger:hover {
   background: rgba(127, 127, 127, 0.14);
   color: var(--text);
 }

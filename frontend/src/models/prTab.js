@@ -51,14 +51,16 @@ export const PRTabModel = createModel(
 
     const activeDiff = computed(() => {
       const path = selectedPath.value;
+      const cache = patches.value;
 
-      return path ? (patches.value[path] ?? null) : null;
+      return path ? (cache[path] ?? null) : null;
     });
 
     const diffLoading = computed(() => {
       const path = selectedPath.value;
+      const pending = loadingPatch.value;
 
-      return path != null && loadingPatch.value === path;
+      return path != null && pending === path;
     });
 
     const checks = computed(() => details.value?.checks ?? null);

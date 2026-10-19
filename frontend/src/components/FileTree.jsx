@@ -12,7 +12,7 @@ import { ChangeSection } from './ChangeSection.jsx';
 import { highlightedPath } from '../models/tabsSelection.js';
 
 /**
- * Sidebar file list: PR mode is a single tree; otherwise Conflicts / Staged / Unstaged sections.
+ * Sidebar file list: Conflicts / Staged / Unstaged sections of the local working tree.
  * Each section collapses independently and scrolls in its own body.
  *
  * @param {Object} props
@@ -20,8 +20,6 @@ import { highlightedPath } from '../models/tabsSelection.js';
  * @param {import('@preact/signals-core').ReadonlySignal<import('../models/tabs.js').Tab|null>} props.activeTab
  * @param {(path: string, section: string, opts?: { pin?: boolean }) => void} props.onOpenDiff
  * @param {(path: string) => void} [props.onEditFile] open the file in an editor tab
- * @param {{ path: string, status: string }[]} props.prFiles
- * @param {boolean} props.isPRMode
  * @param {string} [props.currentBranch]
  * @param {(path: string) => void} [props.onStage]
  * @param {(path: string) => void} [props.onUnstage]
@@ -36,8 +34,6 @@ export function FileTree({
   activeTab,
   onOpenDiff,
   onEditFile,
-  prFiles,
-  isPRMode,
   currentBranch = 'main',
   onStage,
   onUnstage,
@@ -59,7 +55,6 @@ export function FileTree({
   const selectConflict = useMemo(() => openIn('conflict'), [openIn]);
   const selectStaged = useMemo(() => openIn('staged'), [openIn]);
   const selectUnstaged = useMemo(() => openIn('unstaged'), [openIn]);
-  const selectPR = useMemo(() => openIn('pr'), [openIn]);
 
   const hasConflicts = useComputed(() => workingTree.conflicts.value.length > 0);
   const conflictsCount = useComputed(() => workingTree.conflicts.value.length);
@@ -67,26 +62,6 @@ export function FileTree({
   const unstagedCount = useComputed(() => workingTree.unstaged.value.length);
   const hasStaged = useComputed(() => workingTree.staged.value.length > 0);
   const hasUnstaged = useComputed(() => workingTree.unstaged.value.length > 0);
-
-  if (isPRMode) {
-    return (
-      <div class="file-tree-sidebar">
-        <div class="file-sections">
-          <div class="change-section change-section-open">
-            <div class="change-section-body file-tree-scroll">
-              <SignalChangeTree
-                filesSignal={null}
-                files={prFiles}
-                activeTab={activeTab}
-                section="pr"
-                onSelect={selectPR}
-              />
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div class="file-tree-sidebar">
@@ -198,7 +173,6 @@ export function FileTree({
  */
 function SignalChangeTree({
   filesSignal,
-  files,
   activeTab,
   section,
   onSelect,
@@ -211,7 +185,7 @@ function SignalChangeTree({
   onUnstage,
   onDiscard,
 }) {
-  const list = filesSignal ? filesSignal.value : files;
+  const list = filesSignal.value;
 
   const activeFile = highlightedPath(activeTab.value, section);
 

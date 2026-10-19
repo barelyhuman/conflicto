@@ -1,4 +1,4 @@
-import { createModel, signal, computed } from '@preact/signals';
+import { createModel, signal, computed, batch } from '@preact/signals';
 
 /**
  * Editor tabs, scoped per worktree (project path).
@@ -105,9 +105,12 @@ export const TabsModel = createModel(() => {
   let cycle = /** @type {null | { list: string[], idx: number }} */ (null);
 
   function sync() {
-    tabs.value = cur.tabs;
-    activeId.value = cur.activeId;
-    scope.value = scopeKey;
+    // One notification: views keyed by scope + active tab must never see them half-updated.
+    batch(() => {
+      tabs.value = cur.tabs;
+      activeId.value = cur.activeId;
+      scope.value = scopeKey;
+    });
   }
 
   /** @param {Tab} tab */

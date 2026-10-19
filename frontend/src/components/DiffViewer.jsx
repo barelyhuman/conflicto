@@ -131,7 +131,7 @@ const diffViewerStyles = `
  * @param {boolean} props.isPRMode
  * @param {import('@preact/signals-core').ReadonlySignal<boolean>|boolean} props.isUnstaged
  * @param {import('@preact/signals-core').ReadonlySignal<boolean>|boolean} [props.showFullDiff]
- * @param {{ path: string, line: number, side?: string, body: string, html_url?: string, user: { login: string } }[]} props.comments
+ * @param {{ path: string, line: number, side?: string, body: string, html_url?: string, user: { login: string } }[] | import('@preact/signals-core').ReadonlySignal<any[]>} props.comments
  * @param {import('@preact/signals-core').ReadonlySignal<boolean>|boolean} [props.canOpenInEditor]
  * @param {(lineNumber: number) => void} [props.onOpenLineInEditor]
  * @param {InstanceType<typeof import('../models/review.js').ReviewModel>} [props.review] pending-review model (PR mode)
@@ -143,7 +143,7 @@ export function DiffViewer({
   isPRMode = false,
   isUnstaged = false,
   showFullDiff = false,
-  comments = [],
+  comments: commentsProp = [],
   canOpenInEditor = false,
   onOpenLineInEditor,
   review,
@@ -156,6 +156,7 @@ export function DiffViewer({
   const filename = diff?.path ?? '';
   const unstaged = isUnstaged instanceof Signal ? isUnstaged.value : isUnstaged;
   const fullDiff = showFullDiff instanceof Signal ? showFullDiff.value : showFullDiff;
+  const comments = commentsProp instanceof Signal ? commentsProp.value : commentsProp;
 
   const openInEditor =
     canOpenInEditor instanceof Signal ? canOpenInEditor.value : canOpenInEditor;

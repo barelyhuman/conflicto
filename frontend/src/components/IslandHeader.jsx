@@ -7,9 +7,7 @@ import { CopyPathButton } from './CopyPathButton.jsx';
 import { IconPencil } from '@tabler/icons-preact';
 import { TabStrip } from './tabs/TabStrip.jsx';
 import { openFileAt } from '../models/navigation.js';
-import { PRPicker } from './PRPicker.jsx';
-import { PRChecksStatus } from './PRChecksStatus.jsx';
-import { ReviewBar } from './ReviewBar.jsx';
+import { openPalette } from './palette/openPalette.js';
 
 function absoluteFilePath(projectRoot, relativePath) {
   if (!projectRoot) return relativePath;
@@ -19,43 +17,27 @@ function absoluteFilePath(projectRoot, relativePath) {
 }
 
 /**
- * Shared content-island header: sidebar toggle, editor tab strip, PR controls.
+ * Shared content-island header: sidebar toggle, editor tab strip, create-PR and PR browser buttons.
  *
  * @param {Object} props
  * @param {boolean} props.sidebarOpen
  * @param {() => void} props.onToggleSidebar
  * @param {InstanceType<typeof import('../models/tabs.js').TabsModel>} props.tabs
  * @param {string} props.projectPath
- * @param {boolean} props.isPRMode
  * @param {import('@preact/signals-core').ReadonlySignal<boolean>|boolean} props.showFullDiff
  * @param {() => void} props.onToggleShowFullDiff
- * @param {number|null} props.selectedPR
- * @param {{ number: number, title: string, author: string, baseBranch: string }|null} props.currentPR
- * @param {(pr: { number: number, title: string, author: string, baseBranch: string } | null) => void} props.onSelectPR
- * @param {(title: string, message: string) => void} [props.onError]
  * @param {() => void} props.onCreatePR
  * @param {() => void} [props.onShowHome]
- * @param {boolean} [props.showCIMonitor]
- * @param {InstanceType<typeof import('../models/review.js').ReviewModel>} [props.review]
- * @param {{ status?: string, pending?: number, pass?: number, fail?: number, total?: number, checks?: unknown[], error?: string }|null} [props.prChecksSummary]
  */
 export function IslandHeader({
   sidebarOpen,
   onToggleSidebar,
   tabs,
   projectPath,
-  isPRMode,
   showFullDiff,
   onToggleShowFullDiff,
-  selectedPR,
-  currentPR,
-  onSelectPR,
-  onError,
   onCreatePR,
   onShowHome,
-  showCIMonitor = false,
-  prChecksSummary = null,
-  review,
 }) {
   const fullDiff = showFullDiff instanceof Signal ? showFullDiff.value : showFullDiff;
 
@@ -78,11 +60,13 @@ export function IslandHeader({
 
       <Show when={tabs.activeTab}>
         {(tab) => {
+          // PR tabs carry their own header; there is no file path to act on.
+          if (tab.kind === 'pr') return null;
           const fullPath = absoluteFilePath(projectPath, tab.path);
 
           return (
             <div class="island-header-tools">
-              {tab.kind === 'diff' && tab.mode !== 'pr' ? (
+              {tab.kind === 'diff' ? (
                 <button
                   type="button"
                   class="header-icon-btn"
@@ -93,7 +77,7 @@ export function IslandHeader({
                   <IconPencil size={13} stroke={1.75} />
                 </button>
               ) : null}
-              {tab.kind === 'diff' && !isPRMode ? (
+              {tab.kind === 'diff' ? (
                 <DiffExpandToggle
                   expanded={fullDiff}
                   onToggle={onToggleShowFullDiff}
@@ -106,8 +90,6 @@ export function IslandHeader({
       </Show>
 
       <div class="island-header-actions">
-        <PRChecksStatus active={showCIMonitor} summary={prChecksSummary} />
-        {isPRMode && review ? <ReviewBar review={review} /> : null}
         <button
           type="button"
           class="create-pr-trigger"
@@ -116,12 +98,14 @@ export function IslandHeader({
         >
           +PR
         </button>
-        <PRPicker
-          selectedPR={selectedPR}
-          currentPR={currentPR}
-          onSelect={onSelectPR}
-          onError={onError}
-        />
+        <button
+          type="button"
+          class="pr-browse-trigger"
+          onClick={openPalette}
+          title="Find pull requests, worktrees and repos (⌘K)"
+        >
+          PRs
+        </button>
       </div>
     </div>
   );

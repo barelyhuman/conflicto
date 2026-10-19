@@ -90,8 +90,9 @@ export function createNavigator({
     }
 
     if (!path) return false;
-    tabs.moveTab(tab.id, origin, path);
+    // Re-key the model first so the view that mounts in the new scope finds it.
     prTabs.rekey(number, origin, path)?.setWorktreePath(path);
+    tabs.moveTab(tab.id, origin, path);
     // The backend also emits projectChanged; setScope is idempotent.
     tabs.setScope(path);
 
