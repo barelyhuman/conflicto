@@ -11,7 +11,7 @@ import {
 import './palette.css';
 
 function KindIcon({ kind }) {
-  if (kind === 'pr') return <IconGitPullRequest size={16} stroke={1.5} />;
+  if (kind === 'pr' || kind === 'browse') return <IconGitPullRequest size={16} stroke={1.5} />;
 
   if (kind === 'worktree') return <IconGitBranch size={16} stroke={1.5} />;
 
@@ -72,7 +72,7 @@ export function WorkspaceRow({ item, selected, opening, onPick, onHover, idPrefi
     const e = live.value.entry;
     const sel = isSel.value;
     const busy = pending.value;
-    return e.kind === 'pr' && !e.hasWorktree && sel && !busy;
+    return e.kind === 'pr' && sel && !busy;
   });
 
   return (
@@ -93,14 +93,14 @@ export function WorkspaceRow({ item, selected, opening, onPick, onHover, idPrefi
       </span>
       <span class="palette-badges">
         <Show when={showHint}>
-          <span class="palette-hint">Enter: create worktree</span>
+          <span class="palette-hint">Enter: open PR</span>
         </Show>
         <Show when={pending}>
           <span class="palette-spinner" role="status" aria-label="Opening">
             <IconLoader2 size={14} stroke={1.5} />
           </span>
         </Show>
-        {hasWt && <span class="palette-badge">worktree</span>}
+        {hasWt && <span class="palette-badge">{entry.kind === 'pr' ? 'local' : 'worktree'}</span>}
         {entry.prState && entry.kind !== 'repo' && (
           <span class={`palette-badge pr-${entry.prState.toLowerCase()}`}>{entry.prState.toLowerCase()}</span>
         )}
