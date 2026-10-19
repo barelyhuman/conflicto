@@ -102,4 +102,7 @@ export const SHORTCUTS = Object.freeze([
   { id: 'palette.navigate', mac: '↑ ↓ ⌃N ⌃P', other: '↑ ↓ Ctrl+N Ctrl+P', description: 'Move selection', scope: 'palette' },
   { id: 'palette.open', mac: '↵', other: '↵', description: 'Open selected entry', scope: 'palette' },
   { id: 'palette.close', mac: 'Esc', other: 'Esc', description: 'Close palette', scope: 'palette' },
+  { id: 'palette.prMode', mac: '#', other: '#', description: 'Browse pull requests (# as first character)', scope: 'palette' },
+  { id: 'palette.openLocally', mac: '⌘↵', other: 'Ctrl+Enter', description: 'Open PR locally (creates or links its worktree)', scope: 'palette' },
+  { id: 'palette.prState', mac: '⌥⇥', other: 'Alt+Tab', description: 'Cycle PR state filter: open, merged, closed, all (PR mode)', scope: 'palette' },
 ]);
