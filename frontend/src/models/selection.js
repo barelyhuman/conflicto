@@ -6,21 +6,18 @@ import { api as defaultApi } from '../wails.js';
  *
  * @param {{
  *   workingTree: InstanceType<typeof import('./workingTree.js').WorkingTreeModel>,
- *   activePR: import('@preact/signals-core').Signal<number|null>,
  * }} opts
  */
-export const SelectionModel = createModel(({ workingTree, activePR, api = defaultApi }) => {
+export const SelectionModel = createModel(({ workingTree, api = defaultApi }) => {
   const activeFile = signal(/** @type {string|null} */ (null));
-  /** @type {import('@preact/signals-core').Signal<null | 'conflict' | 'staged' | 'unstaged' | 'pr'>} */
+  /** @type {import('@preact/signals-core').Signal<null | 'conflict' | 'staged' | 'unstaged'>} */
   const activeSection = signal(null);
   const activeDiff = signal(/** @type {{ path?: string, patch?: string }|null} */ (null));
   /** True while a diff request is in flight for the current selection. */
   const diffLoading = signal(false);
   const showFullDiff = signal(false);
 
-  const isConflict = computed(
-    () => activePR.value == null && activeSection.value === 'conflict'
-  );
+  const isConflict = computed(() => activeSection.value === 'conflict');
 
   const isUnstaged = computed(() => activeSection.value === 'unstaged');
 
@@ -39,21 +36,13 @@ export const SelectionModel = createModel(({ workingTree, activePR, api = defaul
     }
 
     diffLoading.value = true;
-    const pr = activePR.peek();
-
-    if (pr != null) {
-      api.getPRFileDiff(pr, file);
-    } else {
-      api.getDiff(file, section === 'staged');
-    }
+    api.getDiff(file, section === 'staged');
   }
 
-  // Fetch when the selected file or active PR changes (path change path).
+  // Fetch when the selected file changes (path change path).
   effect(() => {
     const file = activeFile.value;
     const section = activeSection.value;
-    // Subscribe to PR so entering/leaving PR mode re-fetches.
-    activePR.value;
 
     if (!file) {
       diffLoading.value = false;
@@ -73,7 +62,6 @@ export const SelectionModel = createModel(({ workingTree, activePR, api = defaul
     isConflict,
     isUnstaged,
     workingTree,
-    activePR,
 
     select(path, section) {
       const same =
@@ -128,7 +116,7 @@ export const SelectionModel = createModel(({ workingTree, activePR, api = defaul
       this.select(next.path, next.section);
     },
 
-    /** Restore selection to first working-tree entry (e.g. leaving PR mode). */
+    /** Restore selection to first working-tree entry . */
     selectFirstFromWorkingTree() {
       const next = workingTree.firstEntry();
 

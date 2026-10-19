@@ -1,14 +1,15 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { signal } from '@preact/signals';
 import { TabsModel } from './tabs.js';
 import { WorkingTreeModel } from './workingTree.js';
-import { createNavigator, openDiff, openFileAt, registerNavigator } from './navigation.js';
+import { createPRTabRegistry } from './prTab.js';
+import { createNavigator, openDiff, openFileAt, openPR, registerNavigator } from './navigation.js';
 
 describe('navigation', () => {
   let tabs;
   let workingTree;
-  let activePR;
-  let prFiles;
+  let prTabs;
+  let api;
+  let onError;
   let reveal;
   let nav;
 
@@ -17,8 +18,17 @@ describe('navigation', () => {
   beforeEach(() => {
     tabs = new TabsModel();
     tabs.setScope('/wt');
-    activePR = signal(null);
-    prFiles = [];
+    prTabs = createPRTabRegistry({
+      api: {
+        getPRDetails: async () => ({ title: 't', worktreePath: '' }),
+        getPRFilesList: async () => [],
+        getPRReviewComments: async () => [],
+        getPRTimeline: async () => [],
+        getReviewState: async () => ({}),
+      },
+    });
+    api = { openPRLocally: vi.fn(async () => '/wt-pr') };
+    onError = vi.fn();
     reveal = vi.fn();
     workingTree = new WorkingTreeModel({ api: {} });
     workingTree.applyStatus({
@@ -29,8 +39,9 @@ describe('navigation', () => {
     nav = createNavigator({
       tabs,
       workingTree,
-      activePR,
-      isPRFile: (p) => prFiles.includes(p),
+      prTabs,
+      api,
+      onError,
       reveal,
     });
   });
@@ -89,15 +100,38 @@ describe('navigation', () => {
     expect(reveal).toHaveBeenLastCalledWith('file:clean.go', 9, 1, '/wt');
   });
 
-  it('PR mode opens PR files as pr diffs and others as file tabs', () => {
-    activePR.value = 7;
-    prFiles = ['pr.go'];
-    nav.openFileAt('pr.go');
-    expect(active()).toMatchObject({ kind: 'diff', mode: 'pr', path: 'pr.go' });
-    nav.openFileAt('pr.go', 10);
-    expect(active()).toMatchObject({ kind: 'file', path: 'pr.go' });
-    nav.openFileAt('other.go', 2);
-    expect(active()).toMatchObject({ kind: 'file', path: 'other.go' });
+  it('openPR opens or focuses a pr tab in the current scope', async () => {
+    expect(await nav.openPR(12)).toBe(true);
+    expect(active()).toMatchObject({ id: 'pr:12', kind: 'pr', number: 12 });
+    nav.openFileAt('clean.go', 1);
+    await nav.openPR(12);
+    expect(tabs.tabs.value.map((t) => t.id)).toEqual(['pr:12', 'file:clean.go']);
+    expect(active().id).toBe('pr:12');
+    expect(api.openPRLocally).not.toHaveBeenCalled();
+    expect(await nav.openPR(0)).toBe(false);
+  });
+
+  it('openPR locally moves the tab and its model into the worktree scope', async () => {
+    const model = prTabs.get('/wt', 12);
+    await nav.openPR(12);
+    nav.openFileAt('clean.go', 1);
+    expect(await nav.openPR(12, { locally: true })).toBe(true);
+    expect(api.openPRLocally).toHaveBeenCalledWith(12);
+    expect(tabs.currentScope()).toBe('/wt-pr');
+    expect(tabs.tabs.value.map((t) => t.id)).toEqual(['pr:12']);
+    expect(active().id).toBe('pr:12');
+    expect(prTabs.peek('/wt-pr', 12)).toBe(model);
+    expect(prTabs.peek('/wt', 12)).toBeNull();
+    tabs.setScope('/wt');
+    expect(tabs.tabs.value.map((t) => t.id)).toEqual(['file:clean.go']);
+  });
+
+  it('openPR locally leaves the tab in place and reports when the backend fails', async () => {
+    api.openPRLocally.mockRejectedValue(new Error('gh missing'));
+    expect(await nav.openPR(3, { locally: true })).toBe(false);
+    expect(onError).toHaveBeenCalledWith('Open locally failed', 'gh missing');
+    expect(tabs.currentScope()).toBe('/wt');
+    expect(active().id).toBe('pr:3');
   });
 
   it('openDiff opens a preview diff tab', () => {
@@ -105,15 +139,22 @@ describe('navigation', () => {
     expect(active()).toMatchObject({ kind: 'diff', mode: 'staged', preview: true });
   });
 
-  it('module-level helpers delegate to the registered navigator', () => {
+  it('module-level helpers delegate to the registered navigator', async () => {
     expect(openFileAt('a.go', 1)).toBe(false);
     expect(openDiff('a.go')).toBe(false);
-    const impl = { openFileAt: vi.fn(() => true), openDiff: vi.fn(() => true) };
+    const impl = {
+      openFileAt: vi.fn(() => true),
+      openDiff: vi.fn(() => true),
+      openPR: vi.fn(async () => true),
+    };
     const off = registerNavigator(impl);
     expect(openFileAt('a.go', 5, 2)).toBe(true);
     expect(impl.openFileAt).toHaveBeenCalledWith('a.go', 5, 2);
     expect(openDiff('a.go', 'staged')).toBe(true);
+    expect(await openPR(4, { locally: true })).toBe(true);
+    expect(impl.openPR).toHaveBeenCalledWith(4, { locally: true });
     off();
     expect(openFileAt('a.go', 1)).toBe(false);
+    expect(await openPR(4)).toBe(false);
   });
 });
