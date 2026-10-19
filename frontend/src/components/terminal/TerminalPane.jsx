@@ -4,6 +4,7 @@ import { FitAddon } from '@xterm/addon-fit';
 import '@xterm/xterm/css/xterm.css';
 import { api } from '../../wails.js';
 import { terminalTheme } from './terminalTheme.js';
+import { attachTerminalLinkHandling } from './terminalLinks.js';
 
 function decodeTerminalPayload(payload) {
   const raw = payload?.data ?? '';
@@ -31,6 +32,9 @@ function decodeTerminalPayload(payload) {
 export function TerminalPane({
   sessionId,
   focused,
+  repoRoot,
+  cwd,
+  onLinkOpen,
   onFocus,
   onExit,
   onCwdChange,
@@ -43,6 +47,9 @@ export function TerminalPane({
   const onExitRef = useRef(onExit);
   const onCwdChangeRef = useRef(onCwdChange);
   const onTitleChangeRef = useRef(onTitleChange);
+  const onLinkOpenRef = useRef(onLinkOpen);
+  const repoRootRef = useRef(repoRoot);
+  const cwdRef = useRef(cwd);
   const disposedRef = useRef(false);
 
   useEffect(() => {
@@ -60,6 +67,18 @@ export function TerminalPane({
   useEffect(() => {
     onTitleChangeRef.current = onTitleChange;
   }, [onTitleChange]);
+
+  useEffect(() => {
+    onLinkOpenRef.current = onLinkOpen;
+  }, [onLinkOpen]);
+
+  useEffect(() => {
+    repoRootRef.current = repoRoot;
+  }, [repoRoot]);
+
+  useEffect(() => {
+    cwdRef.current = cwd;
+  }, [cwd]);
 
   useEffect(() => {
     const host = hostRef.current;
@@ -148,6 +167,12 @@ export function TerminalPane({
       onTitleChangeRef.current?.(sessionIdRef.current, title);
     });
 
+    const detachLinks = attachTerminalLinkHandling(term, {
+      getRepoRoot: () => repoRootRef.current,
+      getCwd: () => cwdRef.current ?? repoRootRef.current,
+      onOpen: (payload) => onLinkOpenRef.current?.(payload),
+    });
+
     const offData = api.onTerminalData((payload) => {
       if (!payload || payload.id !== sessionIdRef.current) return;
 
@@ -197,6 +222,7 @@ export function TerminalPane({
       onDataDisp.dispose();
       osc7Disp.dispose();
       titleDisp.dispose();
+      detachLinks?.();
       // Do NOT call terminalStop — hide must keep PTY alive.
       term.dispose();
       termRef.current = null;
