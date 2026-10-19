@@ -223,11 +223,16 @@ func (a *App) fetchPRChecks(number int) ([]PRCheck, error) {
 	if a.git == nil || !a.git.IsRepo() {
 		return nil, fmt.Errorf("no git repository")
 	}
+	return ghPRChecks(a.git.path, number)
+}
+
+// ghPRChecks lists CI checks for a PR; replaceable in tests.
+var ghPRChecks = func(dir string, number int) ([]PRCheck, error) {
 	cmd := appCommand(
 		"gh", "pr", "checks", strconv.Itoa(number),
 		"--json", "name,state,bucket,workflow,link",
 	)
-	cmd.Dir = a.git.path
+	cmd.Dir = dir
 	out, err := cmd.Output()
 	if err != nil {
 		return nil, err

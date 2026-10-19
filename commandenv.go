@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"os/exec"
@@ -78,6 +79,17 @@ func appCommand(name string, args ...string) *exec.Cmd {
 		path = name
 	}
 	cmd := exec.Command(path, args...)
+	cmd.Env = os.Environ()
+	return cmd
+}
+
+// appCommandContext is appCommand with cancellation.
+func appCommandContext(ctx context.Context, name string, args ...string) *exec.Cmd {
+	path, err := commandPath(name)
+	if err != nil {
+		path = name
+	}
+	cmd := exec.CommandContext(ctx, path, args...)
 	cmd.Env = os.Environ()
 	return cmd
 }
