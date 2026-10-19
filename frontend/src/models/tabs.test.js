@@ -182,6 +182,54 @@ describe('TabsModel', () => {
   it('maps sections and modes', () => {
     expect(modeForSection('unstaged')).toBe('working');
     expect(sectionForMode('working')).toBe('unstaged');
-    expect(sectionForMode('pr')).toBe('pr');
+  });
+
+  describe('pr tabs', () => {
+    it('opens pr:<n>, never as a preview, and focuses on re-open', () => {
+      const tab = t.open({ kind: 'pr', number: 7, title: '#7 Fix', preview: true });
+      expect(tab).toMatchObject({ id: 'pr:7', kind: 'pr', number: 7, title: '#7 Fix', preview: false });
+      t.open({ kind: 'file', path: 'a' });
+      t.open({ kind: 'pr', number: 7 });
+      expect(ids()).toEqual(['pr:7', 'file:a']);
+      expect(t.activeId.value).toBe('pr:7');
+      expect(t.open({ kind: 'pr', number: 0 })).toBeNull();
+    });
+
+    it('defaults and updates the title', () => {
+      t.open({ kind: 'pr', number: 3 });
+      expect(t.activeTab.value.title).toBe('#3');
+      t.setTitle('pr:3', '#3 Hello');
+      expect(t.activeTab.value.title).toBe('#3 Hello');
+    });
+
+    it('moveTab keeps the tab object, activates it in the target and does not discard', () => {
+      const fn = vi.fn();
+      t.onDiscard(fn);
+      const tab = t.open({ kind: 'pr', number: 9 });
+      t.open({ kind: 'file', path: 'keep' });
+      t.moveTab('pr:9', '/wt/a', '/wt/pr9');
+      expect(ids()).toEqual(['file:keep']);
+      expect(t.activeId.value).toBe('file:keep');
+      t.setScope('/wt/pr9');
+      expect(t.tabs.value[0]).toBe(tab);
+      expect(t.activeId.value).toBe('pr:9');
+      expect(fn).not.toHaveBeenCalled();
+      expect(t.mruOrder()).toEqual(['pr:9']);
+    });
+
+    it('moveTab updates the visible set when moving into the current scope', () => {
+      t.open({ kind: 'pr', number: 4 });
+      t.setScope('/wt/b');
+      t.moveTab('pr:4', '/wt/a', '/wt/b');
+      expect(ids()).toEqual(['pr:4']);
+      expect(t.activeId.value).toBe('pr:4');
+      expect(t.moveTab('pr:99', '/wt/a', '/wt/b')).toBeNull();
+    });
+
+    it('reopens a closed pr tab', () => {
+      t.open({ kind: 'pr', number: 5, title: '#5 X' });
+      t.close('pr:5');
+      expect(t.reopenClosed()).toMatchObject({ id: 'pr:5', number: 5, title: '#5 X' });
+    });
   });
 });

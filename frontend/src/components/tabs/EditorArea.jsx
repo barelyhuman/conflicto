@@ -5,6 +5,7 @@ import { DiffViewer } from '../DiffViewer.jsx';
 import { ConflictViewer } from '../ConflictViewer.jsx';
 import { ConfirmDialog } from '../ConfirmDialog.jsx';
 import { openFileAt } from '../../models/navigation.js';
+import { PRView } from '../pr/PRView.jsx';
 import { ReferencesPanel } from '../search/ReferencesPanel.jsx';
 import { FileTabEditor } from './FileTabEditor.jsx';
 import { useTabShortcuts } from './useTabShortcuts.js';
@@ -20,23 +21,10 @@ const SEP = '\u0000';
  * @param {Object} props
  * @param {InstanceType<typeof import('../../models/tabs.js').TabsModel>} props.tabs
  * @param {InstanceType<typeof import('../../models/selection.js').SelectionModel>} props.selection
- * @param {boolean} props.isPRMode
  * @param {boolean} props.isMac
- * @param {{ path: string, line: number, body: string }[]} props.prComments
- * @param {(path: string, body: string, line: number, side: string) => void} props.onPostComment
- * @param {InstanceType<typeof import('../../models/review.js').ReviewModel>} [props.review]
  * @param {(title: string, message: string) => void} [props.onError]
  */
-export function EditorArea({
-  tabs,
-  selection,
-  isPRMode,
-  isMac,
-  prComments,
-  onPostComment,
-  review,
-  onError,
-}) {
+export function EditorArea({ tabs, selection, isMac, onError }) {
   useTabShortcuts(tabs, isMac);
 
   // Primitive-valued computeds: Show only re-renders when the target changes,
@@ -47,6 +35,14 @@ export function EditorArea({
 
     // Scope is part of the key: same path in two worktrees is two editors.
     return tab?.kind === 'file' ? `${scope}${SEP}${tab.id}` : null;
+  });
+  // Scope is part of the key: moving a PR tab into a worktree remounts the view
+  // (the PR model itself is re-keyed and survives).
+  const prTarget = useComputed(() => {
+    const tab = tabs.activeTab.value;
+    const scope = tabs.scope.value ?? '';
+
+    return tab?.kind === 'pr' ? `${scope}${SEP}${tab.number}` : null;
   });
   const hasDiffTab = useComputed(() => tabs.activeKind.value === 'diff');
   const isConflict = useComputed(() => selection.isConflict.value);
@@ -65,11 +61,6 @@ export function EditorArea({
     [tabs]
   );
 
-  const selectPRFile = useCallback(
-    (path) => tabs.open({ kind: 'diff', path, mode: 'pr', preview: true }),
-    [tabs]
-  );
-
   const pendingClose = useComputed(() => {
     const id = tabs.pendingClose.value;
     const list = tabs.tabs.value;
@@ -79,6 +70,9 @@ export function EditorArea({
 
   return (
     <>
+      <Show
+        when={prTarget}
+        fallback={
       <Show
         when={fileTabId}
         fallback={
@@ -92,13 +86,8 @@ export function EditorArea({
                 <DiffViewer
                   activeDiff={selection.activeDiff}
                   loading={selection.diffLoading}
-                  isPRMode={isPRMode}
                   isUnstaged={selection.isUnstaged}
                   showFullDiff={selection.showFullDiff}
-                  comments={isPRMode ? prComments : []}
-                  onPostComment={onPostComment}
-                  review={review}
-                  onSelectFile={selectPRFile}
                   canOpenInEditor={canOpenInEditor}
                   onOpenLineInEditor={openLineInEditor}
                 />
@@ -121,6 +110,21 @@ export function EditorArea({
               path={id.slice(FILE_PREFIX.length)}
               scope={scope}
               onError={onError}
+            />
+          );
+        }}
+      </Show>
+        }
+      >
+        {(target) => {
+          const cut = target.indexOf(SEP);
+
+          return (
+            <PRView
+              key={target}
+              tabs={tabs}
+              scope={target.slice(0, cut) || null}
+              number={Number(target.slice(cut + 1))}
             />
           );
         }}

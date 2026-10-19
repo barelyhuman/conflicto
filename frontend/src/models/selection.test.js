@@ -1,13 +1,10 @@
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
-import { signal } from '@preact/signals';
 import { SelectionModel } from './selection.js';
 
 const getDiff = vi.fn();
-const getPRFileDiff = vi.fn();
 
 const api = {
   getDiff: (...args) => getDiff(...args),
-  getPRFileDiff: (...args) => getPRFileDiff(...args),
 };
 
 function makeWorkingTree(first = null) {
@@ -19,16 +16,11 @@ function makeWorkingTree(first = null) {
 describe('SelectionModel diffLoading', () => {
   /** @type {InstanceType<typeof SelectionModel>} */
   let selection;
-  /** @type {import('@preact/signals-core').Signal<number|null>} */
-  let activePR;
 
   beforeEach(() => {
     getDiff.mockReset();
-    getPRFileDiff.mockReset();
-    activePR = signal(null);
     selection = new SelectionModel({
       workingTree: makeWorkingTree(),
-      activePR,
       api,
     });
   });
@@ -95,7 +87,6 @@ describe('SelectionModel diffLoading', () => {
     selection.select('conflicted.js', 'conflict');
 
     expect(getDiff).not.toHaveBeenCalled();
-    expect(getPRFileDiff).not.toHaveBeenCalled();
     expect(selection.diffLoading.value).toBe(false);
     expect(selection.activeFile.value).toBe('conflicted.js');
     expect(selection.activeSection.value).toBe('conflict');

@@ -1,4 +1,4 @@
-import { createModel, signal, computed } from '@preact/signals';
+import { createModel, signal, computed, batch } from '@preact/signals';
 
 /**
  * Editor tabs, scoped per worktree (project path).
@@ -10,14 +10,18 @@ import { createModel, signal, computed } from '@preact/signals';
  * Tab kinds:
  *  - `diff`: a changed file's diff. `mode` is working | staged | pr | conflict.
  *  - `file`: an editable source file (CodeMirror).
+ *  - `pr`: a pull request (`pr:<number>`), never a preview tab. Its state lives
+ *    in the PR tab registry (models/prTab.js), keyed by scope + number.
  * Identity is kind + path, so re-opening focuses the existing tab.
  *
- * @typedef {'working' | 'staged' | 'pr' | 'conflict'} DiffMode
+ * @typedef {'working' | 'staged' | 'conflict'} DiffMode
  * @typedef {{
  *   id: string,
- *   kind: 'diff' | 'file',
+ *   kind: 'diff' | 'file' | 'pr',
  *   path: string,
  *   mode?: DiffMode,
+ *   number?: number,
+ *   title?: string,
  *   preview: boolean,
  *   dirty: boolean,
  * }} Tab
@@ -28,14 +32,12 @@ const MAX_CLOSED = 25;
 const SECTION_BY_MODE = /** @type {const} */ ({
   working: 'unstaged',
   staged: 'staged',
-  pr: 'pr',
   conflict: 'conflict',
 });
 
 const MODE_BY_SECTION = /** @type {const} */ ({
   unstaged: 'working',
   staged: 'staged',
-  pr: 'pr',
   conflict: 'conflict',
 });
 
@@ -49,8 +51,13 @@ export function modeForSection(section) {
   return MODE_BY_SECTION[section] ?? 'working';
 }
 
+/** Strip title for a PR tab: `#<n> <title>`. */
+export function prTabTitle(number, title) {
+  return title ? `#${number} ${title}` : `#${number}`;
+}
+
 /**
- * @param {'diff' | 'file'} kind
+ * @param {'diff' | 'file' | 'pr'} kind
  * @param {string} path
  */
 export function tabId(kind, path) {
@@ -98,9 +105,12 @@ export const TabsModel = createModel(() => {
   let cycle = /** @type {null | { list: string[], idx: number }} */ (null);
 
   function sync() {
-    tabs.value = cur.tabs;
-    activeId.value = cur.activeId;
-    scope.value = scopeKey;
+    // One notification: views keyed by scope + active tab must never see them half-updated.
+    batch(() => {
+      tabs.value = cur.tabs;
+      activeId.value = cur.activeId;
+      scope.value = scopeKey;
+    });
   }
 
   /** @param {Tab} tab */
@@ -190,10 +200,16 @@ export const TabsModel = createModel(() => {
 
     /**
      * Open (or focus) a tab.
-     * @param {{ kind: 'diff' | 'file', path: string, mode?: DiffMode, preview?: boolean, activate?: boolean }} spec
+     * @param {{ kind: 'diff' | 'file' | 'pr', path?: string, number?: number, title?: string, mode?: DiffMode, preview?: boolean, activate?: boolean }} spec
      * @returns {Tab | null}
      */
-    open({ kind, path, mode = 'working', preview = false, activate = true }) {
+    open({ kind, path, number, title, mode = 'working', preview = false, activate = true }) {
+      if (kind === 'pr') {
+        if (!Number.isInteger(number) || number <= 0) return null;
+        path = String(number);
+        preview = false;
+      }
+
       if (!path) return null;
       const id = tabId(kind, path);
       const existing = find(id);
@@ -204,6 +220,8 @@ export const TabsModel = createModel(() => {
         if (!preview && existing.preview) patch.preview = false;
 
         if (kind === 'diff' && existing.mode !== mode) patch.mode = mode;
+
+        if (kind === 'pr' && title && existing.title !== title) patch.title = title;
 
         if (Object.keys(patch).length > 0) replaceTab(id, patch);
 
@@ -217,6 +235,11 @@ export const TabsModel = createModel(() => {
       const tab = { id, kind, path, preview, dirty: false };
 
       if (kind === 'diff') tab.mode = mode;
+
+      if (kind === 'pr') {
+        tab.number = number;
+        tab.title = title || prTabTitle(number);
+      }
 
       let next = cur.tabs.slice();
       const previewIdx = preview ? next.findIndex((t) => t.preview && !t.dirty) : -1;
@@ -250,6 +273,54 @@ export const TabsModel = createModel(() => {
       cur.activeId = id;
       touchMru(id);
       sync();
+    },
+
+    /** Rename a tab (PR tabs learn their title after the details load). */
+    setTitle(id, title) {
+      const tab = find(id);
+
+      if (!tab || !title || tab.title === title) return;
+      replaceTab(id, { title });
+      sync();
+    },
+
+    /**
+     * Move a tab between scopes, keeping the same tab object (no discard
+     * event, not recorded as closed). The tab becomes active in `toScope`.
+     * @returns {Tab | null} the tab in its new scope
+     */
+    moveTab(id, fromScope, toScope) {
+      const fk = fromScope || null;
+      const tk = toScope || null;
+      const src = scopes.get(fk);
+      const tab = src?.tabs.find((t) => t.id === id);
+
+      if (!src || !tab) return null;
+
+      if (fk === tk) return tab;
+      src.tabs = src.tabs.filter((t) => t.id !== id);
+      src.mru = src.mru.filter((x) => x !== id);
+
+      if (src.activeId === id) {
+        src.activeId = src.mru[0] ?? src.tabs[src.tabs.length - 1]?.id ?? null;
+      }
+
+      let dst = scopes.get(tk);
+
+      if (!dst) {
+        dst = newScopeState();
+        scopes.set(tk, dst);
+      }
+
+      if (!dst.tabs.some((t) => t.id === id)) dst.tabs = [...dst.tabs, tab];
+      dst.activeId = id;
+      dst.mru = [id, ...dst.mru.filter((x) => x !== id)];
+
+      if (cycle) cycle = null;
+
+      sync();
+
+      return tab;
     },
 
     /** Promote a preview tab to a regular one. */
@@ -338,7 +409,14 @@ export const TabsModel = createModel(() => {
       if (!tab) return null;
       cur.closed = cur.closed.slice(0, -1);
 
-      return api.open({ kind: tab.kind, path: tab.path, mode: tab.mode, preview: false });
+      return api.open({
+        kind: tab.kind,
+        path: tab.path,
+        number: tab.number,
+        title: tab.title,
+        mode: tab.mode,
+        preview: false,
+      });
     },
 
     /** Move tab `id` to `toIndex` in the strip. */

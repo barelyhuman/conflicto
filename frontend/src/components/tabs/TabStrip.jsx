@@ -5,7 +5,7 @@ import { IconX } from '@tabler/icons-preact';
 import { splitPath } from '../ChangeTree.jsx';
 import './tabs.css';
 
-const MODE_LABEL = { staged: 'staged', pr: 'PR', conflict: 'conflict' };
+const MODE_LABEL = { staged: 'staged', conflict: 'conflict' };
 
 /**
  * @param {Object} props
@@ -16,8 +16,12 @@ const MODE_LABEL = { staged: 'staged', pr: 'PR', conflict: 'conflict' };
 function TabItem({ tab, tabs, dragRef }) {
   // `For` may hand us a stale tab object after pin/dirty/mode updates, so all
   // mutable fields are derived from the live tabs signal by id.
-  const { name } = splitPath(tab.path);
   const live = useComputed(() => tabs.tabs.value.find((t) => t.id === tab.id) ?? tab);
+  const name = useComputed(() => {
+    const t = live.value;
+
+    return t.kind === 'pr' ? (t.title ?? `#${t.number}`) : splitPath(t.path).name;
+  });
   const cls = useComputed(() => {
     const t = live.value;
 
@@ -32,6 +36,8 @@ function TabItem({ tab, tabs, dragRef }) {
   });
   const title = useComputed(() => {
     const t = live.value;
+
+    if (t.kind === 'pr') return t.title ?? `#${t.number}`;
 
     return `${t.path}${t.kind === 'diff' ? ` (${t.mode} diff)` : ''}`;
   });

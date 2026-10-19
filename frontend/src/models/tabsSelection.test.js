@@ -1,5 +1,4 @@
 import { describe, expect, it, vi } from 'vitest';
-import { signal } from '@preact/signals';
 import { TabsModel } from './tabs.js';
 import { SelectionModel } from './selection.js';
 import { WorkingTreeModel } from './workingTree.js';
@@ -9,10 +8,9 @@ describe('bindTabsToSelection', () => {
   function setup() {
     const tabs = new TabsModel();
     tabs.setScope('/wt');
-    const api = { getDiff: vi.fn(), getPRFileDiff: vi.fn() };
+    const api = { getDiff: vi.fn() };
     const selection = new SelectionModel({
       workingTree: new WorkingTreeModel({ api: {} }),
-      activePR: signal(null),
       api,
     });
     const dispose = bindTabsToSelection({ tabs, selection });

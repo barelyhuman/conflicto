@@ -5,6 +5,7 @@ import { IconSearch } from '@tabler/icons-preact';
 import { getPlatform } from '../../wails.js';
 import { filterEntries } from './fuzzy.js';
 import { WorkspaceRow } from './WorkspaceRow.jsx';
+import { OPEN_PALETTE_EVENT } from './openPalette.js';
 import './palette.css';
 
 const MAX_RESULTS = 100;
@@ -178,6 +179,14 @@ export function CommandPalette({ index, onHome }) {
     document.addEventListener('keydown', onKey, true);
 
     return () => document.removeEventListener('keydown', onKey, true);
+  }, [open]);
+
+  // Header buttons open the palette through a window event (see openPalette.js).
+  useEffect(() => {
+    const show = () => { open.value = true; };
+    window.addEventListener(OPEN_PALETTE_EVENT, show);
+
+    return () => window.removeEventListener(OPEN_PALETTE_EVENT, show);
   }, [open]);
 
   return (

@@ -42,13 +42,15 @@ export function bindTabsToSelection({ tabs, selection }) {
  * path wherever it is listed.
  *
  * @param {import('./tabs.js').Tab | null} tab
- * @param {string} section 'conflict' | 'staged' | 'unstaged' | 'pr'
+ * @param {string} section 'conflict' | 'staged' | 'unstaged'
  * @returns {string | null}
  */
 export function highlightedPath(tab, section) {
   if (!tab) return null;
 
   if (tab.kind === 'file') return tab.path;
+
+  if (tab.kind !== 'diff') return null;
 
   return sectionForMode(tab.mode) === section ? tab.path : null;
 }

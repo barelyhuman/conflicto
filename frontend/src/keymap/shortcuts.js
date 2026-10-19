@@ -17,7 +17,7 @@
  *   search   the global search panel
  *   terminal terminal dock
  *   home     home screen
- *   palette  command palette (and the PR picker search field)
+ *   palette  command palette
  *
  * `global` overlaps every scope; two other scopes overlap only when equal.
  * `mac` / `other` may be null when a platform has no such binding.
@@ -72,6 +72,8 @@ export const SHORTCUTS = Object.freeze([
   // Review (pending comments)
   { id: 'review.comment', mac: '⌘⇧M', other: 'Ctrl+Shift+M', description: 'Comment on selected lines', scope: 'review' },
   { id: 'review.paste', mac: '⌘⇧V', other: 'Ctrl+Shift+V', description: 'Attach comment from clipboard', scope: 'review' },
+  { id: 'pr.prevFile', mac: '⌥↑', other: 'Alt+↑', description: 'Previous changed file (PR tab, Files view)', scope: 'review' },
+  { id: 'pr.nextFile', mac: '⌥↓', other: 'Alt+↓', description: 'Next changed file (PR tab, Files view)', scope: 'review' },
   { id: 'review.add', mac: '⌘↵', other: 'Ctrl+Enter', description: 'Add comment to pending review', scope: 'review' },
   { id: 'review.cancel', mac: 'Esc', other: 'Esc', description: 'Close comment composer', scope: 'review' },
 
@@ -96,9 +98,8 @@ export const SHORTCUTS = Object.freeze([
   { id: 'home.open', mac: '↵', other: '↵', description: 'Open selected entry', scope: 'home' },
   { id: 'home.close', mac: 'Esc', other: 'Esc', description: 'Clear query, then close home', scope: 'home' },
 
-  // Command palette (and PR picker search)
+  // Command palette
   { id: 'palette.navigate', mac: '↑ ↓ ⌃N ⌃P', other: '↑ ↓ Ctrl+N Ctrl+P', description: 'Move selection', scope: 'palette' },
   { id: 'palette.open', mac: '↵', other: '↵', description: 'Open selected entry', scope: 'palette' },
   { id: 'palette.close', mac: 'Esc', other: 'Esc', description: 'Close palette', scope: 'palette' },
-  { id: 'prs.selectAll', mac: '⌘A', other: 'Ctrl+A', description: 'Select PR search text', scope: 'palette' },
 ]);
