@@ -207,6 +207,10 @@ export const api = {
 
   getRecentProjects: () => window.go.main.App.GetRecentProjects(),
 
+  checkRecentProjects: () => window.go.main.App.CheckRecentProjects(),
+
+  removeRecentProject: (path) => window.go.main.App.RemoveRecentProject(path),
+
   getWorktrees: () => window.go.main.App.GetWorktrees(),
 
   removeWorktree: (path) => window.go.main.App.RemoveWorktree(path),

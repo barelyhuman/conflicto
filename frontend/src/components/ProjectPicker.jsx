@@ -1,6 +1,8 @@
-import { useState, useRef, useMemo } from 'preact/hooks';
-import { IconChevronDown, IconFolder } from '@tabler/icons-preact';
+import { useState, useRef, useMemo, useEffect } from 'preact/hooks';
+import { IconChevronDown, IconFolder, IconFolderOff, IconTrash } from '@tabler/icons-preact';
 import { SearchableMenu } from './SearchableMenu.jsx';
+import { api } from '../wails.js';
+import { availabilityMap, projectItems, statusLabel } from './projectAvailability.js';
 
 /**
  * @param {Object} props
@@ -12,7 +14,24 @@ import { SearchableMenu } from './SearchableMenu.jsx';
  */
 export function ProjectPicker({ currentName, currentPath, recents, onSwitchProject, onOpenProject }) {
   const [open, setOpen] = useState(false);
+  const [availability, setAvailability] = useState(() => new Map());
   const triggerRef = useRef(null);
+  const checkSeq = useRef(0);
+
+  // Just-in-time: re-check the recent folders every time the menu opens (and when the list changes while open).
+  useEffect(() => {
+    if (!open) return;
+    const seq = ++checkSeq.current;
+
+    api
+      .checkRecentProjects()
+      .then((list) => {
+        if (seq === checkSeq.current) setAvailability(availabilityMap(list));
+      })
+      .catch(() => {
+        // A failed check leaves rows as available; switching still refuses missing folders.
+      });
+  }, [open, recents]);
 
   function select(path) {
     onSwitchProject?.(path);
@@ -25,15 +44,8 @@ export function ProjectPicker({ currentName, currentPath, recents, onSwitchProje
   }
 
   const items = useMemo(
-    () =>
-      recents.map((p) => ({
-        id: p.path,
-        label: p.name,
-        sublabel: p.path,
-        title: p.path,
-        current: p.path === currentPath,
-      })),
-    [recents, currentPath]
+    () => projectItems(recents, availability, currentPath),
+    [recents, availability, currentPath]
   );
 
   const displayName = currentName || 'No project';
@@ -62,7 +74,26 @@ export function ProjectPicker({ currentName, currentPath, recents, onSwitchProje
         placeholder="Search projects…"
         items={items}
         onSelect={(item) => select(item.id)}
-        renderIcon={() => <IconFolder size={14} />}
+        renderIcon={(item) => (item.disabled ? <IconFolderOff size={14} /> : <IconFolder size={14} />)}
+        renderBadges={(item) =>
+          item.disabled ? <span class="sm-badge">{statusLabel(item.status)}</span> : null
+        }
+        renderAction={(item) =>
+          item.disabled ? (
+            <button
+              type="button"
+              class="sm-action"
+              title="Remove from recent projects"
+              aria-label={`Remove ${item.label} from recent projects`}
+              onClick={(e) => {
+                e.stopPropagation();
+                api.removeRecentProject(item.id).catch(() => {});
+              }}
+            >
+              <IconTrash size={13} />
+            </button>
+          ) : null
+        }
         footer={
           <button type="button" class="sm-footer-btn" onClick={openFolder}>
             <IconFolder size={14} />

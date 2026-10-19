@@ -51,6 +51,7 @@ function SearchableMenuBody({
   }, [activeId]);
 
   function pick(item) {
+    if (item.disabled) return;
     onSelect?.(item);
     onClose?.();
   }
@@ -116,7 +117,8 @@ function SearchableMenuBody({
                 id={`${idBase}-${pos}`}
                 role="option"
                 aria-selected={isActive ? 'true' : 'false'}
-                class={`sm-item${isActive ? ' active' : ''}${item.current ? ' current' : ''}${mono ? ' mono' : ''}`}
+                aria-disabled={item.disabled ? 'true' : undefined}
+                class={`sm-item${isActive ? ' active' : ''}${item.current ? ' current' : ''}${item.disabled ? ' disabled' : ''}${mono ? ' mono' : ''}`}
                 title={item.title ?? item.sublabel ?? item.label}
                 onMouseMove={() => active !== pos && setActive(pos)}
                 onClick={() => pick(item)}
@@ -147,7 +149,8 @@ function SearchableMenuBody({
  * Anchored dropdown with an autofocused fuzzy-search field (palette-style keys:
  * Up/Down, Ctrl+N/P, Enter; Esc clears the query, then closes).
  *
- * Items: `{ id, label, sublabel?, keywords?, group?, current? }`; see searchableMenu.js.
+ * Items: `{ id, label, sublabel?, keywords?, group?, current?, disabled? }`; see searchableMenu.js.
+ * Disabled items stay visible and searchable (so their actions work) but cannot be picked.
  *
  * @param {Object} props
  * @param {boolean} props.open

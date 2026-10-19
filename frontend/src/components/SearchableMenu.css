@@ -79,6 +79,21 @@
   font-weight: 600;
 }
 
+/* Unavailable rows stay readable enough to recognise, but read as inert. */
+.sm-item.disabled {
+  cursor: default;
+}
+
+.sm-item.disabled .sm-label,
+.sm-item.disabled .sm-sub,
+.sm-item.disabled > svg {
+  opacity: 0.45;
+}
+
+.sm-item.disabled .sm-sub {
+  text-decoration: line-through;
+}
+
 .sm-item > svg {
   flex-shrink: 0;
   color: var(--text-muted);

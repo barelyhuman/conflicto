@@ -272,6 +272,20 @@ export namespace main {
 	        this.url = source["url"];
 	    }
 	}
+	export class ProjectAvailability {
+	    path: string;
+	    status: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new ProjectAvailability(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.path = source["path"];
+	        this.status = source["status"];
+	    }
+	}
 	export class RecentProject {
 	    path: string;
 	    name: string;
