@@ -269,7 +269,7 @@ func (a *App) GetReviewState(number int) (ReviewState, error) {
 		return state, err
 	}
 	state.Drafts = a.reviewStore().List(key)
-	if cache, ok := a.prCache[number]; ok {
+	if cache, ok := a.cachedPR(number); ok {
 		state.HeadSHA = cache.HeadSHA
 		for _, f := range cache.Files {
 			state.Files = append(state.Files, ReviewFile{Path: f.Path, Patch: f.Patch})
@@ -296,7 +296,7 @@ func (a *App) SaveReviewDraft(number int, draft ReviewDraft) (ReviewDraft, error
 		return draft, err
 	}
 	if draft.HeadSHA == "" {
-		if cache, ok := a.prCache[number]; ok {
+		if cache, ok := a.cachedPR(number); ok {
 			draft.HeadSHA = cache.HeadSHA
 		}
 	}
@@ -320,7 +320,7 @@ func (a *App) SubmitReview(number int, event string, body string) error {
 	if err != nil {
 		return err
 	}
-	cache, ok := a.prCache[number]
+	cache, ok := a.cachedPR(number)
 	if !ok || cache.HeadSHA == "" {
 		return fmt.Errorf("PR #%d not loaded; fetch files first", number)
 	}

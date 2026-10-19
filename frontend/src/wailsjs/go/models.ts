@@ -40,6 +40,20 @@ export namespace main {
 	        this.hasNew = source["hasNew"];
 	    }
 	}
+	export class FileDiff {
+	    path: string;
+	    patch: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new FileDiff(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.path = source["path"];
+	        this.patch = source["patch"];
+	    }
+	}
 	export class LSPServerInfo {
 	    id: string;
 	    languages: string[];
@@ -62,6 +76,200 @@ export namespace main {
 	        this.status = source["status"];
 	        this.error = source["error"];
 	        this.rootUri = source["rootUri"];
+	    }
+	}
+	export class PRCheck {
+	    name: string;
+	    state: string;
+	    bucket: string;
+	    workflow: string;
+	    link: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new PRCheck(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.name = source["name"];
+	        this.state = source["state"];
+	        this.bucket = source["bucket"];
+	        this.workflow = source["workflow"];
+	        this.link = source["link"];
+	    }
+	}
+	export class PRChecksSummary {
+	    number: number;
+	    status: string;
+	    pending: number;
+	    pass: number;
+	    fail: number;
+	    total: number;
+	    checks: PRCheck[];
+	
+	    static createFrom(source: any = {}) {
+	        return new PRChecksSummary(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.number = source["number"];
+	        this.status = source["status"];
+	        this.pending = source["pending"];
+	        this.pass = source["pass"];
+	        this.fail = source["fail"];
+	        this.total = source["total"];
+	        this.checks = this.convertValues(source["checks"], PRCheck);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class PRDetails {
+	    number: number;
+	    title: string;
+	    body: string;
+	    author: string;
+	    state: string;
+	    isDraft: boolean;
+	    url: string;
+	    baseRef: string;
+	    headRef: string;
+	    headSha: string;
+	    additions: number;
+	    deletions: number;
+	    changedFiles: number;
+	    reviewDecision: string;
+	    createdAt: string;
+	    updatedAt: string;
+	    checks?: PRChecksSummary;
+	    worktreePath: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new PRDetails(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.number = source["number"];
+	        this.title = source["title"];
+	        this.body = source["body"];
+	        this.author = source["author"];
+	        this.state = source["state"];
+	        this.isDraft = source["isDraft"];
+	        this.url = source["url"];
+	        this.baseRef = source["baseRef"];
+	        this.headRef = source["headRef"];
+	        this.headSha = source["headSha"];
+	        this.additions = source["additions"];
+	        this.deletions = source["deletions"];
+	        this.changedFiles = source["changedFiles"];
+	        this.reviewDecision = source["reviewDecision"];
+	        this.createdAt = source["createdAt"];
+	        this.updatedAt = source["updatedAt"];
+	        this.checks = this.convertValues(source["checks"], PRChecksSummary);
+	        this.worktreePath = source["worktreePath"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class PRFile {
+	    path: string;
+	    status: string;
+	    additions: number;
+	    deletions: number;
+	    patch: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new PRFile(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.path = source["path"];
+	        this.status = source["status"];
+	        this.additions = source["additions"];
+	        this.deletions = source["deletions"];
+	        this.patch = source["patch"];
+	    }
+	}
+	export class PRSummary {
+	    number: number;
+	    title: string;
+	    author: string;
+	    state: string;
+	    isDraft: boolean;
+	    headRef: string;
+	    updatedAt: string;
+	    worktreePath: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new PRSummary(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.number = source["number"];
+	        this.title = source["title"];
+	        this.author = source["author"];
+	        this.state = source["state"];
+	        this.isDraft = source["isDraft"];
+	        this.headRef = source["headRef"];
+	        this.updatedAt = source["updatedAt"];
+	        this.worktreePath = source["worktreePath"];
+	    }
+	}
+	export class PRTimelineItem {
+	    kind: string;
+	    author: string;
+	    body: string;
+	    createdAt: string;
+	    state: string;
+	    url: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new PRTimelineItem(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.kind = source["kind"];
+	        this.author = source["author"];
+	        this.body = source["body"];
+	        this.createdAt = source["createdAt"];
+	        this.state = source["state"];
+	        this.url = source["url"];
 	    }
 	}
 	export class RecentProject {
