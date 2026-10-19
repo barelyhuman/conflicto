@@ -450,6 +450,26 @@
   background: rgba(127, 127, 127, 0.1);
 }
 
+.change-tree-more {
+  display: block;
+  width: calc(100% - 8px);
+  margin: 2px 4px;
+  padding: 6px 12px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-muted);
+  font-family: var(--font-sans);
+  font-size: 11.5px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.change-tree-more:hover {
+  background: rgba(127, 127, 127, 0.1);
+  color: var(--text);
+}
+
 .file-row.active,
 .change-tree-file.active {
   background: rgba(127, 127, 127, 0.16);

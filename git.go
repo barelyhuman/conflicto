@@ -149,8 +149,31 @@ func (gs *GitService) GetFileStatus() ([]FileStatus, []FileStatus, []FileStatus,
 		return nil, nil, nil, err
 	}
 
+	// An un-ignored dependency/build folder can add tens of thousands of
+	// untracked files; collapse untracked directories back to one entry each.
+	if countUntracked(out) > maxUntrackedListed {
+		if collapsed, cerr := gs.runGit("status", "--porcelain", "-unormal"); cerr == nil {
+			out = collapsed
+		}
+	}
+
 	staged, unstaged, conflicts := parseFileStatus(string(out), gs.path)
 	return staged, unstaged, conflicts, nil
+}
+
+// maxUntrackedListed is the untracked-file count above which status falls
+// back to git's default per-directory listing.
+const maxUntrackedListed = 2000
+
+// countUntracked counts "?? " lines in porcelain status output.
+func countUntracked(out []byte) int {
+	n := 0
+	for _, line := range bytes.Split(out, []byte("\n")) {
+		if bytes.HasPrefix(line, []byte("?? ")) {
+			n++
+		}
+	}
+	return n
 }
 
 // parseFileStatus splits `git status --porcelain -uall` output into staged,

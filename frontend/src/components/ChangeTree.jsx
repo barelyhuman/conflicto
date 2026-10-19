@@ -77,6 +77,21 @@ function finalize(map) {
   return sortNodes(nodes);
 }
 
+/** Rows rendered per page in the flat list, and the size above which the tree starts collapsed. */
+const ROW_PAGE = 500;
+
+/** Every folder path in a tree. */
+function folderPaths(nodes, out = new Set()) {
+  for (const n of nodes) {
+    if (n.children) {
+      out.add(n.path);
+      folderPaths(n.children, out);
+    }
+  }
+
+  return out;
+}
+
 /**
  * Folders first, then files; alphabetical within each group.
  * @param {TreeNode[]} nodes
@@ -173,7 +188,11 @@ export function ChangeTree({
 }) {
   const tree = useMemo(() => (flat ? null : buildFileTree(files)), [files, flat]);
   const flatFiles = useMemo(() => (flat ? sortFlatFiles(files) : null), [files, flat]);
-  const [collapsed, setCollapsed] = useState(() => new Set());
+  // Huge change sets (e.g. an un-ignored build folder) would freeze the UI if rendered at once:
+  // the tree starts with folders collapsed and the flat list renders in pages.
+  const huge = files.length > ROW_PAGE;
+  const [collapsed, setCollapsed] = useState(() => (huge && tree ? folderPaths(tree) : new Set()));
+  const [shown, setShown] = useState(ROW_PAGE);
 
   const toggleFolder = useCallback((path) => {
     setCollapsed((prev) => {
@@ -191,7 +210,7 @@ export function ChangeTree({
   if (flat) {
     return (
       <div class="change-tree change-tree-flat" role="list">
-        {flatFiles.map((file) => {
+        {flatFiles.slice(0, shown).map((file) => {
           const { name, dir } = splitPath(file.path);
 
           return (
@@ -214,6 +233,11 @@ export function ChangeTree({
             />
           );
         })}
+        {flatFiles.length > shown && (
+          <button type="button" class="change-tree-more" onClick={() => setShown((n) => n + ROW_PAGE)}>
+            {flatFiles.length - shown} more files · show {Math.min(ROW_PAGE, flatFiles.length - shown)} more
+          </button>
+        )}
       </div>
     );
   }
