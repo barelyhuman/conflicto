@@ -4,6 +4,7 @@ import { For, Show } from '@preact/signals/utils';
 import { IconLoader2, IconSearch } from '@tabler/icons-preact';
 import { api, getPlatform } from '../../wails.js';
 import { openPR } from '../../models/navigation.js';
+import { tabsStore } from '../../models/tabs.js';
 import { filterEntries } from './fuzzy.js';
 import {
   PR_STATES,
@@ -222,6 +223,9 @@ function PaletteDialog({ index, onClose, onHome, isMac }) {
     try {
       if (entry.repoPath && entry.repoPath !== repo.peek().repoPath) {
         await api.switchProject(entry.repoPath);
+        // openPR targets the current tab scope; don't depend on projectChanged arriving first.
+        const project = await api.getCurrentProject();
+        if (project?.path) tabsStore.setScope(project.path);
       }
 
       const ok = await openPR(entry.prNumber, { locally });
