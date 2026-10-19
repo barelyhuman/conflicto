@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io/fs"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -1060,6 +1061,14 @@ func (a *App) OpenProject() (string, error) {
 
 // SwitchProject switches to a project by path (from recents)
 func (a *App) SwitchProject(path string) error {
+	// OpenRepo walks up to the nearest .git, so a deleted folder would
+	// otherwise silently open whatever repository encloses it.
+	if _, err := os.Stat(path); err != nil {
+		if err.Error() == fs.ErrExist.Error() {
+			return fmt.Errorf("folder not available: %s", path)
+		}
+		return fmt.Errorf("failed to switch to: %s", path)
+	}
 	return a.switchToProject(path)
 }
 
