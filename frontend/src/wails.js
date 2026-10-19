@@ -162,6 +162,21 @@ export const api = {
 
   getPRComments: (number) => window.go.main.App.GetPRComments(number),
 
+  // PR tabs: request/response per PR number (current repo); see PLAN.md "PR tabs" contract.
+  getPRDetails: (number) => window.go.main.App.GetPRDetails(number),
+
+  getPRFilesList: (number) => window.go.main.App.GetPRFilesList(number),
+
+  getPRFilePatch: (number, path) => window.go.main.App.GetPRFilePatch(number, path),
+
+  getPRReviewComments: (number) => window.go.main.App.GetPRReviewComments(number),
+
+  getPRTimeline: (number) => window.go.main.App.GetPRTimeline(number),
+
+  searchPRs: (query, state = 'open', limit = 30) => window.go.main.App.SearchPRs(query, state, limit),
+
+  openPRLocally: (number) => window.go.main.App.OpenPRLocally(number),
+
   postPRComment: (number, path, body, line, side, startLine, startSide) =>
     window.go.main.App.PostPRComment(number, path, body, line, side, startLine, startSide),
 
