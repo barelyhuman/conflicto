@@ -50,7 +50,7 @@ function WorktreeRow({ wt, worktree, onSwitch, onRemove }) {
         title={wt.path}
       >
         <span class="worktree-row-label">
-          {label}
+          <span class="worktree-row-name" title={label}>{label}</span>
           {wt.isMain && <span class="worktree-badge">main</span>}
           <Show when={() => isActive.value && !wt.isMain}>
             <span class="worktree-badge">active</span>
@@ -165,9 +165,13 @@ export function WorktreesPanel({ worktree, onSwitch, onRemove }) {
           font-weight: 500;
           color: var(--text-h);
           max-width: 100%;
+          min-width: 0;
+          white-space: nowrap;
+        }
+        .worktree-row-name {
+          min-width: 0;
           overflow: hidden;
           text-overflow: ellipsis;
-          white-space: nowrap;
         }
         .worktree-row-path {
           font-size: 10px;
