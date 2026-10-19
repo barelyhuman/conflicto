@@ -120,9 +120,6 @@ export function WorktreePicker({ worktree, workspaceIndex, onSwitch, onRemove })
             padding: 0 12px 8px;
             min-width: 0;
           }
-          .sidebar.is-searching > .sidebar-worktree {
-            display: none;
-          }
           .worktree-picker {
             position: relative;
             display: inline-block;

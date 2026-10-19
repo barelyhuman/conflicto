@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { SHORTCUTS } from './shortcuts.js';
 
-const SCOPES = ['global', 'editor', 'diff', 'review', 'search', 'terminal', 'home', 'palette'];
+const SCOPES = ['global', 'editor', 'diff', 'review', 'terminal', 'home', 'palette'];
 
 /**
  * Clashes that exist in the app today and are accepted for now. Each one must

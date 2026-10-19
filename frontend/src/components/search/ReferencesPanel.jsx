@@ -2,7 +2,7 @@ import { useComputed } from '@preact/signals';
 import { Show } from '@preact/signals/utils';
 import { IconX } from '@tabler/icons-preact';
 import { resultsPanel, closeResults } from '../../models/resultsPanel.js';
-import { searchModel } from '../../lsp/index.js';
+import { openResult } from '../../lsp/index.js';
 import { ResultsList } from './ResultsList.jsx';
 import './search.css';
 
@@ -34,7 +34,7 @@ export function ReferencesPanel() {
           </button>
         </div>
         <div class="refs-body">
-          <Show when={empty} fallback={<ResultsList items={items} onOpen={(i) => searchModel.openResult(i)} />}>
+          <Show when={empty} fallback={<ResultsList items={items} onOpen={openResult} />}>
             <div class="search-summary">No results</div>
           </Show>
         </div>

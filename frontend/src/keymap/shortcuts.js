@@ -14,7 +14,6 @@
  *   editor   code / file tabs
  *   diff     the changes / commit panel
  *   review   pending-review comment composer
- *   search   the global search panel
  *   terminal terminal dock
  *   home     home screen
  *   palette  command palette
@@ -22,7 +21,7 @@
  * `global` overlaps every scope; two other scopes overlap only when equal.
  * `mac` / `other` may be null when a platform has no such binding.
  *
- * @type {ReadonlyArray<{ id: string, mac: string | null, other: string | null, description: string, scope: 'global' | 'editor' | 'diff' | 'review' | 'search' | 'terminal' | 'home' | 'palette' }>}
+ * @type {ReadonlyArray<{ id: string, mac: string | null, other: string | null, description: string, scope: 'global' | 'editor' | 'diff' | 'review' | 'terminal' | 'home' | 'palette' }>}
  */
 export const SHORTCUTS = Object.freeze([
   // Global
@@ -30,7 +29,6 @@ export const SHORTCUTS = Object.freeze([
   { id: 'home.toggle', mac: '⌘⇧H', other: 'Ctrl+Shift+H', description: 'Toggle home screen', scope: 'global' },
   { id: 'prefs.open', mac: '⌘,', other: 'Ctrl+,', description: 'Preferences', scope: 'global' },
   { id: 'terminal.toggle', mac: '⌃`', other: 'Ctrl+`', description: 'Show or hide terminal dock', scope: 'global' },
-  { id: 'search.open', mac: '⌘⇧F', other: 'Ctrl+Shift+F', description: 'Global search (seeds from selection)', scope: 'global' },
   { id: 'app.reload', mac: '⌘R', other: 'Ctrl+R', description: 'Reload (refresh current workspace)', scope: 'global' },
   { id: 'app.fullscreen', mac: '⌃⌘F', other: 'Ctrl+F', description: 'Toggle full screen', scope: 'global' },
   { id: 'app.quit', mac: '⌘Q', other: null, description: 'Quit (macOS app menu)', scope: 'global' },
@@ -78,12 +76,6 @@ export const SHORTCUTS = Object.freeze([
   { id: 'review.cancel', mac: 'Esc', other: 'Esc', description: 'Close comment composer', scope: 'review' },
 
   // Search panel
-  { id: 'search.case', mac: '⌥⌘C', other: 'Alt+C', description: 'Toggle match case', scope: 'search' },
-  { id: 'search.word', mac: '⌥⌘W', other: 'Alt+W', description: 'Toggle whole word', scope: 'search' },
-  { id: 'search.regex', mac: '⌥⌘R', other: 'Alt+R', description: 'Toggle regex', scope: 'search' },
-  { id: 'search.run', mac: '↵', other: '↵', description: 'Run search (from query field)', scope: 'search' },
-  { id: 'search.results', mac: '↓', other: '↓', description: 'Move focus into results', scope: 'search' },
-  { id: 'search.blur', mac: 'Esc', other: 'Esc', description: 'Leave search field', scope: 'search' },
 
   // Terminal
   { id: 'terminal.split', mac: '⌘\\', other: 'Ctrl+\\', description: 'Split terminal right', scope: 'terminal' },

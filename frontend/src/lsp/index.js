@@ -4,7 +4,6 @@ import { tabsStore } from '../models/tabs.js';
 import { getActiveView, getViewMeta } from '../models/editorRegistry.js';
 import { openFileAt } from '../models/navigation.js';
 import { showResults } from '../models/resultsPanel.js';
-import { createSearchModel } from '../models/searchModel.js';
 import { createLspSession } from './session.js';
 import { createNavHistory } from './navHistory.js';
 import { createCodeNav } from './codeNav.js';
@@ -80,22 +79,17 @@ export const codeNav = createCodeNav({
   notify,
 });
 
-export const searchModel = createSearchModel({
-  api,
-  openFileAt: (path, line, col) => {
-    const from = getCurrent();
+/** Open a references/results row, recording the jump for back navigation. */
+export function openResult(item) {
+  const from = getCurrent();
 
-    if (from) navHistory.push(from);
+  if (from) navHistory.push(from);
 
-    return openFileAt(path, line, col);
-  },
-});
+  return openFileAt(item.path, item.line, item.col);
+}
 
 /** Called by the app on project change. */
 export function resetLspForProject(path) {
   lspSession.reset(path ?? '');
   navHistory.clear();
-
-  if (searchModel.query.peek()) searchModel.runNow();
-  else searchModel.results.value = [];
 }

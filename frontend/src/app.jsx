@@ -26,8 +26,7 @@ import { setTerminalScope, removeTerminalScope } from './components/terminal/ter
 import { SidebarActions } from './components/SidebarActions.jsx';
 import { IslandHeader } from './components/IslandHeader.jsx';
 import { WorktreePicker } from './components/WorktreePicker.jsx';
-import { SearchPanel, SidebarViewSwitch } from './components/search/SearchPanel.jsx';
-import { searchModel, resetLspForProject } from './lsp/index.js';
+import { resetLspForProject } from './lsp/index.js';
 import { useCodeShortcuts } from './lsp/useCodeShortcuts.js';
 import { CommandPalette } from './components/palette/CommandPalette.jsx';
 import { HomeScreen } from './components/home/HomeScreen.jsx';
@@ -115,16 +114,7 @@ export function App() {
   selectionRef.current = selection;
   workspaceIndexRef.current = workspaceIndex;
 
-  // Sidebar view: Changes (file tree) or Search. Derived classes keep App from re-rendering on switch.
-  const asideClass = useComputed(() =>
-    searchModel.mode.value === 'search' ? 'sidebar is-searching' : 'sidebar'
-  );
-  const changesViewClass = useComputed(() =>
-    searchModel.mode.value === 'search' ? 'sidebar-view hidden' : 'sidebar-view'
-  );
-  const searchMode = useComputed(() => searchModel.mode.value === 'search');
-  const openSidebar = useCallback(() => setSidebarOpen(true), []);
-  useCodeShortcuts({ isMac: isMacOS, onOpenSearch: openSidebar });
+  useCodeShortcuts({ isMac: isMacOS });
 
   // Terminal links, palette, search and PR browsing open things through the navigation seam.
   useEffect(
@@ -538,7 +528,7 @@ export function App() {
         <div class={shellClass}>
           <div class="window">
             <div class={`window-body${sidebarOpen ? '' : ' sidebar-collapsed'}`}>
-              <aside class={asideClass} aria-hidden={!sidebarOpen}>
+              <aside class="sidebar" aria-hidden={!sidebarOpen}>
                 <div class="sidebar-project">
                   <ProjectPicker
                     currentName={projectName}
@@ -564,9 +554,6 @@ export function App() {
                   sync={sync}
                 />
 
-                <SidebarViewSwitch model={searchModel} />
-
-                <div class={changesViewClass}>
                 <FileTree
                   workingTree={workingTree}
                   activeTab={tabs.activeTab}
@@ -581,11 +568,6 @@ export function App() {
                   onDiscardAll={handleDiscardAll}
                   onCommit={(message) => workingTree.commit(message)}
                 />
-                </div>
-
-                <Show when={searchMode}>
-                  <SearchPanel model={searchModel} />
-                </Show>
               </aside>
 
               <div class="content-well">

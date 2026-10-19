@@ -53,13 +53,13 @@ Signals are the primary state layer. The repo includes local OpenCode skills und
 - **Workspace index** (`workspace_index.go`): builds the palette/home list of repos, PRs and worktrees. Cached `gh` data lives in `~/.config/conflicto/workspace-index.json` and refreshes in the background. PR↔worktree mapping is stored in git config as `branch.<b>.conflicto-pr`; stale = PR merged/closed.
 - **Review drafts** (`review.go`): pending review comments persist to `~/.config/conflicto/review_drafts.json`, keyed by `<mainRepoPath>#<prNumber>` so a PR worktree and the main checkout share drafts. Submission posts all drafts as one review.
 - **LSP** (`lsp.go`): the transport contract is documented at the top of the file. The backend is a generic JSON-RPC bridge plus process lifecycle. The frontend owns protocol semantics; the backend never sends `initialize`. Only the active worktree's servers run.
-- **Search** (`search.go`): `SearchText` uses ripgrep when it is on PATH and falls back to `git grep`.
+- **Search** (`search.go`): `SearchText` uses ripgrep when it is on PATH and falls back to `git grep`. It backs the LSP goto/references text fallback; there is no global search UI for now.
 
 ## Frontend architecture notes
 
 - **Editor tabs** (`models/tabs.js`): per-worktree tab set, kinds `diff` and `file`. Identity is kind + path.
 - **Editor extension points** (`models/editorRegistry.js`): `registerEditorExtension` adds CodeMirror extensions to every file editor. `getView` and `revealLine` address live views. Keep CodeMirror imports out of this module.
-- **Navigation seam** (`models/navigation.js`): `openFileAt` / `openDiff` are the only way to jump to code. Terminal links, palette, search, LSP goto and review comments all go through it. Do not reveal lines directly.
+- **Navigation seam** (`models/navigation.js`): `openFileAt` / `openDiff` are the only way to jump to code. Terminal links, palette, LSP goto/references and review comments all go through it. Do not reveal lines directly.
 - **LSP client** (`frontend/src/lsp/`): `client.js` is the JSON-RPC client and `session.js` owns per-server state (`idle | starting | indexing | ready | unavailable | error`). `codeNav.js` provides goto/references with the ripgrep fallback. The CodeMirror wiring lives in `components/tabs/cm/lsp.js`.
 - **Terminal scopes** (`components/terminal/terminalStore.js`): panes are keyed by project/worktree path. Switching scope swaps the visible panes; other scopes stay mounted so PTYs and scrollback survive.
 - **Keyboard shortcuts** (`keymap/shortcuts.js`): documentation data that feeds Preferences → Shortcuts. It does not wire handlers. Keep it updated when you add or change a shortcut; `shortcuts.test.js` fails on unintended clashes.
@@ -69,7 +69,7 @@ Signals are the primary state layer. The repo includes local OpenCode skills und
 
 - `git` — Required for all repo operations.
 - `gh` (GitHub CLI) — Required for PR features (list, checkout, comments, create). Diff viewing and local git ops work without it.
-- `rg` (ripgrep) — Optional. Global search and code-navigation fallback; `git grep` is used when absent.
+- `rg` (ripgrep) — Optional. Code-navigation text fallback; `git grep` is used when absent.
 - Language servers — Optional, per language: `gopls`, `typescript-language-server`, `pyright-langserver`, `rust-analyzer`. Missing ones show an install hint.
 
 ## CI

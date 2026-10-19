@@ -11,7 +11,6 @@ const SHORTCUT_SCOPES = [
   ['editor', 'Editor'],
   ['diff', 'Changes panel'],
   ['review', 'Review comments'],
-  ['search', 'Search'],
   ['terminal', 'Terminal'],
 ];
 
