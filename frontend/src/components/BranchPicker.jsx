@@ -1,6 +1,6 @@
-import { useState, useRef } from 'preact/hooks';
+import { useState, useRef, useMemo } from 'preact/hooks';
 import { IconChevronDown } from '@tabler/icons-preact';
-import { AnchoredMenu } from './AnchoredMenu.jsx';
+import { SearchableMenu } from './SearchableMenu.jsx';
 
 /**
  * @param {Object} props
@@ -23,6 +23,14 @@ export function BranchPicker({
 }) {
   const [open, setOpen] = useState(false);
   const triggerRef = useRef(null);
+
+  const items = useMemo(
+    () => [
+      ...localBranches.map((b) => ({ id: `local:${b}`, label: b, group: 'Local', current: currentBranch === b })),
+      ...remoteBranches.map((b) => ({ id: `remote:${b}`, label: b, group: 'Remote', current: currentBranch === b })),
+    ],
+    [localBranches, remoteBranches, currentBranch]
+  );
 
   function select(branch) {
     onSelect?.(branch);
@@ -52,42 +60,17 @@ export function BranchPicker({
         {!pill && <IconChevronDown size={10} class={open ? 'open' : ''} />}
       </button>
 
-      <AnchoredMenu
+      <SearchableMenu
         open={open}
         onClose={() => setOpen(false)}
         anchorRef={triggerRef}
-        placement="bottom"
-        alignment="start"
-        offset={4}
         className="branch-dropdown"
-      >
-        <div class="branch-group">
-          <div class="branch-group-label">Local</div>
-          {localBranches.map((b) => (
-            <button
-              key={b}
-              type="button"
-              class={`branch-option${currentBranch === b ? ' active' : ''}`}
-              onClick={() => select(b)}
-            >
-              {b}
-            </button>
-          ))}
-        </div>
-        <div class="branch-group">
-          <div class="branch-group-label">Remote</div>
-          {remoteBranches.map((b) => (
-            <button
-              key={b}
-              type="button"
-              class={`branch-option${currentBranch === b ? ' active' : ''}`}
-              onClick={() => select(b)}
-            >
-              {b}
-            </button>
-          ))}
-        </div>
-      </AnchoredMenu>
+        label="Switch branch"
+        placeholder="Search branches…"
+        mono
+        items={items}
+        onSelect={(item) => select(item.label)}
+      />
 
       <style>{`
         .branch-picker {
@@ -139,42 +122,7 @@ export function BranchPicker({
         }
         .anchored-menu.branch-dropdown {
           min-width: 220px;
-          max-width: 280px;
-          padding: 4px;
-          display: flex;
-          flex-direction: column;
-          gap: 2px;
-        }
-        .branch-group-label {
-          padding: 6px 10px 4px;
-          font-size: 10px;
-          font-weight: 600;
-          text-transform: uppercase;
-          letter-spacing: 0.08em;
-          color: var(--grey);
-        }
-        .branch-option {
-          width: 100%;
-          text-align: left;
-          padding: 6px 10px;
-          border-radius: 4px;
-          border: none;
-          background: transparent;
-          color: var(--text);
-          font-family: var(--font-mono);
-          font-size: 12px;
-          cursor: pointer;
-          transition: background 0.1s;
-          overflow: hidden;
-          text-overflow: ellipsis;
-          white-space: nowrap;
-        }
-        .branch-option:hover {
-          background: rgba(127, 127, 127, 0.12);
-        }
-        .branch-option.active {
-          color: var(--text);
-          background: rgba(127, 127, 127, 0.16);
+          max-width: 300px;
         }
       `}</style>
     </div>

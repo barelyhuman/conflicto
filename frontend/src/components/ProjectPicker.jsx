@@ -1,6 +1,6 @@
-import { useState, useRef } from 'preact/hooks';
+import { useState, useRef, useMemo } from 'preact/hooks';
 import { IconChevronDown, IconFolder } from '@tabler/icons-preact';
-import { AnchoredMenu } from './AnchoredMenu.jsx';
+import { SearchableMenu } from './SearchableMenu.jsx';
 
 /**
  * @param {Object} props
@@ -24,6 +24,18 @@ export function ProjectPicker({ currentName, currentPath, recents, onSwitchProje
     setOpen(false);
   }
 
+  const items = useMemo(
+    () =>
+      recents.map((p) => ({
+        id: p.path,
+        label: p.name,
+        sublabel: p.path,
+        title: p.path,
+        current: p.path === currentPath,
+      })),
+    [recents, currentPath]
+  );
+
   const displayName = currentName || 'No project';
 
   return (
@@ -40,48 +52,24 @@ export function ProjectPicker({ currentName, currentPath, recents, onSwitchProje
         <IconChevronDown size={10} class={open ? 'open' : ''} />
       </button>
 
-      <AnchoredMenu
+      <SearchableMenu
         open={open}
         onClose={() => setOpen(false)}
         anchorRef={triggerRef}
-        placement="bottom"
-        alignment="start"
         offset={6}
         className="project-dropdown"
-      >
-        {recents.length > 0 && (
-          <div class="project-group">
-            {recents.map((p) => (
-              <button
-                key={p.path}
-                type="button"
-                class={`project-option${p.path === currentPath ? ' active' : ''}`}
-                onClick={() => select(p.path)}
-                title={p.path}
-              >
-                <IconFolder size={14} />
-                <span class="project-option-info">
-                  <span class="project-option-name">{p.name}</span>
-                  <span class="project-option-path">{p.path}</span>
-                </span>
-              </button>
-            ))}
-          </div>
-        )}
-
-        <div class="project-divider" />
-
-        <button
-          type="button"
-          class="project-option project-option-open"
-          onClick={openFolder}
-        >
-          <IconFolder size={14} />
-          <span class="project-option-info">
-            <span class="project-option-name">Open Other Folder...</span>
-          </span>
-        </button>
-      </AnchoredMenu>
+        label="Switch project"
+        placeholder="Search projects…"
+        items={items}
+        onSelect={(item) => select(item.id)}
+        renderIcon={() => <IconFolder size={14} />}
+        footer={
+          <button type="button" class="sm-footer-btn" onClick={openFolder}>
+            <IconFolder size={14} />
+            <span>Open Other Folder...</span>
+          </button>
+        }
+      />
 
       <style>{`
         .project-picker {
@@ -122,73 +110,10 @@ export function ProjectPicker({ currentName, currentPath, recents, onSwitchProje
         }
         .anchored-menu.project-dropdown {
           min-width: 280px;
-          max-width: 360px;
-          padding: 4px;
-          display: flex;
-          flex-direction: column;
-          gap: 2px;
         }
-        .project-group {
-          display: flex;
-          flex-direction: column;
-          gap: 2px;
-        }
-        .project-divider {
-          height: 1px;
-          background: var(--border-subtle);
-          margin: 4px 0;
-        }
-        .project-option {
-          display: flex;
-          align-items: center;
-          gap: 8px;
-          width: 100%;
-          text-align: left;
-          padding: 6px 8px;
-          border-radius: 4px;
-          border: none;
-          background: transparent;
-          color: var(--text);
-          font-family: var(--font-sans);
-          font-size: 12px;
-          cursor: pointer;
-          transition: background 0.1s;
-        }
-        .project-option:hover {
-          background: var(--accent-bg);
-        }
-        .project-option.active {
-          color: var(--text-h);
-          background: var(--accent-bg);
-        }
-        .project-option svg {
-          flex-shrink: 0;
-          color: var(--text-muted);
-        }
-        .project-option-info {
-          display: flex;
-          flex-direction: column;
-          min-width: 0;
-          flex: 1;
-        }
-        .project-option-name {
-          font-weight: 500;
-          overflow: hidden;
-          text-overflow: ellipsis;
-          white-space: nowrap;
-        }
-        .project-option-path {
+        .anchored-menu.project-dropdown .sm-sub {
           font-size: 11px;
-          color: var(--text-muted);
-          overflow: hidden;
-          text-overflow: ellipsis;
-          white-space: nowrap;
-        }
-        .project-option-open .project-option-name {
-          color: var(--text-muted);
-        }
-        .project-option-open:hover .project-option-name {
-          color: var(--text);
+          font-family: var(--font-sans);
         }
       `}</style>
     </div>

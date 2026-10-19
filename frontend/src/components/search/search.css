@@ -31,8 +31,7 @@
   font-weight: 500;
 }
 
-.sidebar.is-searching > .actions-row,
-.sidebar.is-searching > .worktrees-panel {
+.sidebar.is-searching > .actions-row {
   display: none;
 }
 

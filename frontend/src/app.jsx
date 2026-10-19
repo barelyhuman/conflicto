@@ -25,7 +25,7 @@ import { TerminalDock, isTerminalFocusTarget } from './components/terminal/Termi
 import { setTerminalScope, removeTerminalScope } from './components/terminal/terminalStore.js';
 import { SidebarActions } from './components/SidebarActions.jsx';
 import { IslandHeader } from './components/IslandHeader.jsx';
-import { WorktreesPanel } from './components/WorktreesPanel.jsx';
+import { WorktreePicker } from './components/WorktreePicker.jsx';
 import { SearchPanel, SidebarViewSwitch } from './components/search/SearchPanel.jsx';
 import { searchModel, resetLspForProject } from './lsp/index.js';
 import { useCodeShortcuts } from './lsp/useCodeShortcuts.js';
@@ -549,18 +549,19 @@ export function App() {
                   />
                 </div>
 
+                <WorktreePicker
+                  worktree={worktree}
+                  workspaceIndex={workspaceIndex}
+                  onSwitch={handleSwitchProject}
+                  onRemove={handleRemoveWorktree}
+                />
+
                 <SidebarActions
                   currentBranch={branches.current}
                   localBranches={branches.local}
                   remoteBranches={branches.remote}
                   onSelectBranch={handleSelectBranch}
                   sync={sync}
-                />
-
-                <WorktreesPanel
-                  worktree={worktree}
-                  onSwitch={handleSwitchProject}
-                  onRemove={handleRemoveWorktree}
                 />
 
                 <SidebarViewSwitch model={searchModel} />
