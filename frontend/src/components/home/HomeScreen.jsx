@@ -179,7 +179,7 @@ export function HomeScreen({ index, ghStatus, onClose, onRemoveWorktree, onOpenP
         <div class="home-status">
           <span class="home-gh">
             {ghStatus?.installed && ghStatus?.user
-              ? `Signed in as @${ghStatus.user}`
+              ? `Signed in as ${ghStatus.user}`
               : 'gh not available — PRs hidden'}
           </span>
           <span class="home-ago">{agoText}</span>
