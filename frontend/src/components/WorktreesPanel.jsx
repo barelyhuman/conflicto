@@ -1,6 +1,6 @@
 import { useState } from 'preact/hooks';
 import { useComputed } from '@preact/signals';
-import { For, Show } from '@preact/signals/utils';
+import { For, Show, useLiveSignal } from '@preact/signals/utils';
 import { IconTrash } from '@tabler/icons-preact';
 import { ChangeSection } from './ChangeSection.jsx';
 
@@ -26,7 +26,14 @@ function shortenPath(path) {
  * @param {(path: string) => void} [props.onRemove]
  */
 function WorktreeRow({ wt, worktree, onSwitch, onRemove }) {
-  const isActive = useComputed(() => wt.path === worktree.currentPath.value || wt.isCurrent);
+  // <For> reuses row instances by position, so `wt` must be live for the computed to track it.
+  // currentPath is authoritative; isCurrent is only a fallback before the project path is known.
+  const liveWt = useLiveSignal(wt);
+  const isActive = useComputed(() => {
+    const current = worktree.currentPath.value;
+    const { path, isCurrent } = liveWt.value;
+    return current ? path === current : isCurrent;
+  });
 
   const rowClass = useComputed(
     () => `worktree-row${isActive.value ? ' active' : ''}`

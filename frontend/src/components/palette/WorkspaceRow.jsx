@@ -1,5 +1,5 @@
 import { useComputed } from '@preact/signals';
-import { Show } from '@preact/signals/utils';
+import { Show, useLiveSignal } from '@preact/signals/utils';
 import {
   IconFolder,
   IconGitBranch,
@@ -59,15 +59,21 @@ export function Highlighted({ text, indices }) {
  */
 export function WorkspaceRow({ item, selected, opening, onPick, onHover, idPrefix = 'palette-opt', onRemove }) {
   const { entry, indices, pos } = item;
+  // Rows are keyed by entry id, so the same instance survives re-ranking: keep item live.
+  const live = useLiveSignal(item);
+  const isSel = useComputed(() => selected.value === live.value.pos);
   const className = useComputed(
-    () => `palette-row${selected.value === pos ? ' selected' : ''}${entry.stale ? ' stale' : ''}`
+    () => `palette-row${isSel.value ? ' selected' : ''}${live.value.entry.stale ? ' stale' : ''}`
   );
-  const isSelected = useComputed(() => (selected.value === pos ? 'true' : 'false'));
-  const pending = useComputed(() => opening.value === entry.id);
-  const isPR = entry.kind === 'pr';
+  const isSelected = useComputed(() => (isSel.value ? 'true' : 'false'));
+  const pending = useComputed(() => opening.value === live.value.entry.id);
   const hasWt = entry.kind === 'worktree' || entry.hasWorktree;
-  const remoteOnly = isPR && !entry.hasWorktree;
-  const showHint = useComputed(() => remoteOnly && selected.value === pos && !pending.value);
+  const showHint = useComputed(() => {
+    const e = live.value.entry;
+    const sel = isSel.value;
+    const busy = pending.value;
+    return e.kind === 'pr' && !e.hasWorktree && sel && !busy;
+  });
 
   return (
     <div
