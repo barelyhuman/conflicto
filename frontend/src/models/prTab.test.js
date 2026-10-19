@@ -24,7 +24,7 @@ describe('PRTabModel', () => {
 
   beforeEach(() => {
     api = fakeApi();
-    model = new PRTabModel({ number: 7, api, pollMs: 1000 });
+    model = new PRTabModel({ number: 7, api });
   });
 
   afterEach(() => {
@@ -107,27 +107,26 @@ describe('PRTabModel', () => {
     expect(model.activeDiff.value.patch).toBe('new');
   });
 
-  it('keeps old details when a background poll fails', async () => {
+  it('loads review state only after the file list returns', async () => {
+    let releaseFiles;
+    api.getPRFilesList.mockImplementation(() => new Promise((resolve) => {
+      releaseFiles = resolve;
+    }));
+    const pending = model.load();
+
+    await flush();
+    expect(api.getReviewState).not.toHaveBeenCalled();
+    releaseFiles([{ path: 'a.go' }]);
+    await pending;
+    expect(api.getReviewState).toHaveBeenCalledWith(7);
+  });
+
+  it('keeps old details when a silent refresh fails', async () => {
     await model.load();
     api.getPRDetails.mockRejectedValue(new Error('flaky'));
     await model.refreshDetails();
     expect(model.details.value.title).toBe('Fix');
     expect(model.error.value).toBeNull();
-  });
-
-  it('polls details only while active', async () => {
-    vi.useFakeTimers();
-    await model.load();
-    api.getPRDetails.mockClear();
-    vi.advanceTimersByTime(3000);
-    expect(api.getPRDetails).not.toHaveBeenCalled();
-    model.setActive(true);
-    vi.advanceTimersByTime(2000);
-    expect(api.getPRDetails).toHaveBeenCalledTimes(2);
-    model.setActive(false);
-    api.getPRDetails.mockClear();
-    vi.advanceTimersByTime(3000);
-    expect(api.getPRDetails).not.toHaveBeenCalled();
   });
 
   it('applies checks and worktree path to details', async () => {

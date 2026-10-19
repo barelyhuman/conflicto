@@ -1,6 +1,7 @@
 import { createModel, signal, computed } from '@preact/signals';
 import { api as defaultApi } from '../wails.js';
 import { compareTabPath } from './tabs.js';
+import { activePatch, beginPatch, dropPatches, emptyFileSet, endPatch, fileIndex, patchPending, putPatch, stepPath, withList } from './fileSet.js';
 
 const errText = (err) => err?.message ?? String(err);
 
@@ -16,11 +17,7 @@ const errText = (err) => err?.message ?? String(err);
  */
 export const CompareTabModel = createModel(({ ref, mergeBase = false, api = defaultApi }) => {
   const baseSHA = signal('');
-  const files = signal(/** @type {CompareFileEntry[]} */ ([]));
-  const selectedPath = signal(/** @type {string|null} */ (null));
-  /** path -> { path, patch } */
-  const patches = signal(/** @type {Record<string, any>} */ ({}));
-  const loadingPatch = signal(/** @type {string|null} */ (null));
+  const fileSet = signal(emptyFileSet());
   const loading = signal(true);
   const error = signal(/** @type {string|null} */ (null));
   const patchError = signal(/** @type {string|null} */ (null));
@@ -29,22 +26,11 @@ export const CompareTabModel = createModel(({ ref, mergeBase = false, api = defa
   let loadedOnce = false;
   let loadSeq = 0;
 
-  const selectedIndex = computed(() => files.value.findIndex((f) => f.path === selectedPath.value));
-
-  const activeDiff = computed(() => {
-    const path = selectedPath.value;
-    const cache = patches.value;
-
-    return path ? (cache[path] ?? null) : null;
-  });
-
-  const diffLoading = computed(() => {
-    const path = selectedPath.value;
-    const pending = loadingPatch.value;
-    const cache = patches.value;
-
-    return path != null && pending === path && !cache[path];
-  });
+  const files = computed(() => fileSet.value.list);
+  const selectedPath = computed(() => fileSet.value.selected);
+  const selectedIndex = computed(() => fileIndex(fileSet.value));
+  const activeDiff = computed(() => activePatch(fileSet.value));
+  const diffLoading = computed(() => patchPending(fileSet.value));
 
   const totals = computed(() =>
     files.value.reduce(
@@ -61,27 +47,28 @@ export const CompareTabModel = createModel(({ ref, mergeBase = false, api = defa
   async function fetchPatch(path, { force = false } = {}) {
     const base = baseSHA.peek();
 
-    if (!base || (!force && patches.peek()[path])) return;
+    if (!base || (!force && fileSet.peek().patches[path])) return;
     const entry = entryFor(path);
-    loadingPatch.value = path;
+
+    fileSet.value = beginPatch(fileSet.peek(), path);
     patchError.value = null;
 
     try {
       const data = await api.getCompareFilePatch(base, path, entry?.oldPath ?? '', Boolean(entry?.untracked));
 
       if (disposed || base !== baseSHA.peek()) return;
-      patches.value = { ...patches.peek(), [path]: { ...(data ?? {}), path } };
+      fileSet.value = putPatch(fileSet.peek(), path, { ...(data ?? {}), path });
     } catch (err) {
       if (!disposed) patchError.value = errText(err);
     } finally {
-      if (!disposed && loadingPatch.peek() === path) loadingPatch.value = null;
+      if (!disposed) fileSet.value = endPatch(fileSet.peek(), path);
     }
   }
 
   function selectPath(path) {
     if (!path) return undefined;
-    selectedPath.value = path;
     patchError.value = null;
+    fileSet.value = { ...fileSet.peek(), selected: path };
 
     return fetchPatch(path);
   }
@@ -96,21 +83,17 @@ export const CompareTabModel = createModel(({ ref, mergeBase = false, api = defa
 
       if (disposed || seq !== loadSeq) return;
       const list = res?.files ?? [];
-      const sel = selectedPath.peek();
+      const sel = fileSet.peek().selected;
+      const keep = sel && list.some((f) => f.path === sel) && res?.baseSHA === baseSHA.peek() ? sel : null;
 
       // Patches of the old base are stale; keep the selected one on screen until it is refetched.
-      patches.value = sel && res?.baseSHA === baseSHA.peek() && patches.peek()[sel] ? { [sel]: patches.peek()[sel] } : {};
+      fileSet.value = withList(dropPatches(fileSet.peek(), keep), list);
       baseSHA.value = res?.baseSHA ?? '';
-      files.value = list;
       error.value = null;
 
-      if (sel && list.some((f) => f.path === sel)) {
-        await fetchPatch(sel, { force: true });
-      } else if (list.length > 0) {
-        await selectPath(list[0].path);
-      } else {
-        selectedPath.value = null;
-      }
+      const selected = fileSet.peek().selected;
+
+      if (selected) await fetchPatch(selected, { force: true });
     } catch (err) {
       // A failed background refresh must not blank a tab that already has data.
       if (!disposed && seq === loadSeq && (!silent || !baseSHA.peek())) error.value = errText(err);
@@ -158,12 +141,9 @@ export const CompareTabModel = createModel(({ ref, mergeBase = false, api = defa
 
     /** Step the selected file by `delta` (wraps). */
     stepFile(delta) {
-      const list = files.peek();
+      const path = stepPath(fileSet.peek().list, fileSet.peek().selected, delta);
 
-      if (list.length === 0) return;
-      const idx = selectedIndex.peek();
-      const at = idx < 0 ? (delta > 0 ? 0 : list.length - 1) : (idx + delta + list.length) % list.length;
-      selectPath(list[at].path);
+      if (path) selectPath(path);
     },
 
     /** Both sides of a file, for expanding unchanged context. */

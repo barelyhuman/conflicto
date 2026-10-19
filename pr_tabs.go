@@ -259,19 +259,7 @@ func (a *App) GetPRDetails(number int) (*PRDetails, error) {
 		return nil, err
 	}
 
-	var checks *PRChecksSummary
-	var wg sync.WaitGroup
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		if list, cerr := ghPRChecks(dir, number); cerr == nil {
-			s := summarizePRChecks(number, list)
-			checks = &s
-		}
-	}()
-
 	out, err := ghPRViewJSON(context.Background(), dir, number)
-	wg.Wait()
 	if err != nil {
 		return nil, fmt.Errorf("gh pr view #%d failed: %w", number, err)
 	}
@@ -279,7 +267,6 @@ func (a *App) GetPRDetails(number int) (*PRDetails, error) {
 	if err != nil {
 		return nil, err
 	}
-	d.Checks = checks
 	d.WorktreePath = prWorktreeMap(dir)[number]
 	return d, nil
 }

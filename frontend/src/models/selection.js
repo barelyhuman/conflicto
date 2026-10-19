@@ -2,24 +2,45 @@ import { createModel, signal, computed, effect } from '@preact/signals';
 import { api as defaultApi } from '../wails.js';
 
 /**
- * File / section / diff selection and diff fetching.
+ * Working-tree diff for the open tab.
+ *
+ * The visible file follows the active diff tab. The patch is remembered per
+ * worktree scope, so a result that arrives after a switch is stored for the
+ * scope that requested it and is not painted into the scope now on screen.
  *
  * @param {{
  *   workingTree: InstanceType<typeof import('./workingTree.js').WorkingTreeModel>,
+ *   api?: typeof defaultApi,
+ *   onError?: (title: string, message: string) => void,
  * }} opts
  */
-export const SelectionModel = createModel(({ workingTree, api = defaultApi }) => {
+export const SelectionModel = createModel(({ workingTree, api = defaultApi, onError }) => {
   const activeFile = signal(/** @type {string|null} */ (null));
   /** @type {import('@preact/signals-core').Signal<null | 'conflict' | 'staged' | 'unstaged'>} */
   const activeSection = signal(null);
   const activeDiff = signal(/** @type {{ path?: string, patch?: string }|null} */ (null));
-  /** True while a diff request is in flight for the current selection. */
+  /** True while a diff request is in flight for the current selection and nothing is stored yet. */
   const diffLoading = signal(false);
   const showFullDiff = signal(false);
 
   const isConflict = computed(() => activeSection.value === 'conflict');
-
   const isUnstaged = computed(() => activeSection.value === 'unstaged');
+
+  /** @type {string | null} */
+  let scopeKey = null;
+  let seq = 0;
+  /** Latest request token per scope+section+path. */
+  const latest = new Map();
+  /** Last patch returned for that key. */
+  const remembered = new Map();
+
+  function cacheKey(scope, section, path) {
+    return `${scope ?? ''}\0${section ?? ''}\0${path ?? ''}`;
+  }
+
+  function rememberedDiff(section, path) {
+    return remembered.get(cacheKey(scopeKey, section, path)) ?? null;
+  }
 
   function requestDiff(file, section) {
     if (!file) {
@@ -35,8 +56,31 @@ export const SelectionModel = createModel(({ workingTree, api = defaultApi }) =>
       return;
     }
 
-    diffLoading.value = true;
-    api.getDiff(file, section === 'staged');
+    const scope = scopeKey;
+    const key = cacheKey(scope, section, file);
+    const token = ++seq;
+
+    latest.set(key, token);
+
+    const hit = remembered.get(key) ?? null;
+
+    if (hit) activeDiff.value = hit;
+    else diffLoading.value = true;
+
+    Promise.resolve(api.getDiff(file, section === 'staged'))
+      .then((data) => {
+        if (latest.get(key) !== token) return;
+        if (data?.path) remembered.set(key, data);
+        if (scopeKey !== scope || activeFile.peek() !== file || activeSection.peek() !== section) return;
+        if (!data?.path) return;
+        activeDiff.value = data;
+        diffLoading.value = false;
+      })
+      .catch((err) => {
+        if (latest.get(key) !== token || scopeKey !== scope || activeFile.peek() !== file) return;
+        diffLoading.value = false;
+        onError?.('Diff Error', err?.message ?? String(err));
+      });
   }
 
   // Fetch when the selected file changes (path change path).
@@ -63,17 +107,28 @@ export const SelectionModel = createModel(({ workingTree, api = defaultApi }) =>
     isUnstaged,
     workingTree,
 
-    select(path, section) {
-      const same =
-        this.activeFile.peek() === path && this.activeSection.peek() === section;
+    /** Swap the visible diff to this worktree. Other scopes keep their patches. */
+    setScope(next) {
+      const key = next || null;
 
-      // Drop stale viewer content immediately so we never flash the previous file.
+      if (scopeKey === key) return;
+      scopeKey = key;
+      this.activeFile.value = null;
+      this.activeSection.value = null;
       this.activeDiff.value = null;
-      this.diffLoading.value = true;
+      this.diffLoading.value = false;
+      this.showFullDiff.value = false;
+    },
+
+    select(path, section) {
+      const same = this.activeFile.peek() === path && this.activeSection.peek() === section;
+      const hit = section === 'conflict' ? null : rememberedDiff(section, path);
+
+      this.activeDiff.value = hit;
+      this.diffLoading.value = section !== 'conflict' && !hit;
       this.showFullDiff.value = false;
 
       if (same) {
-        // Same path is a signal no-op — effect won't re-run; fetch explicitly.
         requestDiff(path, section);
 
         return;
@@ -103,6 +158,7 @@ export const SelectionModel = createModel(({ workingTree, api = defaultApi }) =>
         return;
       }
 
+      if (path) remembered.set(cacheKey(scopeKey, this.activeSection.peek(), path), data);
       this.activeDiff.value = data ?? null;
       this.diffLoading.value = false;
     },
@@ -135,6 +191,7 @@ export const SelectionModel = createModel(({ workingTree, api = defaultApi }) =>
       const section = this.activeSection.value;
 
       if (!file) return;
+      remembered.delete(cacheKey(scopeKey, section, file));
       this.activeDiff.value = null;
       requestDiff(file, section);
     },

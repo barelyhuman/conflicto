@@ -110,7 +110,12 @@ export function App() {
     },
   }));
 
-  const selection = useModel(() => new SelectionModel({ workingTree }));
+  const selection = useModel(() => new SelectionModel({
+    workingTree,
+    onError: (title, message) => {
+      setToasts((prev) => [...prev, { id: Date.now().toString(), title, message }]);
+    },
+  }));
 
   // Models are stable for App lifetime; keep refs for the mount-once event effect.
   const workingTreeRef = useRef(workingTree);
@@ -192,9 +197,6 @@ export function App() {
       onAheadBehindUpdated: (data) => {
         sync.setAheadBehind(data);
       },
-      onDiffLoaded: (data) => {
-        selectionRef.current.applyDiff(data);
-      },
       onGHStatusChanged: (data) => {
         setGhStatus(data ?? { installed: false, version: '', user: '' });
       },
@@ -223,7 +225,7 @@ export function App() {
         setProjectName(data.name ?? '');
         setProjectPath(data.path ?? '');
         worktreeRef.current.setCurrentPath(data.path ?? '');
-        selectionRef.current.clear();
+        selectionRef.current.setScope(data.path ?? '');
         tabs.setScope(data.path ?? '');
         resetLspForProject(data.path ?? '');
         setTerminalScope(data.path ?? '');
@@ -378,6 +380,7 @@ export function App() {
         setProjectName(proj.name ?? '');
         setProjectPath(proj.path ?? '');
         worktreeRef.current.setCurrentPath(proj.path ?? '');
+        selectionRef.current.setScope(proj.path ?? '');
         setTerminalScope(proj.path ?? '');
         tabs.setScope(proj.path ?? '');
       } else {

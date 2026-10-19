@@ -4,10 +4,6 @@ import {main} from '../models';
 
 export function CheckRecentProjects():Promise<Array<main.ProjectAvailability>>;
 
-export function CheckoutPR(arg1:number):Promise<void>;
-
-export function CheckoutPRToWorktree(arg1:number,arg2:string):Promise<void>;
-
 export function Commit(arg1:string):Promise<void>;
 
 export function CreatePR(arg1:string,arg2:string,arg3:string,arg4:boolean):Promise<void>;
@@ -36,23 +32,15 @@ export function GetConflictFile(arg1:string):Promise<main.ConflictFile>;
 
 export function GetCurrentProject():Promise<Record<string, string>>;
 
-export function GetDiff(arg1:string,arg2:boolean):Promise<void>;
+export function GetDiff(arg1:string,arg2:boolean):Promise<main.FileDiff>;
 
 export function GetFileContents(arg1:string,arg2:boolean):Promise<main.FileContentsResult>;
 
-export function GetPRComments(arg1:number):Promise<void>;
-
 export function GetPRDetails(arg1:number):Promise<main.PRDetails>;
-
-export function GetPRFileDiff(arg1:number,arg2:string):Promise<void>;
 
 export function GetPRFilePatch(arg1:number,arg2:string):Promise<main.FileDiff>;
 
-export function GetPRFiles(arg1:number):Promise<void>;
-
 export function GetPRFilesList(arg1:number):Promise<Array<main.PRFile>>;
-
-export function GetPRList():Promise<void>;
 
 export function GetPRReviewComments(arg1:number):Promise<Array<Record<string, any>>>;
 
@@ -103,8 +91,6 @@ export function RemoveRecentProject(arg1:string):Promise<void>;
 export function RemoveWorktree(arg1:string):Promise<void>;
 
 export function SaveReviewDraft(arg1:number,arg2:main.ReviewDraft):Promise<main.ReviewDraft>;
-
-export function SearchPRList(arg1:number,arg2:string):Promise<Array<Record<string, any>>>;
 
 export function SearchPRs(arg1:string,arg2:string,arg3:number):Promise<Array<main.PRSummary>>;
 

@@ -53,26 +53,8 @@ export function setupWailsEvents(callbacks) {
   window.runtime.EventsOn('aheadBehindUpdated', (data) => {
     callbacks.onAheadBehindUpdated?.(data);
   });
-  window.runtime.EventsOn('diffLoaded', (data) => {
-    callbacks.onDiffLoaded?.(data);
-  });
   window.runtime.EventsOn('ghStatusChanged', (data) => {
     callbacks.onGHStatusChanged?.(data);
-  });
-  window.runtime.EventsOn('prListUpdated', (data) => {
-    callbacks.onPRListUpdated?.(data);
-  });
-  window.runtime.EventsOn('prFilesUpdated', (data) => {
-    callbacks.onPRFilesUpdated?.(data);
-  });
-  window.runtime.EventsOn('prCommentsUpdated', (data) => {
-    callbacks.onPRCommentsUpdated?.(data);
-  });
-  window.runtime.EventsOn('prCommentPosted', (data) => {
-    callbacks.onPRCommentPosted?.(data);
-  });
-  window.runtime.EventsOn('prCheckoutCompleted', (data) => {
-    callbacks.onPRCheckoutCompleted?.(data);
   });
   window.runtime.EventsOn('prCreated', (data) => {
     callbacks.onPRCreated?.(data);
@@ -154,15 +136,6 @@ export const api = {
 
   detectGH: () => window.go.main.App.DetectGH(),
 
-  searchPRList: (limit, search) => window.go.main.App.SearchPRList(limit, search),
-
-  getPRFiles: (number) => window.go.main.App.GetPRFiles(number),
-
-  getPRFileDiff: (number, path) => window.go.main.App.GetPRFileDiff(number, path),
-
-  getPRComments: (number) => window.go.main.App.GetPRComments(number),
-
-  // PR tabs: request/response per PR number (current repo); see PLAN.md "PR tabs" contract.
   getPRDetails: (number) => window.go.main.App.GetPRDetails(number),
 
   getPRFilesList: (number) => window.go.main.App.GetPRFilesList(number),
@@ -203,11 +176,7 @@ export const api = {
 
   clipboardGetText: () => window.runtime.ClipboardGetText(),
 
-  checkoutPR: (number) => window.go.main.App.CheckoutPR(number),
-
   previewWorktreePath: () => window.go.main.App.PreviewWorktreePath(),
-
-  checkoutPRToWorktree: (number, hash) => window.go.main.App.CheckoutPRToWorktree(number, hash ?? ''),
 
   createPR: (title, body, baseBranch, draft) =>
     window.go.main.App.CreatePR(title, body, baseBranch, draft),

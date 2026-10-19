@@ -52,9 +52,10 @@ function StateButton({ state, current, onPick }) {
 
 function PaletteDialog({ index, onClose, onHome, isMac }) {
   const query = useSignal('');
-  const prMode = useSignal(false);
-  /** Ref picker for "Diff against ref…" (exclusive with PR mode). */
-  const refMode = useSignal(false);
+  /** 'index' searches the workspace list, 'prs' searches pull requests, 'refs' picks a compare ref. */
+  const mode = useSignal(/** @type {'index' | 'prs' | 'refs'} */ ('index'));
+  const prMode = useComputed(() => mode.value === 'prs');
+  const refMode = useComputed(() => mode.value === 'refs');
   const refs = useSignal(/** @type {any[]} */ ([]));
   const refsLoading = useSignal(false);
   const refsError = useSignal('');
@@ -212,7 +213,7 @@ function PaletteDialog({ index, onClose, onHome, isMac }) {
   });
 
   function enterPRMode() {
-    prMode.value = true;
+    mode.value = 'prs';
     query.value = '';
 
     if (inputRef.current) {
@@ -222,7 +223,7 @@ function PaletteDialog({ index, onClose, onHome, isMac }) {
   }
 
   function exitPRMode() {
-    prMode.value = false;
+    mode.value = 'index';
     query.value = '';
   }
 
@@ -236,7 +237,7 @@ function PaletteDialog({ index, onClose, onHome, isMac }) {
   }
 
   async function enterRefMode() {
-    refMode.value = true;
+    mode.value = 'refs';
     resetInput();
     refsLoading.value = true;
     refsError.value = '';
@@ -251,7 +252,7 @@ function PaletteDialog({ index, onClose, onHome, isMac }) {
   }
 
   function exitRefMode() {
-    refMode.value = false;
+    mode.value = 'index';
     query.value = '';
   }
 
@@ -329,12 +330,12 @@ function PaletteDialog({ index, onClose, onHome, isMac }) {
     const el = e.currentTarget;
 
     // A leading # switches to PR mode; the rest of the input becomes the PR query.
-    if (!prMode.peek() && !refMode.peek() && el.value.startsWith('#')) {
-      const { query: rest } = parsePaletteInput(el.value);
+    if (mode.peek() === 'index' && el.value.startsWith('#')) {
+      const parsedInput = parsePaletteInput(el.value);
 
-      prMode.value = true;
-      query.value = rest;
-      el.value = rest;
+      mode.value = parsedInput.mode;
+      query.value = parsedInput.query;
+      el.value = parsedInput.query;
 
       return;
     }

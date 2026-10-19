@@ -14,14 +14,14 @@ import {
 
 describe('parsePaletteInput', () => {
   it('enters PR mode on a leading #', () => {
-    expect(parsePaletteInput('#')).toEqual({ prMode: true, query: '' });
-    expect(parsePaletteInput('#36')).toEqual({ prMode: true, query: '36' });
-    expect(parsePaletteInput('# fix bug')).toEqual({ prMode: true, query: 'fix bug' });
+    expect(parsePaletteInput('#')).toEqual({ mode: 'prs', query: '' });
+    expect(parsePaletteInput('#36')).toEqual({ mode: 'prs', query: '36' });
+    expect(parsePaletteInput('# fix bug')).toEqual({ mode: 'prs', query: 'fix bug' });
   });
 
   it('keeps # elsewhere in the query as plain text', () => {
-    expect(parsePaletteInput('repo#36')).toEqual({ prMode: false, query: 'repo#36' });
-    expect(parsePaletteInput('')).toEqual({ prMode: false, query: '' });
+    expect(parsePaletteInput('repo#36')).toEqual({ mode: 'index', query: 'repo#36' });
+    expect(parsePaletteInput('')).toEqual({ mode: 'index', query: '' });
   });
 });
 

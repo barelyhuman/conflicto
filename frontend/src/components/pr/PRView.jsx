@@ -50,13 +50,6 @@ function stateClass(d) {
 export function PRView({ tabs, scope, number }) {
   const model = useMemo(() => prTabs.get(scope, number), [scope, number]);
 
-  // Only the visible PR tab polls checks.
-  useEffect(() => {
-    model.setActive(true);
-
-    return () => model.setActive(false);
-  }, [model]);
-
   // The strip shows `#n title` once the details arrive.
   useSignalEffect(() => {
     const d = model.details.value;

@@ -6,14 +6,6 @@ export function CheckRecentProjects() {
   return window['go']['main']['App']['CheckRecentProjects']();
 }
 
-export function CheckoutPR(arg1) {
-  return window['go']['main']['App']['CheckoutPR'](arg1);
-}
-
-export function CheckoutPRToWorktree(arg1, arg2) {
-  return window['go']['main']['App']['CheckoutPRToWorktree'](arg1, arg2);
-}
-
 export function Commit(arg1) {
   return window['go']['main']['App']['Commit'](arg1);
 }
@@ -78,32 +70,16 @@ export function GetFileContents(arg1, arg2) {
   return window['go']['main']['App']['GetFileContents'](arg1, arg2);
 }
 
-export function GetPRComments(arg1) {
-  return window['go']['main']['App']['GetPRComments'](arg1);
-}
-
 export function GetPRDetails(arg1) {
   return window['go']['main']['App']['GetPRDetails'](arg1);
-}
-
-export function GetPRFileDiff(arg1, arg2) {
-  return window['go']['main']['App']['GetPRFileDiff'](arg1, arg2);
 }
 
 export function GetPRFilePatch(arg1, arg2) {
   return window['go']['main']['App']['GetPRFilePatch'](arg1, arg2);
 }
 
-export function GetPRFiles(arg1) {
-  return window['go']['main']['App']['GetPRFiles'](arg1);
-}
-
 export function GetPRFilesList(arg1) {
   return window['go']['main']['App']['GetPRFilesList'](arg1);
-}
-
-export function GetPRList() {
-  return window['go']['main']['App']['GetPRList']();
 }
 
 export function GetPRReviewComments(arg1) {
@@ -204,10 +180,6 @@ export function RemoveWorktree(arg1) {
 
 export function SaveReviewDraft(arg1, arg2) {
   return window['go']['main']['App']['SaveReviewDraft'](arg1, arg2);
-}
-
-export function SearchPRList(arg1, arg2) {
-  return window['go']['main']['App']['SearchPRList'](arg1, arg2);
 }
 
 export function SearchPRs(arg1, arg2, arg3) {

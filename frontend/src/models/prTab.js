@@ -1,8 +1,7 @@
-import { createModel, signal, computed, effect } from '@preact/signals';
+import { createModel, signal, computed } from '@preact/signals';
 import { api as defaultApi } from '../wails.js';
 import { ReviewModel } from './review.js';
-
-const CHECKS_POLL_MS = 30_000;
+import { activePatch, beginPatch, dropPatches, emptyFileSet, endPatch, fileIndex, patchPending, putPatch, stepPath, withList } from './fileSet.js';
 
 const errText = (err) => err?.message ?? String(err);
 
@@ -18,21 +17,15 @@ const errText = (err) => err?.message ?? String(err);
  *   number: number,
  *   api?: typeof defaultApi,
  *   onError?: (title: string, message: string) => void,
- *   pollMs?: number,
- *   now?: () => number,
  *   readClipboard?: () => Promise<string>,
  * }} opts
  */
 export const PRTabModel = createModel(
-  ({ number, api = defaultApi, onError, pollMs = CHECKS_POLL_MS, now = Date.now, readClipboard }) => {
+  ({ number, api = defaultApi, onError, readClipboard }) => {
     const details = signal(/** @type {any} */ (null));
-    const files = signal(/** @type {PRFileEntry[]} */ ([]));
+    const fileSet = signal(emptyFileSet());
     const comments = signal(/** @type {any[]} */ ([]));
     const timeline = signal(/** @type {any[]} */ ([]));
-    const selectedPath = signal(/** @type {string|null} */ (null));
-    /** path -> { path, patch } */
-    const patches = signal(/** @type {Record<string, any>} */ ({}));
-    const loadingPatch = signal(/** @type {string|null} */ (null));
     const view = signal(/** @type {'files'|'conversation'} */ ('files'));
     const loading = signal(true);
     const filesLoading = signal(true);
@@ -41,27 +34,15 @@ export const PRTabModel = createModel(
     const filesError = signal(/** @type {string|null} */ (null));
     const timelineError = signal(/** @type {string|null} */ (null));
     const patchError = signal(/** @type {string|null} */ (null));
-    const active = signal(false);
 
     let disposed = false;
-    let lastDetailsAt = 0;
     let loadedOnce = false;
 
-    const selectedIndex = computed(() => files.value.findIndex((f) => f.path === selectedPath.value));
-
-    const activeDiff = computed(() => {
-      const path = selectedPath.value;
-      const cache = patches.value;
-
-      return path ? (cache[path] ?? null) : null;
-    });
-
-    const diffLoading = computed(() => {
-      const path = selectedPath.value;
-      const pending = loadingPatch.value;
-
-      return path != null && pending === path;
-    });
+    const files = computed(() => fileSet.value.list);
+    const selectedPath = computed(() => fileSet.value.selected);
+    const selectedIndex = computed(() => fileIndex(fileSet.value));
+    const activeDiff = computed(() => activePatch(fileSet.value));
+    const diffLoading = computed(() => patchPending(fileSet.value));
 
     const checks = computed(() => details.value?.checks ?? null);
 
@@ -78,7 +59,6 @@ export const PRTabModel = createModel(
         if (disposed) return;
         details.value = d ?? null;
         error.value = d ? null : 'Pull request not found.';
-        lastDetailsAt = now();
       } catch (err) {
         if (disposed) return;
 
@@ -96,14 +76,12 @@ export const PRTabModel = createModel(
         const list = (await api.getPRFilesList(number)) ?? [];
 
         if (disposed) return;
-        files.value = list;
+        fileSet.value = withList(fileSet.peek(), list);
         filesError.value = null;
 
-        const sel = selectedPath.peek();
+        const sel = fileSet.peek().selected;
 
-        if ((sel == null || !list.some((f) => f.path === sel)) && list.length > 0) {
-          selectPath(list[0].path);
-        }
+        if (sel && !fileSet.peek().patches[sel]) await fetchPatch(sel);
       } catch (err) {
         if (!disposed) filesError.value = errText(err);
       } finally {
@@ -138,26 +116,26 @@ export const PRTabModel = createModel(
     }
 
     async function fetchPatch(path) {
-      if (patches.peek()[path]) return;
-      loadingPatch.value = path;
+      if (fileSet.peek().patches[path]) return;
+      fileSet.value = beginPatch(fileSet.peek(), path);
       patchError.value = null;
 
       try {
         const data = await api.getPRFilePatch(number, path);
 
         if (disposed) return;
-        patches.value = { ...patches.peek(), [path]: { ...(data ?? {}), path } };
+        fileSet.value = putPatch(fileSet.peek(), path, { ...(data ?? {}), path });
       } catch (err) {
         if (!disposed) patchError.value = errText(err);
       } finally {
-        if (!disposed && loadingPatch.peek() === path) loadingPatch.value = null;
+        if (!disposed) fileSet.value = endPatch(fileSet.peek(), path);
       }
     }
 
     function selectPath(path) {
-      if (!path) return;
-      selectedPath.value = path;
+      if (!path) return undefined;
       patchError.value = null;
+      fileSet.value = { ...fileSet.peek(), selected: path };
 
       return fetchPatch(path);
     }
@@ -182,13 +160,6 @@ export const PRTabModel = createModel(
 
     const review = new ReviewModel({ api: reviewApi, onError, readClipboard });
 
-    effect(() => {
-      if (!active.value) return undefined;
-      const id = setInterval(() => loadDetails({ silent: true }), pollMs);
-
-      return () => clearInterval(id);
-    });
-
     return {
       number,
       review,
@@ -209,26 +180,27 @@ export const PRTabModel = createModel(
       filesError,
       timelineError,
       patchError,
-      active,
 
-      /** Fetch everything once; later calls are no-ops (use `refresh`). */
+      /**
+       * Fetch everything once; later calls are no-ops (use `refresh`).
+       * Review drafts load after the file list so line checks see the PR file cache.
+       */
       async load() {
         if (loadedOnce) return;
         loadedOnce = true;
-        await Promise.all([loadDetails(), loadFiles(), loadComments(), loadTimeline(), review.load(number)]);
+        await Promise.all([loadDetails(), loadFiles(), loadComments(), loadTimeline()]);
+        await review.load(number);
       },
 
       /** Re-fetch everything (patches are dropped; head may have moved). */
       async refresh() {
-        patches.value = {};
+        fileSet.value = dropPatches(fileSet.peek());
         loadedOnce = true;
-        const sel = selectedPath.peek();
-        await Promise.all([loadDetails(), loadFiles(), loadComments(), loadTimeline(), review.load(number)]);
-
-        if (sel && selectedPath.peek() === sel && !patches.peek()[sel]) await fetchPatch(sel);
+        await Promise.all([loadDetails(), loadFiles(), loadComments(), loadTimeline()]);
+        await review.load(number);
       },
 
-      /** Details only (checks, state, worktree link); keeps stale data on failure. */
+      /** Header fields only; a failed refresh keeps the details already on screen. */
       refreshDetails() {
         return loadDetails({ silent: true });
       },
@@ -239,26 +211,13 @@ export const PRTabModel = createModel(
 
       /** Step the selected file by `delta` (wraps). */
       stepFile(delta) {
-        const list = files.peek();
+        const path = stepPath(fileSet.peek().list, fileSet.peek().selected, delta);
 
-        if (list.length === 0) return;
-        const idx = selectedIndex.peek();
-        const at = idx < 0 ? (delta > 0 ? 0 : list.length - 1) : (idx + delta + list.length) % list.length;
-        selectPath(list[at].path);
+        if (path) selectPath(path);
       },
 
       setView(next) {
         view.value = next === 'conversation' ? 'conversation' : 'files';
-      },
-
-      /** Checks polling runs only while the tab is the active one. */
-      setActive(next) {
-        const was = active.peek();
-        active.value = !!next;
-
-        if (next && !was && details.peek() && now() - lastDetailsAt >= pollMs) {
-          loadDetails({ silent: true });
-        }
       },
 
       /** Push a fresh checks summary (monitor event) into the details. */
@@ -292,9 +251,9 @@ export const PRTabModel = createModel(
  * so moving a tab from the origin scope into the worktree scope (`rekey`)
  * keeps everything that was already fetched.
  *
- * @param {{ api?: typeof defaultApi, onError?: (title: string, message: string) => void, pollMs?: number }} [opts]
+ * @param {{ api?: typeof defaultApi, onError?: (title: string, message: string) => void }} [opts]
  */
-export function createPRTabRegistry({ api = defaultApi, onError, pollMs } = {}) {
+export function createPRTabRegistry({ api = defaultApi, onError } = {}) {
   /** @type {Map<string, InstanceType<typeof PRTabModel>>} */
   const entries = new Map();
   let errorSink = onError;
@@ -322,7 +281,6 @@ export function createPRTabRegistry({ api = defaultApi, onError, pollMs } = {}) 
         model = new PRTabModel({
           number,
           api,
-          pollMs,
           onError: (t, m) => errorSink?.(t, m),
         });
         entries.set(k, model);

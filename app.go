@@ -3,12 +3,11 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io/fs"
 	"os"
 	"os/exec"
-	"path/filepath"
-	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -91,14 +90,6 @@ func (a *App) startup(ctx context.Context) {
 
 	// Detect gh CLI status
 	a.DetectGH()
-
-	// Initial UI state is emitted from Refresh() once the frontend
-	// has registered event listeners (startup races ahead of that).
-
-	// Fetch PR list if gh is available and we're in a repo
-	if a.git != nil && a.git.IsRepo() {
-		go a.GetPRList()
-	}
 }
 
 // domReady is called after the frontend has loaded
@@ -289,26 +280,15 @@ func (a *App) emitAheadBehind() {
 	})
 }
 
-// emitDiff emits diff data for a file.
-// staged selects index-vs-HEAD (true) or worktree-vs-index (false).
-func (a *App) emitDiff(path string, staged bool) {
+// GetDiff returns the working-tree or staged diff for one file.
+// staged=true → staged (index) diff; staged=false → unstaged (worktree) diff.
+func (a *App) GetDiff(path string, staged bool) (*FileDiff, error) {
 	if a.git == nil || !a.git.IsRepo() {
-		return
+		return nil, fmt.Errorf("no repository open")
 	}
 
-	diff, err := a.git.GetDiff(path, staged)
-	if err != nil {
-		a.EmitEvent("error", map[string]string{
-			"title":   "Diff Error",
-			"message": err.Error(),
-		})
-		return
-	}
-
-	a.EmitEvent("diffLoaded", diff)
+	return a.git.GetDiff(path, staged)
 }
-
-// StageFile stages a file
 func (a *App) StageFile(path string) error {
 	if a.git == nil {
 		return fmt.Errorf("no git repository")
@@ -383,13 +363,6 @@ func (a *App) SwitchBranch(name string) error {
 	a.emitBranchStatus()
 	a.emitFileStatus()
 	a.emitAheadBehind()
-	return nil
-}
-
-// GetDiff gets diff for a file.
-// staged=true → staged (index) diff; staged=false → unstaged (worktree) diff.
-func (a *App) GetDiff(path string, staged bool) error {
-	a.emitDiff(path, staged)
 	return nil
 }
 
@@ -538,137 +511,6 @@ func (a *App) DetectGH() {
 	})
 }
 
-// GetPRList gets list of open PRs for the current repo and emits structured data
-func (a *App) GetPRList() error {
-	if a.git == nil || !a.git.IsRepo() {
-		return fmt.Errorf("no git repository")
-	}
-
-	cmd := appCommand("gh", "pr", "list", "--json", "number,title,author,baseRefName", "--limit", "20")
-	cmd.Dir = a.git.path
-	out, err := cmd.Output()
-	if err != nil {
-		a.EmitEvent("error", map[string]string{
-			"title":   "PR List Error",
-			"message": "Failed to fetch PR list. Make sure gh CLI is authenticated.",
-		})
-		return err
-	}
-
-	var raw []struct {
-		Number int    `json:"number"`
-		Title  string `json:"title"`
-		Author struct {
-			Login string `json:"login"`
-		} `json:"author"`
-		BaseRefName string `json:"baseRefName"`
-	}
-	if err := json.Unmarshal(out, &raw); err != nil {
-		a.EmitEvent("error", map[string]string{
-			"title":   "PR List Parse Error",
-			"message": err.Error(),
-		})
-		return err
-	}
-
-	prs := make([]map[string]interface{}, 0, len(raw))
-	for _, pr := range raw {
-		prs = append(prs, map[string]interface{}{
-			"number":     pr.Number,
-			"title":      pr.Title,
-			"author":     pr.Author.Login,
-			"baseBranch": pr.BaseRefName,
-		})
-	}
-
-	a.EmitEvent("prListUpdated", map[string]interface{}{
-		"prs": prs,
-	})
-	return nil
-}
-
-// SearchPRList searches open PRs with optional query and returns structured data.
-func (a *App) SearchPRList(limit int, search string) ([]map[string]interface{}, error) {
-	if a.git == nil || !a.git.IsRepo() {
-		return nil, fmt.Errorf("no git repository")
-	}
-
-	args := []string{"pr", "list", "--json", "number,title,author,baseRefName", "--limit", strconv.Itoa(limit)}
-	if search != "" {
-		args = append(args, "--search", search)
-	}
-	cmd := appCommand("gh", args...)
-	cmd.Dir = a.git.path
-	out, err := cmd.Output()
-	if err != nil {
-		return nil, fmt.Errorf("gh pr list failed: %w", err)
-	}
-
-	var raw []struct {
-		Number int    `json:"number"`
-		Title  string `json:"title"`
-		Author struct {
-			Login string `json:"login"`
-		} `json:"author"`
-		BaseRefName string `json:"baseRefName"`
-	}
-	if err := json.Unmarshal(out, &raw); err != nil {
-		return nil, err
-	}
-
-	prs := make([]map[string]interface{}, 0, len(raw))
-	for _, pr := range raw {
-		prs = append(prs, map[string]interface{}{
-			"number":     pr.Number,
-			"title":      pr.Title,
-			"author":     pr.Author.Login,
-			"baseBranch": pr.BaseRefName,
-		})
-	}
-	return prs, nil
-}
-
-// GetPRFiles fetches the changed files for a PR (cached) and emits prFilesUpdated.
-// Prefer GetPRFilesList, which returns the data and has no global side effects.
-func (a *App) GetPRFiles(number int) error {
-	files, err := a.GetPRFilesList(number)
-	if err != nil {
-		a.EmitEvent("error", map[string]string{
-			"title":   "PR Files Error",
-			"message": err.Error(),
-		})
-		return err
-	}
-	fileList := make([]map[string]interface{}, 0, len(files))
-	for _, f := range files {
-		fileList = append(fileList, map[string]interface{}{
-			"path":   f.Path,
-			"status": f.Status,
-		})
-	}
-	a.EmitEvent("prFilesUpdated", map[string]interface{}{
-		"number": number,
-		"files":  fileList,
-	})
-	return nil
-}
-
-// GetPRFileDiff emits the diff patch for a single file in a PR.
-// Prefer GetPRFilePatch, which returns the diff.
-func (a *App) GetPRFileDiff(number int, path string) error {
-	diff, err := a.GetPRFilePatch(number, path)
-	if err != nil {
-		a.EmitEvent("error", map[string]string{
-			"title":   "PR Diff Error",
-			"message": err.Error(),
-		})
-		a.EmitEvent("diffLoaded", &FileDiff{Path: path, Patch: ""})
-		return err
-	}
-	a.EmitEvent("diffLoaded", diff)
-	return nil
-}
-
 func fileDiffFromPRCache(cache PRCache, number int, path string) (*FileDiff, error) {
 	for _, f := range cache.Files {
 		if f.Path == path {
@@ -723,25 +565,6 @@ func normalizeGitHubPatch(path, status, patch string) string {
 // invalidatePRCache resets all PR cache timestamps so the next fetch hits the API
 func (a *App) invalidatePRCache() {
 	a.prCache.invalidate()
-}
-
-// GetPRComments fetches review comments for a PR and emits prCommentsUpdated.
-// Prefer GetPRReviewComments, which returns the data.
-func (a *App) GetPRComments(number int) error {
-	comments, err := a.GetPRReviewComments(number)
-	if err != nil {
-		a.EmitEvent("error", map[string]string{
-			"title":   "PR Comments Error",
-			"message": err.Error(),
-		})
-		return err
-	}
-	raw, _ := json.Marshal(comments)
-	a.EmitEvent("prCommentsUpdated", map[string]interface{}{
-		"number": number,
-		"raw":    string(raw),
-	})
-	return nil
 }
 
 // PostPRComment posts a review comment on a PR file
@@ -801,33 +624,6 @@ func (a *App) PostPRComment(number int, path string, body string, line int, side
 	return nil
 }
 
-// CheckoutPR checks out a PR branch locally using gh pr checkout
-func (a *App) CheckoutPR(number int) error {
-	if a.git == nil || !a.git.IsRepo() {
-		return fmt.Errorf("no git repository")
-	}
-
-	cmd := appCommand("gh", "pr", "checkout", fmt.Sprintf("%d", number))
-	cmd.Dir = a.git.path
-	out, err := cmd.CombinedOutput()
-	if err != nil {
-		a.EmitEvent("error", map[string]string{
-			"title":   "Checkout Error",
-			"message": string(out),
-		})
-		return err
-	}
-
-	a.emitBranchStatus()
-	a.emitFileStatus()
-	a.emitAheadBehind()
-	a.EmitEvent("prCheckoutCompleted", map[string]interface{}{
-		"number": number,
-		"mode":   "local",
-	})
-	return nil
-}
-
 // PreviewWorktreePath returns a planned worktree path and hash without creating anything.
 func (a *App) PreviewWorktreePath() (WorktreePathPreview, error) {
 	if a.git == nil || !a.git.IsRepo() {
@@ -840,42 +636,6 @@ func (a *App) PreviewWorktreePath() (WorktreePathPreview, error) {
 	}
 
 	return WorktreePathPreview{Path: path, Hash: hash}, nil
-}
-
-// CheckoutPRToWorktree checks out a PR into a new git worktree outside the repo.
-// If hash is non-empty, uses the pre-reserved path from PreviewWorktreePath.
-func (a *App) CheckoutPRToWorktree(number int, hash string) error {
-	if a.git == nil || !a.git.IsRepo() {
-		return fmt.Errorf("no git repository")
-	}
-
-	mainRepo, err := a.git.MainRepoPath()
-	if err != nil {
-		return err
-	}
-	repoName := filepath.Base(mainRepo)
-
-	worktreePath, err := createPRWorktree(a.git, number, hash, func(title string, err error) {
-		a.EmitEvent("error", map[string]string{
-			"title":   title,
-			"message": err.Error(),
-		})
-	})
-	if err != nil {
-		return err
-	}
-
-	if err := a.switchToProject(worktreePath); err != nil {
-		return err
-	}
-
-	a.EmitEvent("prCheckoutCompleted", map[string]interface{}{
-		"number":       number,
-		"mode":         "worktree",
-		"worktreePath": worktreePath,
-		"repoName":     repoName,
-	})
-	return nil
 }
 
 // GetWorktrees returns all worktrees for the current repository.
@@ -975,8 +735,6 @@ func (a *App) CreatePR(title string, body string, baseBranch string, draft bool)
 		"base":  baseBranch,
 		"url":   strings.TrimSpace(string(out)),
 	})
-	// Refresh PR list after creating
-	go a.GetPRList()
 	return nil
 }
 
@@ -1031,9 +789,6 @@ func (a *App) switchToProject(path string) error {
 	a.emitBranchStatus()
 	a.emitAheadBehind()
 
-	// Fetch PR list for the new repo
-	go a.GetPRList()
-
 	a.emitWorktreesUpdated()
 
 	return nil
@@ -1064,7 +819,7 @@ func (a *App) SwitchProject(path string) error {
 	// OpenRepo walks up to the nearest .git, so a deleted folder would
 	// otherwise silently open whatever repository encloses it.
 	if _, err := os.Stat(path); err != nil {
-		if err.Error() == fs.ErrExist.Error() {
+		if errors.Is(err, fs.ErrNotExist) {
 			return fmt.Errorf("folder not available: %s", path)
 		}
 		return fmt.Errorf("failed to switch to: %s", path)
@@ -1116,7 +871,6 @@ func (a *App) Refresh() {
 	a.DetectGH()
 	if a.git != nil && a.git.IsRepo() {
 		a.invalidatePRCache()
-		go a.GetPRList()
 	}
 	a.emitWorktreesUpdated()
 	a.EmitEvent("refreshCompleted", nil)

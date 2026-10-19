@@ -83,6 +83,55 @@ describe('SelectionModel diffLoading', () => {
     expect(selection.diffLoading.value).toBe(false);
   });
 
+  it('stores a diff on the scope that requested it', async () => {
+    /** @type {((data: object) => void)[]} */
+    const replies = [];
+
+    getDiff.mockImplementation(() => new Promise((resolve) => replies.push(resolve)));
+    selection.setScope('/a');
+    selection.select('a.go', 'unstaged');
+    selection.setScope('/b');
+    selection.select('a.go', 'unstaged');
+    replies[0]({ path: 'a.go', patch: 'from-a' });
+    await Promise.resolve();
+    expect(selection.activeDiff.value).toBeNull();
+
+    selection.setScope('/a');
+    selection.select('a.go', 'unstaged');
+    expect(selection.activeDiff.value).toEqual({ path: 'a.go', patch: 'from-a' });
+  });
+
+  it('reports a diff failure for the current scope and drops one from an old scope', async () => {
+    const onError = vi.fn();
+    const rejects = [];
+    const failing = new SelectionModel({
+      workingTree: makeWorkingTree(),
+      api: {
+        getDiff: () => new Promise((_, reject) => {
+          rejects.push(reject);
+        }),
+      },
+      onError,
+    });
+
+    failing.setScope('/a');
+    failing.select('a.go', 'unstaged');
+    failing.setScope('/b');
+    failing.select('b.go', 'unstaged');
+    rejects[0](new Error('from-a'));
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(onError).not.toHaveBeenCalled();
+    expect(failing.activeFile.value).toBe('b.go');
+    expect(failing.diffLoading.value).toBe(true);
+
+    rejects[1](new Error('no repo'));
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(onError).toHaveBeenCalledWith('Diff Error', 'no repo');
+    expect(failing.diffLoading.value).toBe(false);
+
+    failing[Symbol.dispose]?.();
+  });
+
   it('conflict selection skips getDiff', () => {
     selection.select('conflicted.js', 'conflict');
 

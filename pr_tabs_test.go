@@ -96,8 +96,8 @@ func TestGetPRDetailsChecksAndWorktree(t *testing.T) {
 	if d.WorktreePath != wt {
 		t.Errorf("worktree = %q want %q", d.WorktreePath, wt)
 	}
-	if d.Checks == nil || d.Checks.Status != "failure" || d.Checks.Total != 2 {
-		t.Errorf("checks = %+v", d.Checks)
+	if d.Checks != nil {
+		t.Errorf("checks = %+v, the monitor owns checks", d.Checks)
 	}
 	d2, err := a.GetPRDetails(2)
 	if err != nil || d2.WorktreePath != "" {

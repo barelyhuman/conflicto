@@ -20,14 +20,14 @@ export function nextPRState(state) {
  * Split raw palette input into mode and query. A leading `#` switches to PR mode;
  * the query is what follows it.
  *
- * @returns {{ prMode: boolean, query: string }}
+ * @returns {{ mode: 'index' | 'prs', query: string }}
  */
 export function parsePaletteInput(raw) {
   const value = raw ?? '';
 
-  if (value.startsWith('#')) return { prMode: true, query: value.slice(1).trimStart() };
+  if (value.startsWith('#')) return { mode: 'prs', query: value.slice(1).trimStart() };
 
-  return { prMode: false, query: value };
+  return { mode: 'index', query: value };
 }
 
 /**
