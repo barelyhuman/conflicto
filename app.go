@@ -40,7 +40,7 @@ type App struct {
 	settings *Settings
 	git      *GitService
 	recents  *RecentsManager
-	prCache  map[int]PRCache
+	prCache  *prCacheStore
 	prChecks *prChecksMonitor
 	terms    *terminalManager
 
@@ -52,6 +52,10 @@ type App struct {
 	searchMu     sync.Mutex
 	searchCancel context.CancelFunc
 
+	prSearchMu     sync.Mutex
+	prSearchCancel context.CancelFunc
+	prSlugs        sync.Map // main repo path -> owner/repo
+
 	wsIndex    *workspaceIndex
 	wsInitOnce sync.Once
 }
@@ -59,7 +63,7 @@ type App struct {
 // NewApp creates a new App application struct
 func NewApp() *App {
 	return &App{
-		prCache: make(map[int]PRCache),
+		prCache: newPRCacheStore(),
 	}
 }
 
@@ -216,6 +220,9 @@ func (a *App) beforeClose(ctx context.Context) bool {
 
 // EmitEvent emits a named event to the frontend
 func (a *App) EmitEvent(name string, data interface{}) {
+	if a.ctx == nil {
+		return // before startup (and in tests) there is no Wails runtime to emit to
+	}
 	runtime.EventsEmit(a.ctx, name, data)
 }
 
@@ -620,29 +627,10 @@ func (a *App) SearchPRList(limit int, search string) ([]map[string]interface{}, 
 	return prs, nil
 }
 
-// GetPRFiles fetches the changed files for a PR via GitHub API and caches them
+// GetPRFiles fetches the changed files for a PR (cached) and emits prFilesUpdated.
+// Prefer GetPRFilesList, which returns the data and has no global side effects.
 func (a *App) GetPRFiles(number int) error {
-	if a.git == nil || !a.git.IsRepo() {
-		return fmt.Errorf("no git repository")
-	}
-
-	// Return cached file list if still fresh (without re-fetching patches)
-	if cache, ok := a.prCache[number]; ok && !cache.FetchedAt.IsZero() && time.Since(cache.FetchedAt) < prCacheTTL {
-		fileList := make([]map[string]interface{}, 0, len(cache.Files))
-		for _, f := range cache.Files {
-			fileList = append(fileList, map[string]interface{}{
-				"path":   f.Path,
-				"status": f.Status,
-			})
-		}
-		a.EmitEvent("prFilesUpdated", map[string]interface{}{
-			"number": number,
-			"files":  fileList,
-		})
-		return nil
-	}
-
-	slug, err := a.git.GetRepoSlug()
+	files, err := a.GetPRFilesList(number)
 	if err != nil {
 		a.EmitEvent("error", map[string]string{
 			"title":   "PR Files Error",
@@ -650,86 +638,6 @@ func (a *App) GetPRFiles(number int) error {
 		})
 		return err
 	}
-
-	var apiFiles []struct {
-		Filename  string `json:"filename"`
-		Status    string `json:"status"`
-		Additions int    `json:"additions"`
-		Deletions int    `json:"deletions"`
-		Patch     string `json:"patch"`
-	}
-
-	// GitHub paginates at 30 by default (max 100); walk pages until exhausted.
-	const perPage = 100
-	for page := 1; ; page++ {
-		cmd := appCommand(
-			"gh", "api",
-			fmt.Sprintf("repos/%s/pulls/%d/files?per_page=%d&page=%d", slug, number, perPage, page),
-		)
-		cmd.Dir = a.git.path
-		out, err := cmd.Output()
-		if err != nil {
-			a.EmitEvent("error", map[string]string{
-				"title":   "PR Files Error",
-				"message": fmt.Sprintf("Failed to fetch files for PR #%d", number),
-			})
-			return err
-		}
-
-		var pageFiles []struct {
-			Filename  string `json:"filename"`
-			Status    string `json:"status"`
-			Additions int    `json:"additions"`
-			Deletions int    `json:"deletions"`
-			Patch     string `json:"patch"`
-		}
-		if err := json.Unmarshal(out, &pageFiles); err != nil {
-			a.EmitEvent("error", map[string]string{
-				"title":   "PR Files Parse Error",
-				"message": err.Error(),
-			})
-			return err
-		}
-		apiFiles = append(apiFiles, pageFiles...)
-		if len(pageFiles) < perPage {
-			break
-		}
-		// GitHub caps list-files at 3000 entries.
-		if len(apiFiles) >= 3000 {
-			break
-		}
-	}
-
-	files := make([]PRFile, 0, len(apiFiles))
-	for _, f := range apiFiles {
-		status := strings.ToUpper(f.Status)
-		if len(status) > 1 {
-			status = string(status[0])
-		}
-		files = append(files, PRFile{
-			Path:      f.Filename,
-			Status:    status,
-			Additions: f.Additions,
-			Deletions: f.Deletions,
-			Patch:     f.Patch,
-		})
-	}
-
-	// Fetch PR head SHA for posting comments
-	headSHA := ""
-	headCmd := appCommand("gh", "api", fmt.Sprintf("repos/%s/pulls/%d", slug, number), "--jq", ".head.sha")
-	headCmd.Dir = a.git.path
-	if headOut, headErr := headCmd.Output(); headErr == nil {
-		headSHA = strings.TrimSpace(string(headOut))
-	}
-
-	a.prCache[number] = PRCache{
-		HeadSHA:   headSHA,
-		Files:     files,
-		FetchedAt: time.Now(),
-	}
-
-	// Emit simplified file list to frontend (no patch payload)
 	fileList := make([]map[string]interface{}, 0, len(files))
 	for _, f := range files {
 		fileList = append(fileList, map[string]interface{}{
@@ -744,49 +652,20 @@ func (a *App) GetPRFiles(number int) error {
 	return nil
 }
 
-// GetPRFileDiff returns the diff patch for a single file in a cached PR
+// GetPRFileDiff emits the diff patch for a single file in a PR.
+// Prefer GetPRFilePatch, which returns the diff.
 func (a *App) GetPRFileDiff(number int, path string) error {
-	cache, err := loadPRCacheEntry(a.prCache, number, func() error {
-		return a.GetPRFiles(number)
-	})
-	if err != nil {
-		if strings.Contains(err.Error(), "not cached") {
-			a.EmitEvent("error", map[string]string{
-				"title":   "PR Diff Error",
-				"message": fmt.Sprintf("PR #%d not loaded. Fetch files first.", number),
-			})
-		}
-		a.EmitEvent("diffLoaded", &FileDiff{Path: path, Patch: ""})
-		return err
-	}
-
-	diff, err := fileDiffFromPRCache(cache, number, path)
+	diff, err := a.GetPRFilePatch(number, path)
 	if err != nil {
 		a.EmitEvent("error", map[string]string{
 			"title":   "PR Diff Error",
-			"message": fmt.Sprintf("File %s not found in PR #%d", path, number),
+			"message": err.Error(),
 		})
 		a.EmitEvent("diffLoaded", &FileDiff{Path: path, Patch: ""})
 		return err
 	}
 	a.EmitEvent("diffLoaded", diff)
 	return nil
-}
-
-// loadPRCacheEntry returns a populated cache entry, calling reload when missing or empty.
-func loadPRCacheEntry(cache map[int]PRCache, number int, reload func() error) (PRCache, error) {
-	entry, ok := cache[number]
-	if ok && len(entry.Files) > 0 {
-		return entry, nil
-	}
-	if err := reload(); err != nil {
-		return PRCache{}, err
-	}
-	entry, ok = cache[number]
-	if !ok {
-		return PRCache{}, fmt.Errorf("PR #%d not cached", number)
-	}
-	return entry, nil
 }
 
 func fileDiffFromPRCache(cache PRCache, number int, path string) (*FileDiff, error) {
@@ -842,19 +721,13 @@ func normalizeGitHubPatch(path, status, patch string) string {
 
 // invalidatePRCache resets all PR cache timestamps so the next fetch hits the API
 func (a *App) invalidatePRCache() {
-	for n, cache := range a.prCache {
-		cache.FetchedAt = time.Time{}
-		a.prCache[n] = cache
-	}
+	a.prCache.invalidate()
 }
 
-// GetPRComments fetches review comments for a PR
+// GetPRComments fetches review comments for a PR and emits prCommentsUpdated.
+// Prefer GetPRReviewComments, which returns the data.
 func (a *App) GetPRComments(number int) error {
-	if a.git == nil || !a.git.IsRepo() {
-		return fmt.Errorf("no git repository")
-	}
-
-	slug, err := a.git.GetRepoSlug()
+	comments, err := a.GetPRReviewComments(number)
 	if err != nil {
 		a.EmitEvent("error", map[string]string{
 			"title":   "PR Comments Error",
@@ -862,28 +735,17 @@ func (a *App) GetPRComments(number int) error {
 		})
 		return err
 	}
-
-	cmd := appCommand("gh", "api", fmt.Sprintf("repos/%s/pulls/%d/comments", slug, number))
-	cmd.Dir = a.git.path
-	out, err := cmd.Output()
-	if err != nil {
-		a.EmitEvent("error", map[string]string{
-			"title":   "PR Comments Error",
-			"message": fmt.Sprintf("Failed to fetch comments for PR #%d", number),
-		})
-		return err
-	}
-
+	raw, _ := json.Marshal(comments)
 	a.EmitEvent("prCommentsUpdated", map[string]interface{}{
 		"number": number,
-		"raw":    string(out),
+		"raw":    string(raw),
 	})
 	return nil
 }
 
 // PostPRComment posts a review comment on a PR file
 func (a *App) PostPRComment(number int, path string, body string, line int, side string, startLine int, startSide string) error {
-	cache, ok := a.prCache[number]
+	cache, ok := a.cachedPR(number)
 	if !ok || cache.HeadSHA == "" {
 		a.EmitEvent("error", map[string]string{
 			"title":   "Comment Error",
@@ -1169,7 +1031,6 @@ func (a *App) switchToProject(path string) error {
 	a.emitAheadBehind()
 
 	// Fetch PR list for the new repo
-	a.prCache = make(map[int]PRCache)
 	go a.GetPRList()
 
 	a.emitWorktreesUpdated()
