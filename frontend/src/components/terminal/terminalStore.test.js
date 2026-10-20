@@ -199,6 +199,15 @@ describe('terminalStore scoping', () => {
     expect(snap.layouts).toHaveLength(0);
   });
 
+  it('removing the current scope keeps the dock on that scope instead of the null scope', () => {
+    store.setTerminalScope('/p1');
+    store.createTabPlaceholder();
+
+    store.removeTerminalScope('/p1');
+    // A null scope would make the dock start a shell with no cwd and adopt it into the next project.
+    expect(store.getTerminalStoreSnapshot().scopePath).toBe('/p1');
+  });
+
   it('panes created before the first project event are adopted into the first scope', () => {
     // Boot: dock bootstraps a pane before any projectChanged arrives
     const a = store.createTabPlaceholder();

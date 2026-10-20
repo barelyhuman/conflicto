@@ -179,12 +179,27 @@ func (s *reviewDraftStore) Delete(key, id string) error {
 	return s.write(all)
 }
 
-// Clear removes every draft for a key.
-func (s *reviewDraftStore) Clear(key string) error {
+// Remove deletes the drafts with the given IDs, leaving any others for the key (for
+// example drafts saved while a review was being posted).
+func (s *reviewDraftStore) Remove(key string, ids []string) error {
+	drop := make(map[string]bool, len(ids))
+	for _, id := range ids {
+		drop[id] = true
+	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	all := s.load()
-	delete(all, key)
+	kept := make([]ReviewDraft, 0, len(all[key]))
+	for _, d := range all[key] {
+		if !drop[d.ID] {
+			kept = append(kept, d)
+		}
+	}
+	if len(kept) == 0 {
+		delete(all, key)
+	} else {
+		all[key] = kept
+	}
 
 	return s.write(all)
 }
@@ -330,7 +345,8 @@ func (a *App) SubmitReview(number int, event string, body string) error {
 	}
 
 	store := a.reviewStore()
-	payload, err := buildReviewPayload(cache.HeadSHA, event, body, store.List(key))
+	drafts := store.List(key)
+	payload, err := buildReviewPayload(cache.HeadSHA, event, body, drafts)
 	if err != nil {
 		return err
 	}
@@ -344,7 +360,11 @@ func (a *App) SubmitReview(number int, event string, body string) error {
 
 		return fmt.Errorf("%s", msg)
 	}
-	if err := store.Clear(key); err != nil {
+	posted := make([]string, len(drafts))
+	for i, d := range drafts {
+		posted[i] = d.ID
+	}
+	if err := store.Remove(key, posted); err != nil {
 		return err
 	}
 	if a.ctx != nil {

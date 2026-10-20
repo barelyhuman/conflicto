@@ -18,7 +18,7 @@ import './tabs.css';
 async function readFile(path) {
   const res = await api.getFileContents(path, false);
 
-  if (!res?.hasNew) throw new Error('This file is missing or too large to open.');
+  if (!res?.hasNew) throw new Error('This file is missing, too large, or not UTF-8 text, so it cannot be opened.');
 
   return res.newContent;
 }
@@ -55,12 +55,14 @@ export function FileTabEditor({ tabId, path, scope, onError }) {
     async function save() {
       const handle = view && (await import('./cm/createEditor.js')).getHandle(view);
 
-      if (!handle) return;
+      // Saving an unmodified buffer would clobber newer on-disk content with a stale copy.
+      if (!handle?.isDirty()) return;
+      const written = handle.view.state.doc;
       const text = handle.getText();
 
       try {
         await api.writeFile(path, text);
-        handle.markSaved();
+        handle.markSaved(written);
         notifyFileSaved(ctx);
       } catch (err) {
         onErrorRef.current?.('Save Error', err?.message ?? String(err));

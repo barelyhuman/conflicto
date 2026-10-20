@@ -94,3 +94,20 @@ func TestGhPostReviewStub(t *testing.T) {
 		t.Fatal("stub not used")
 	}
 }
+
+func TestReviewDraftRemoveKeepsDraftsSavedMeanwhile(t *testing.T) {
+	s := newReviewDraftStore(filepath.Join(t.TempDir(), "d.json"))
+	key := reviewKey("/repo", 7)
+	posted, _ := s.Save(key, ReviewDraft{Path: "a.go", Body: "one", Line: 1})
+	ids := []string{posted.ID}
+	// A draft saved while the review is being posted must survive the cleanup.
+	late, _ := s.Save(key, ReviewDraft{Path: "b.go", Body: "two", Line: 2})
+
+	if err := s.Remove(key, ids); err != nil {
+		t.Fatal(err)
+	}
+	got := s.List(key)
+	if len(got) != 1 || got[0].ID != late.ID {
+		t.Fatalf("remaining drafts = %+v, want only the late one", got)
+	}
+}

@@ -226,6 +226,17 @@ describe('lsp session', () => {
     expect(session.servers.value.gopls.state).toBe('indexing');
   });
 
+  it('ignores status events from a process of another root', async () => {
+    const { backend, session } = await boot();
+    await vi.advanceTimersByTimeAsync(600);
+    const client = session.readyClientFor('go');
+    // The previous worktree's server reports its exit after the new one is running.
+    backend.status({ id: 'gopls', status: 'stopped', rootUri: 'file:///work/previous' });
+    backend.status({ id: 'gopls', status: 'error', error: 'old', rootUri: 'file:///work/previous' });
+    expect(session.servers.value.gopls.state).toBe('ready');
+    expect(session.readyClientFor('go')).toBe(client);
+  });
+
   it('drops all client state on project switch and re-starts lazily', async () => {
     const { backend, session } = await boot();
     await vi.advanceTimersByTimeAsync(600);

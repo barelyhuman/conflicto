@@ -3,6 +3,16 @@ import { findLinks, normalizeAbsolute, resolveRepoRelative, isOpenModifier } fro
 
 const files = (text) => findLinks(text).filter((l) => l.kind === 'file');
 
+describe('findLinks: performance', () => {
+  it('stays linear on a very long unbroken token', () => {
+    for (const text of ['a'.repeat(50000), 'a/'.repeat(25000), `${'a.'.repeat(25000)}b`]) {
+      const t0 = performance.now();
+      findLinks(text);
+      expect(performance.now() - t0).toBeLessThan(1000);
+    }
+  });
+});
+
 describe('findLinks: file paths', () => {
   it('parses path:line', () => {
     const [l] = files('error in src/app.go:42 here');

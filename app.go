@@ -779,7 +779,7 @@ func (a *App) switchToProject(path string) error {
 
 	// Update recents
 	if a.recents != nil {
-		a.recents.Add(path)
+		a.recents.Add(a.git.recentsPath())
 	}
 
 	// Emit updated state

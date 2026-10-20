@@ -8,6 +8,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"unicode/utf8"
 )
 
 // FileDiff is the minimal diff payload sent to the frontend (Pierre parses the patch).
@@ -144,7 +145,7 @@ func (gs *GitService) GetFileStatus() ([]FileStatus, []FileStatus, []FileStatus,
 	}
 
 	// -uall lists every untracked file (not just the top-level directory name).
-	out, err := gs.runGit("status", "--porcelain", "-uall")
+	out, err := gs.runGit("status", "--porcelain", "-z", "-uall")
 	if err != nil {
 		return nil, nil, nil, err
 	}
@@ -152,7 +153,7 @@ func (gs *GitService) GetFileStatus() ([]FileStatus, []FileStatus, []FileStatus,
 	// An un-ignored dependency/build folder can add tens of thousands of
 	// untracked files; collapse untracked directories back to one entry each.
 	if countUntracked(out) > maxUntrackedListed {
-		if collapsed, cerr := gs.runGit("status", "--porcelain", "-unormal"); cerr == nil {
+		if collapsed, cerr := gs.runGit("status", "--porcelain", "-z", "-unormal"); cerr == nil {
 			out = collapsed
 		}
 	}
@@ -165,10 +166,10 @@ func (gs *GitService) GetFileStatus() ([]FileStatus, []FileStatus, []FileStatus,
 // back to git's default per-directory listing.
 const maxUntrackedListed = 2000
 
-// countUntracked counts "?? " lines in porcelain status output.
+// countUntracked counts "?? " records in NUL-separated porcelain status output.
 func countUntracked(out []byte) int {
 	n := 0
-	for _, line := range bytes.Split(out, []byte("\n")) {
+	for _, line := range bytes.Split(out, []byte{0}) {
 		if bytes.HasPrefix(line, []byte("?? ")) {
 			n++
 		}
@@ -176,32 +177,35 @@ func countUntracked(out []byte) int {
 	return n
 }
 
-// parseFileStatus splits `git status --porcelain -uall` output into staged,
+// parseFileStatus splits `git status --porcelain -z` output into staged,
 // unstaged, and conflicts lists. repoDir is used to scan untracked files for
 // conflict markers. Conflict entries carry the raw two-char unmerged code
 // (UU, AA, DU, UD, AU, UA, DD); X describes our side vs the base and Y the
 // other side (e.g. UD = we kept our change, they deleted the file).
+//
+// -z keeps paths verbatim (no C-quoting) and lists a rename as "XY new\0old\0".
 func parseFileStatus(out string, repoDir string) ([]FileStatus, []FileStatus, []FileStatus) {
 	var staged []FileStatus
 	var unstaged []FileStatus
 	var conflicts []FileStatus
 
-	lines := strings.Split(out, "\n")
-	for _, line := range lines {
+	records := strings.Split(out, "\x00")
+	for i := 0; i < len(records); i++ {
+		line := records[i]
 		if len(line) < 3 {
 			continue
 		}
 
 		x := line[0] // index status
 		y := line[1] // worktree status
-		rest := line[3:]
-
-		// Parse path (handle renames with tab separator)
-		path := rest
-		oldPath := rest
-		if idx := strings.Index(rest, "\t"); idx != -1 {
-			oldPath = rest[:idx]
-			path = rest[idx+1:]
+		path := line[3:]
+		oldPath := path
+		if x == 'R' || x == 'C' || y == 'R' || y == 'C' {
+			// The origin path follows as its own record.
+			if i+1 < len(records) {
+				oldPath = records[i+1]
+				i++
+			}
 		}
 
 		// Untracked
@@ -312,13 +316,13 @@ func hasConflictMarker(content []byte) bool {
 
 // StageFile stages a file
 func (gs *GitService) StageFile(path string) error {
-	_, err := gs.runGit("add", path)
+	_, err := gs.runGit("add", "--", path)
 	return err
 }
 
 // UnstageFile unstages a file
 func (gs *GitService) UnstageFile(path string) error {
-	cmd := appCommand("git", "reset", "HEAD", path)
+	cmd := appCommand("git", "reset", "HEAD", "--", path)
 	cmd.Dir = gs.path
 	return cmd.Run()
 }
@@ -502,7 +506,8 @@ func (gs *GitService) GetFileContents(path string, staged bool) (*FileContentsRe
 		fullPath := filepath.Join(gs.path, path)
 		if st, statErr := os.Stat(fullPath); statErr == nil && st.Size() <= maxWorktreeContentSize {
 			data, err := os.ReadFile(fullPath)
-			if err == nil {
+			// Not valid UTF-8 (binary, Latin-1): the editor would save U+FFFD over the bytes.
+			if err == nil && utf8.Valid(data) {
 				res.NewContent = string(data)
 				res.HasNew = true
 			}

@@ -132,27 +132,22 @@ func (gs *GitService) ListWorktrees() ([]WorktreeInfo, error) {
 			continue
 		}
 
-		fields := strings.Fields(line)
-		if len(fields) < 2 {
-			continue
-		}
-
-		switch fields[0] {
+		key, value, _ := strings.Cut(line, " ")
+		switch key {
 		case "worktree":
 			flush()
-			current = &WorktreeInfo{Path: fields[1]}
+			current = &WorktreeInfo{Path: value}
 		case "HEAD":
-			if current != nil && len(fields) >= 2 {
-				head := fields[1]
+			if current != nil {
+				head := value
 				if len(head) > 7 {
 					head = head[:7]
 				}
 				current.Head = head
 			}
 		case "branch":
-			if current != nil && len(fields) >= 2 {
-				ref := fields[1]
-				current.Branch = strings.TrimPrefix(ref, "refs/heads/")
+			if current != nil {
+				current.Branch = strings.TrimPrefix(value, "refs/heads/")
 			}
 		case "detached":
 			// leave Branch empty
@@ -338,4 +333,22 @@ func randomHex(n int) (string, error) {
 		return "", err
 	}
 	return hex.EncodeToString(buf), nil
+}
+
+// recentsPath is the path recorded in recents for the open project. Worktrees under
+// WorktreeBaseDir are created by the app (PR worktrees), so they collapse into their
+// main repo instead of crowding real projects out of the capped list.
+func (gs *GitService) recentsPath() string {
+	mainRepo, err := gs.MainRepoPath()
+	if err != nil || samePath(mainRepo, gs.path) {
+		return gs.path
+	}
+	base, err := gs.WorktreeBaseDir()
+	if err != nil {
+		return gs.path
+	}
+	if rel, err := filepath.Rel(base, gs.path); err == nil && rel != "." && !strings.HasPrefix(rel, "..") {
+		return mainRepo
+	}
+	return gs.path
 }

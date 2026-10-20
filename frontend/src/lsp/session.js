@@ -107,6 +107,11 @@ export function createLspSession({ api, createClient, graceMs = 1200, onDiagnost
 
     if (!entry) return;
 
+    // A previous root's process reports its exit after the new one started (same id).
+    const currentRoot = clients.get(info.id)?.rootUri ?? entry.rootUri;
+
+    if (info.rootUri && currentRoot && info.rootUri !== currentRoot) return;
+
     if (info.status === 'error') {
       dropClient(info.id);
       setEntry(info.id, { state: 'error', error: info.error ?? 'server exited', message: '' });

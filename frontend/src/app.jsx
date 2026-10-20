@@ -461,13 +461,15 @@ export function App() {
     setConfirmKind(null);
 
     if (kind === 'remove-worktree' && worktreePath) {
-      // Kill terminals scoped to the removed worktree before the dir goes away.
-      tabs.removeScope(worktreePath);
-      removeTerminalScope(worktreePath).forEach((sessionId) => {
-        api.terminalStop(sessionId).catch(() => {});
+      // Git refuses to remove a dirty worktree; only tear down its tabs and shells once
+      // it is really gone. Go re-emits the workspace index after a successful removal.
+      worktree.remove(worktreePath).then((removed) => {
+        if (!removed) return;
+        tabs.removeScope(worktreePath);
+        removeTerminalScope(worktreePath).forEach((sessionId) => {
+          api.terminalStop(sessionId).catch(() => {});
+        });
       });
-      // Go re-emits the workspace index after a successful removal.
-      worktree.remove(worktreePath);
 
       return;
     }
@@ -684,7 +686,11 @@ export function App() {
             onCancel={handleCancelConfirm}
           />
 
-          <CommandPalette index={workspaceIndex} onHome={() => { homeOpen.value = true; }} />
+          <CommandPalette
+            index={workspaceIndex}
+            onHome={() => { homeOpen.value = true; }}
+            onOpened={() => { homeOpen.value = false; }}
+          />
 
           <ToastContainer
             toasts={toasts}

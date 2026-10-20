@@ -191,6 +191,21 @@ func prStateFor(rc repoPRCache, n int) string {
 
 func isStaleState(state string) bool { return state == "MERGED" || state == "CLOSED" }
 
+// openableWorktreeForPR is worktreeForPR restricted to worktrees whose directory still
+// exists. A worktree deleted without `git worktree prune` stays listed, and reusing it
+// would make every open of the PR fail.
+func (s repoSnapshot) openableWorktreeForPR(n int) (string, bool) {
+	for _, wt := range s.Worktrees {
+		if wt.IsMain || wt.Branch == "" || s.WTPR[wt.Branch] != n {
+			continue
+		}
+		if info, err := os.Stat(wt.Path); err == nil && info.IsDir() {
+			return wt.Path, true
+		}
+	}
+	return "", false
+}
+
 // worktreeForPR returns the worktree path mapped to PR n, if any.
 func (s repoSnapshot) worktreeForPR(n int) (string, bool) {
 	for _, wt := range s.Worktrees {
@@ -488,7 +503,7 @@ func (a *App) OpenWorkspace(id string) error {
 		}
 		var wtPath string
 		if snaps := snapshotRepos([]RecentProject{{Path: repoPath}}); len(snaps) == 1 {
-			wtPath, _ = snaps[0].worktreeForPR(n)
+			wtPath, _ = snaps[0].openableWorktreeForPR(n)
 		}
 		if wtPath == "" {
 			var err error

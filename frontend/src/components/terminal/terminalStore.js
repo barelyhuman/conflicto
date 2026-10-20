@@ -207,12 +207,9 @@ export function removeTerminalScope(path) {
 
   if (!scope) return [];
   const sessionIds = scope.panes.map((p) => p.sessionId).filter(Boolean);
+  // Stays on key when it is current: moving to the null scope would make the dock start a
+  // cwd-less shell. The scope is re-created empty on demand until the next project event.
   scopes.delete(key);
-
-  if (currentScopePath === key) {
-    currentScopePath = null;
-  }
-
   notify();
 
   return sessionIds;

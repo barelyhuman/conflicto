@@ -27,7 +27,8 @@ const PATH_BODY =
   `(?:(?:\\.{1,2}\\/|\\/)?(?:${SEG}\\/)*${SEG}\\.[A-Za-z][A-Za-z0-9]*` +
   `|(?:\\.{1,2}\\/|\\/)(?:${SEG}\\/)*${SEG})`;
 const LOCATION = '(?::(\\d+)(?::(\\d+))?|\\((\\d+)(?:,\\s*(\\d+))?\\)|\\s+line\\s+(\\d+))?';
-const PATH_RE = new RegExp(`(${PATH_BODY})${LOCATION}`, 'g');
+// Sticky: tried only where a token starts, so a long unbroken token is scanned once, not per character.
+const PATH_RE = new RegExp(`(${PATH_BODY})${LOCATION}`, 'y');
 
 /** Characters that mean the match started mid-token (so it is not a path). */
 const TOKEN_CHAR = /[\w/.\-@~:+%]/;
@@ -90,19 +91,28 @@ export function findLinks(text) {
     links.push({ kind: 'url', start: m.index, end: m.index + url.length, text: url, url });
   }
 
-  PATH_RE.lastIndex = 0;
+  for (let i = 0; i < text.length; ) {
+    if (i > 0 && TOKEN_CHAR.test(text[i - 1])) {
+      i++;
+      continue;
+    }
 
-  while ((m = PATH_RE.exec(text)) != null) {
+    PATH_RE.lastIndex = i;
+    m = PATH_RE.exec(text);
+
+    if (!m) {
+      i++;
+      continue;
+    }
+
     const start = m.index;
     const end = start + m[0].length;
-
-    if (start > 0 && TOKEN_CHAR.test(text[start - 1])) continue;
+    i = end;
 
     if (links.some((l) => start < l.end && end > l.start)) continue;
 
     const line = toInt(m[2] ?? m[4] ?? m[6]);
     const col = line == null ? null : toInt(m[3] ?? m[5]);
-    // Without a location, drop a trailing "." that PATH_BODY cannot hold anyway.
     links.push({ kind: 'file', start, end, text: m[0], path: m[1], line, col });
   }
 

@@ -85,7 +85,8 @@ func searchText(ctx context.Context, root string, opts SearchOpts) ([]SearchMatc
 	}
 	var res []SearchMatch
 	var err error
-	if rg := resolveLSPBinary("rg", root); rg != "" {
+	// Empty root: never pick up a repo-local node_modules/.bin/rg from an untrusted repo.
+	if rg := resolveLSPBinary("rg", ""); rg != "" {
 		res, err = searchRipgrep(ctx, rg, root, opts)
 	} else {
 		res, err = searchGitGrep(ctx, root, opts)

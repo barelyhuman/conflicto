@@ -50,7 +50,7 @@ function StateButton({ state, current, onPick }) {
   );
 }
 
-function PaletteDialog({ index, onClose, onHome, isMac }) {
+function PaletteDialog({ index, onClose, onHome, onOpened, isMac }) {
   const query = useSignal('');
   /** 'index' searches the workspace list, 'prs' searches pull requests, 'refs' picks a compare ref. */
   const mode = useSignal(/** @type {'index' | 'prs' | 'refs'} */ ('index'));
@@ -272,8 +272,10 @@ function PaletteDialog({ index, onClose, onHome, isMac }) {
 
       const ok = await openPR(entry.prNumber, { locally });
 
-      if (ok) onClose();
-      else actionError.value = `Could not open PR #${entry.prNumber}`;
+      if (ok) {
+        onOpened?.();
+        onClose();
+      } else actionError.value = `Could not open PR #${entry.prNumber}`;
     } catch (err) {
       actionError.value = err?.message ?? String(err);
     } finally {
@@ -310,8 +312,10 @@ function PaletteDialog({ index, onClose, onHome, isMac }) {
     }
 
     if (entry.kind === 'ref') {
-      if (openCompare(entry.ref, { mergeBase: locally })) onClose();
-      else actionError.value = 'Open a project to diff against a ref';
+      if (openCompare(entry.ref, { mergeBase: locally })) {
+        onOpened?.();
+        onClose();
+      } else actionError.value = 'Open a project to diff against a ref';
 
       return;
     }
@@ -456,8 +460,9 @@ function PaletteDialog({ index, onClose, onHome, isMac }) {
  * @param {Object} props
  * @param {InstanceType<typeof import('../../models/workspaceIndex.js').WorkspaceIndexModel>} props.index
  * @param {() => void} [props.onHome] shows the home screen; enables the "Home" result
+ * @param {() => void} [props.onOpened] a PR or compare tab was opened (dismiss overlays such as Home)
  */
-export function CommandPalette({ index, onHome }) {
+export function CommandPalette({ index, onHome, onOpened }) {
   const open = useSignal(false);
   const isMac = useRef(typeof navigator !== 'undefined' && /Mac/i.test(navigator.platform ?? ''));
 
@@ -506,6 +511,7 @@ export function CommandPalette({ index, onHome }) {
           index={index}
           isMac={isMac}
           onHome={onHome}
+          onOpened={onOpened}
           onClose={() => { open.value = false; }}
         />
       )}

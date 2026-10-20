@@ -15,6 +15,8 @@ import {
 import { defaultKeymap, history, historyKeymap, indentWithTab } from '@codemirror/commands';
 import { gotoLine, highlightSelectionMatches, search, searchKeymap } from '@codemirror/search';
 import { effect } from '@preact/signals';
+import { createDirtyTracker } from './dirtyTracker.js';
+import { lineSeparatorExtension } from './lineSeparator.js';
 import { appEditorTheme, appHighlighting } from './theme.js';
 import { loadLanguage, languageKeyForPath, usesTabs } from './languages.js';
 import {
@@ -32,7 +34,7 @@ const External = Annotation.define();
  * @typedef {{
  *   view: EditorView,
  *   isDirty: () => boolean,
- *   markSaved: () => void,
+ *   markSaved: (written: import('@codemirror/state').Text) => void,
  *   reloadFromDisk: (text: string) => void,
  *   getText: () => string,
  *   setDark: (dark: boolean) => void,
@@ -93,13 +95,13 @@ export async function createFileEditor({ text, path, ctx, dark, onDirtyChange, o
 
   const themeCompartment = new Compartment();
   const externalCompartment = new Compartment();
-  let reportedDirty = false;
-  /** @type {import('@codemirror/state').Text} */
-  let savedDoc;
+  /** @type {ReturnType<typeof createDirtyTracker>} */
+  let dirtyTracker;
 
   const state = EditorState.create({
     doc: text,
     extensions: [
+      lineSeparatorExtension(text),
       lineNumbers(),
       highlightActiveLineGutter(),
       highlightActiveLine(),
@@ -135,17 +137,12 @@ export async function createFileEditor({ text, path, ctx, dark, onDirtyChange, o
         if (!update.docChanged) return;
 
         if (update.transactions.every((tr) => tr.annotation(External))) return;
-        const dirty = !update.state.doc.eq(savedDoc);
-
-        if (dirty !== reportedDirty) {
-          reportedDirty = dirty;
-          onDirtyChange(dirty);
-        }
+        dirtyTracker.update(update.state.doc);
       }),
       externalCompartment.of(resolveEditorExtensions(ctx)),
     ],
   });
-  savedDoc = state.doc;
+  dirtyTracker = createDirtyTracker(state.doc, onDirtyChange);
 
   const view = new EditorView({ state });
 
@@ -153,23 +150,19 @@ export async function createFileEditor({ text, path, ctx, dark, onDirtyChange, o
   const handle = {
     view,
     externalCompartment,
-    isDirty: () => reportedDirty,
-    getText: () => view.state.doc.toString(),
-    markSaved() {
-      savedDoc = view.state.doc;
-
-      if (reportedDirty) {
-        reportedDirty = false;
-        onDirtyChange(false);
-      }
+    isDirty: () => dirtyTracker.isDirty(),
+    // sliceDoc keeps the file's own line separator; doc.toString() would force "\n".
+    getText: () => view.state.sliceDoc(0),
+    markSaved(written) {
+      dirtyTracker.markSaved(written, view.state.doc);
     },
     reloadFromDisk(next) {
-      if (next === view.state.doc.toString()) return;
+      if (next === view.state.sliceDoc(0)) return;
       view.dispatch({
         changes: { from: 0, to: view.state.doc.length, insert: next },
         annotations: External.of(true),
       });
-      savedDoc = view.state.doc;
+      dirtyTracker.reset(view.state.doc);
     },
     setDark(next) {
       view.dispatch({ effects: themeCompartment.reconfigure(appEditorTheme(next)) });
