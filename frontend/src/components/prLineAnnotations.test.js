@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildPRLineAnnotations, toPierreSide } from './prLineAnnotations.js';
+import { buildPRLineAnnotations, buildReviewAnnotations, toPierreSide } from './prLineAnnotations.js';
 
 describe('toPierreSide', () => {
   it('maps GitHub sides and defaults unknowns to additions', () => {
@@ -64,5 +64,31 @@ describe('buildPRLineAnnotations', () => {
         },
       },
     ]);
+  });
+});
+
+describe('buildReviewAnnotations', () => {
+  const filename = 'a.js';
+  const draft = { id: 'd1', path: filename, line: 4, side: 'LEFT', body: 'x' };
+
+  it('adds drafts and composer, skipping the draft being edited', () => {
+    const composer = { path: filename, editId: 'd1', loc: { line: 4, side: 'LEFT' }, rev: 1 };
+    const out = buildReviewAnnotations({
+      isPRMode: true, comments: [], drafts: [draft, { ...draft, id: 'd2', path: 'z.js' }], composer, filename,
+      outdatedIds: new Set(['d1']),
+    });
+
+    expect(out).toEqual([
+      { lineNumber: 4, side: 'deletions', metadata: { kind: 'composer', composerRev: 1 } },
+    ]);
+
+    const drafts = buildReviewAnnotations({ isPRMode: true, drafts: [draft], filename, outdatedIds: new Set(['d1']) });
+
+    expect(drafts[0].metadata).toMatchObject({ kind: 'draft', outdated: true });
+  });
+
+  it('returns undefined when nothing applies', () => {
+    expect(buildReviewAnnotations({ isPRMode: false, drafts: [draft], filename })).toBeUndefined();
+    expect(buildReviewAnnotations({ isPRMode: true, drafts: [], filename })).toBeUndefined();
   });
 });

@@ -105,6 +105,18 @@ func (rm *RecentsManager) Add(path string) {
 	rm.Save()
 }
 
+// Remove drops a project from the recents list and persists the change.
+func (rm *RecentsManager) Remove(path string) error {
+	filtered := make([]RecentProject, 0, len(rm.projects))
+	for _, p := range rm.projects {
+		if p.Path != path {
+			filtered = append(filtered, p)
+		}
+	}
+	rm.projects = filtered
+	return rm.Save()
+}
+
 // List returns the current list of recent projects, sorted by most recent first
 func (rm *RecentsManager) List() []RecentProject {
 	// Return a copy

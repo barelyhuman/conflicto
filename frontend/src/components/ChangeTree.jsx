@@ -1,5 +1,5 @@
 import { useMemo, useState, useCallback } from 'preact/hooks';
-import { IconArrowBackUp, IconChevronRight } from '@tabler/icons-preact';
+import { IconArrowBackUp, IconChevronRight, IconPencil } from '@tabler/icons-preact';
 import { conflictKindGlyph, conflictKindLabel } from './conflictView.js';
 
 /**
@@ -75,6 +75,21 @@ function finalize(map) {
   }
 
   return sortNodes(nodes);
+}
+
+/** Rows rendered per page in the flat list, and the size above which the tree starts collapsed. */
+const ROW_PAGE = 500;
+
+/** Every folder path in a tree. */
+function folderPaths(nodes, out = new Set()) {
+  for (const n of nodes) {
+    if (n.children) {
+      out.add(n.path);
+      folderPaths(n.children, out);
+    }
+  }
+
+  return out;
 }
 
 /**
@@ -162,6 +177,7 @@ export function ChangeTree({
   files,
   activeFile,
   onSelect,
+  onEdit,
   flat = false,
   showStage = false,
   showUnstage = false,
@@ -172,7 +188,11 @@ export function ChangeTree({
 }) {
   const tree = useMemo(() => (flat ? null : buildFileTree(files)), [files, flat]);
   const flatFiles = useMemo(() => (flat ? sortFlatFiles(files) : null), [files, flat]);
-  const [collapsed, setCollapsed] = useState(() => new Set());
+  // Huge change sets (e.g. an un-ignored build folder) would freeze the UI if rendered at once:
+  // the tree starts with folders collapsed and the flat list renders in pages.
+  const huge = files.length > ROW_PAGE;
+  const [collapsed, setCollapsed] = useState(() => (huge && tree ? folderPaths(tree) : new Set()));
+  const [shown, setShown] = useState(ROW_PAGE);
 
   const toggleFolder = useCallback((path) => {
     setCollapsed((prev) => {
@@ -190,7 +210,7 @@ export function ChangeTree({
   if (flat) {
     return (
       <div class="change-tree change-tree-flat" role="list">
-        {flatFiles.map((file) => {
+        {flatFiles.slice(0, shown).map((file) => {
           const { name, dir } = splitPath(file.path);
 
           return (
@@ -203,6 +223,7 @@ export function ChangeTree({
               title={file.path}
               active={activeFile === file.path}
               onSelect={onSelect}
+              onEdit={onEdit}
               showStage={showStage}
               showUnstage={showUnstage}
               showDiscard={showDiscard}
@@ -212,6 +233,11 @@ export function ChangeTree({
             />
           );
         })}
+        {flatFiles.length > shown && (
+          <button type="button" class="change-tree-more" onClick={() => setShown((n) => n + ROW_PAGE)}>
+            {flatFiles.length - shown} more files · show {Math.min(ROW_PAGE, flatFiles.length - shown)} more
+          </button>
+        )}
       </div>
     );
   }
@@ -263,6 +289,7 @@ function FileRow({
   title,
   active,
   onSelect,
+  onEdit,
   showStage,
   showUnstage,
   showDiscard,
@@ -283,7 +310,7 @@ function FileRow({
         type="button"
         class="change-tree-file-main"
         title={title}
-        onClick={() => onSelect?.(path)}
+        onClick={(e) => onSelect?.(path, { pin: e.detail >= 2 })}
       >
         <span class={`status-badge ${badge.kind}`}>{badge.glyph}</span>
         <span class="file-name">{name}</span>
@@ -293,6 +320,20 @@ function FileRow({
         {dir != null && <span class="file-path">{dir}</span>}
       </button>
       <div class="row-actions change-tree-actions">
+        {onEdit && status !== 'D' && (
+          <button
+            type="button"
+            class="stage-btn"
+            title="Open file to edit"
+            aria-label="Open file to edit"
+            onClick={(e) => {
+              e.stopPropagation();
+              onEdit(path);
+            }}
+          >
+            <IconPencil size={10} stroke={2.2} />
+          </button>
+        )}
         {showDiscard && (
           <button
             type="button"

@@ -44,7 +44,27 @@ Requires glibc 2.39+ (Ubuntu 24.04+, Debian 13+, Fedora 40+) and `webkit2gtk 4.1
 
   PR listing, checkout, comments, and related GitHub features call `gh` at runtime. Diff viewing still works without it; GitHub integration does not.
 
+- **Git** — required for all repository operations.
+- **ripgrep (`rg`)** *(optional)* — the text-search fallback for code navigation. Without it, the fallback uses `git grep`.
+- **Language servers** *(optional)* — code intelligence per language. Only the active worktree's servers run. A missing one shows an install hint in the status pill:
+  - Go: `gopls` (`go install golang.org/x/tools/gopls@latest`)
+  - TypeScript / JavaScript: `typescript-language-server` (`npm i -g typescript-language-server typescript`)
+  - Python: `pyright-langserver` (`npm i -g pyright`)
+  - Rust: `rust-analyzer` (`rustup component add rust-analyzer`)
+
 Also required to build: a C/C++ toolchain for [Wails](https://wails.io/) (platform deps vary — see the Wails docs).
+
+## How it works
+
+- **Workspaces are worktrees.** Each workspace is one git worktree: your main checkout or a PR's worktree. Switching workspaces switches the whole view, including tabs, terminals and language servers.
+- **Navigate with the palette.** `⌘K` opens a fuzzy palette over repos, open PRs and worktrees. The home screen (`⌘⇧H`) shows the same index at full size. The index is backed by a local `gh` cache that refreshes in the background.
+- **Opening a PR creates a worktree.** Checking out a PR creates a worktree for its branch and records the PR↔worktree mapping in the repo's git config. Worktrees whose PR is merged or closed are marked stale. Cleanup is manual.
+- **Per-worktree terminals.** Each worktree keeps its own terminals across switches. `Cmd`+click on `file:line` in terminal output opens the file at that line.
+- **Editor tabs.** The diff of a changed file and file tabs (CodeMirror) share one tab strip. You can edit files in place and save with `⌘S`.
+- **Code intelligence.** Go to definition (`F12`, `⌘`+click), find references (`⇧F12`) and completion come from the language servers above. While a server is indexing, or when none is installed, navigation falls back to ripgrep text matching.
+- **Reviewing PRs.** Select lines and press `⌘⇧M` to comment; `⌘⇧V` attaches a pasted block to a file and line. Comments collect into a pending review that you submit in one batch.
+
+Every shortcut is listed under **Preferences → Shortcuts** (`⌘,`).
 
 ## Setup
 
@@ -91,16 +111,6 @@ List all tasks: `mise tasks`
 
 ## Keybindings
 
-| Shortcut                        | Action                                  |
-| ------------------------------- | --------------------------------------- |
-| `Cmd/Ctrl+,`                    | Preferences                             |
-| `Escape`                        | Close Preferences                       |
-| `Cmd/Ctrl+R`                    | Reload                                  |
-| `Cmd+Ctrl+F` (macOS) / `Ctrl+F` | Full Screen                             |
-| `Cmd/Ctrl+W`                    | Close window                            |
-| `Cmd/Ctrl+Enter`                | Commit (from commit message field)      |
-| ``Cmd/Ctrl+` ``                 | Toggle terminal dock                    |
-| ``Cmd/Ctrl+Shift+` ``           | New terminal tab (opens dock if needed) |
-| `Cmd/Ctrl+\\`                   | Split terminal right (dock open)        |
+The full, platform-specific list is in **Preferences → Shortcuts** (`Cmd/Ctrl+,`). The source of truth is `frontend/src/keymap/shortcuts.js`.
 
 On macOS, the Edit menu also provides the usual text-editing shortcuts (`Cmd+A/C/V/X/Z`).

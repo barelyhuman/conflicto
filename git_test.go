@@ -46,9 +46,10 @@ func TestParseFileStatusUnmergedCodes(t *testing.T) {
 		"M  staged.txt",
 		" M unstaged.txt",
 		"?? untracked.txt",
-		"R  old-name.txt\tnew-name.txt",
+		"R  new-name.txt",
+		"old-name.txt",
 		"",
-	}, "\n")
+	}, "\x00")
 
 	staged, unstaged, conflicts := parseFileStatus(out, t.TempDir())
 
@@ -106,7 +107,7 @@ func TestParseFileStatusUntrackedConflictMarkers(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(dir, "plain.txt"), []byte("hello\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	out := "?? conflicted.txt\n?? plain.txt\n"
+	out := "?? conflicted.txt\x00?? plain.txt\x00"
 	_, unstaged, conflicts := parseFileStatus(out, dir)
 
 	if len(conflicts) != 1 || conflicts[0].Path != "conflicted.txt" || conflicts[0].Status != "C" {
@@ -142,7 +143,7 @@ func TestParseFileStatusMidLineMarkerNotConflict(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(dir, "source.go"), []byte("if strings.Contains(s, \"<<<<<<<\") {\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	_, unstaged, conflicts := parseFileStatus("?? source.go\n", dir)
+	_, unstaged, conflicts := parseFileStatus("?? source.go\x00", dir)
 	if len(conflicts) != 0 {
 		t.Fatalf("mid-line markers must not be flagged as conflicts: %+v", conflicts)
 	}
@@ -188,5 +189,91 @@ func TestIsConflict_OversizedSkipped(t *testing.T) {
 func TestIsConflict_MissingFile(t *testing.T) {
 	if isConflict(filepath.Join(t.TempDir(), "does-not-exist.txt")) {
 		t.Fatal("missing file should not be a conflict")
+	}
+}
+
+func TestGetFileStatusRealRenameAndUnicodePaths(t *testing.T) {
+	repo := t.TempDir()
+	gitIn(t, repo, "init", "-q", "-b", "main", ".")
+	gitIn(t, repo, "config", "user.email", "t@example.com")
+	gitIn(t, repo, "config", "user.name", "t")
+	if err := os.WriteFile(filepath.Join(repo, "a.txt"), []byte("one\ntwo\nthree\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	gitIn(t, repo, "add", ".")
+	gitIn(t, repo, "commit", "-qm", "base")
+	gitIn(t, repo, "mv", "a.txt", "new name.txt")
+	if err := os.WriteFile(filepath.Join(repo, "café.txt"), []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	staged, unstaged, _, err := (&GitService{path: repo}).GetFileStatus()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(staged) != 1 || staged[0].Path != "new name.txt" || staged[0].OldPath != "a.txt" || staged[0].Status != "R" {
+		t.Errorf("staged rename = %+v", staged)
+	}
+	if len(unstaged) != 1 || unstaged[0].Path != "café.txt" {
+		t.Errorf("unstaged = %+v", unstaged)
+	}
+}
+
+func TestStageUnstageTreatDashPrefixedNamesAsPaths(t *testing.T) {
+	repo := t.TempDir()
+	gitIn(t, repo, "init", "-q", "-b", "main", ".")
+	gitIn(t, repo, "config", "user.email", "t@example.com")
+	gitIn(t, repo, "config", "user.name", "t")
+	write := func(name, body string) {
+		if err := os.WriteFile(filepath.Join(repo, name), []byte(body), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	write("a.txt", "base\n")
+	gitIn(t, repo, "add", ".")
+	gitIn(t, repo, "commit", "-qm", "base")
+	write("--hard", "x\n")
+	write("-A", "y\n")
+	write("a.txt", "edited\n")
+	gs := &GitService{path: repo}
+
+	if err := gs.StageFile("-A"); err != nil {
+		t.Fatal(err)
+	}
+	if got := gitIn(t, repo, "diff", "--cached", "--name-only"); strings.TrimSpace(got) != "-A" {
+		t.Fatalf("staging \"-A\" staged %q, want only the file named -A", got)
+	}
+
+	gitIn(t, repo, "add", "--", "--hard")
+	if err := gs.UnstageFile("--hard"); err != nil {
+		t.Fatal(err)
+	}
+	if got, _ := os.ReadFile(filepath.Join(repo, "a.txt")); string(got) != "edited\n" {
+		t.Fatalf("unstaging \"--hard\" reset the working tree: a.txt = %q", got)
+	}
+}
+
+func TestGetFileContentsSkipsNonUTF8WorktreeFiles(t *testing.T) {
+	repo := t.TempDir()
+	gitIn(t, repo, "init", "-q", "-b", "main", ".")
+	if err := os.WriteFile(filepath.Join(repo, "latin1.txt"), []byte("caf\xe9\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(repo, "ok.txt"), []byte("café\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	gs := &GitService{path: repo}
+
+	// The editor writes the buffer back, which would replace the invalid bytes with U+FFFD.
+	res, err := gs.GetFileContents("latin1.txt", false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res.HasNew {
+		t.Errorf("non-UTF-8 file returned as text: %q", res.NewContent)
+	}
+	res, err = gs.GetFileContents("ok.txt", false)
+	if err != nil || !res.HasNew || res.NewContent != "café\n" {
+		t.Errorf("valid UTF-8 file: %+v %v", res, err)
 	}
 }

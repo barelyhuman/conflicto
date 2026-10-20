@@ -1,13 +1,10 @@
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
-import { signal } from '@preact/signals';
 import { SelectionModel } from './selection.js';
 
 const getDiff = vi.fn();
-const getPRFileDiff = vi.fn();
 
 const api = {
   getDiff: (...args) => getDiff(...args),
-  getPRFileDiff: (...args) => getPRFileDiff(...args),
 };
 
 function makeWorkingTree(first = null) {
@@ -19,16 +16,11 @@ function makeWorkingTree(first = null) {
 describe('SelectionModel diffLoading', () => {
   /** @type {InstanceType<typeof SelectionModel>} */
   let selection;
-  /** @type {import('@preact/signals-core').Signal<number|null>} */
-  let activePR;
 
   beforeEach(() => {
     getDiff.mockReset();
-    getPRFileDiff.mockReset();
-    activePR = signal(null);
     selection = new SelectionModel({
       workingTree: makeWorkingTree(),
-      activePR,
       api,
     });
   });
@@ -91,101 +83,61 @@ describe('SelectionModel diffLoading', () => {
     expect(selection.diffLoading.value).toBe(false);
   });
 
+  it('stores a diff on the scope that requested it', async () => {
+    /** @type {((data: object) => void)[]} */
+    const replies = [];
+
+    getDiff.mockImplementation(() => new Promise((resolve) => replies.push(resolve)));
+    selection.setScope('/a');
+    selection.select('a.go', 'unstaged');
+    selection.setScope('/b');
+    selection.select('a.go', 'unstaged');
+    replies[0]({ path: 'a.go', patch: 'from-a' });
+    await Promise.resolve();
+    expect(selection.activeDiff.value).toBeNull();
+
+    selection.setScope('/a');
+    selection.select('a.go', 'unstaged');
+    expect(selection.activeDiff.value).toEqual({ path: 'a.go', patch: 'from-a' });
+  });
+
+  it('reports a diff failure for the current scope and drops one from an old scope', async () => {
+    const onError = vi.fn();
+    const rejects = [];
+    const failing = new SelectionModel({
+      workingTree: makeWorkingTree(),
+      api: {
+        getDiff: () => new Promise((_, reject) => {
+          rejects.push(reject);
+        }),
+      },
+      onError,
+    });
+
+    failing.setScope('/a');
+    failing.select('a.go', 'unstaged');
+    failing.setScope('/b');
+    failing.select('b.go', 'unstaged');
+    rejects[0](new Error('from-a'));
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(onError).not.toHaveBeenCalled();
+    expect(failing.activeFile.value).toBe('b.go');
+    expect(failing.diffLoading.value).toBe(true);
+
+    rejects[1](new Error('no repo'));
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(onError).toHaveBeenCalledWith('Diff Error', 'no repo');
+    expect(failing.diffLoading.value).toBe(false);
+
+    failing[Symbol.dispose]?.();
+  });
+
   it('conflict selection skips getDiff', () => {
     selection.select('conflicted.js', 'conflict');
 
     expect(getDiff).not.toHaveBeenCalled();
-    expect(getPRFileDiff).not.toHaveBeenCalled();
     expect(selection.diffLoading.value).toBe(false);
     expect(selection.activeFile.value).toBe('conflicted.js');
     expect(selection.activeSection.value).toBe('conflict');
-  });
-
-  it('toggleViewMode switches between diff and edit for unstaged files', () => {
-    selection.select('src/a.js', 'unstaged');
-    expect(selection.viewMode.value).toBe('diff');
-    expect(selection.canEdit.value).toBe(true);
-
-    selection.toggleViewMode();
-    expect(selection.viewMode.value).toBe('edit');
-    expect(selection.isEditView.value).toBe(true);
-
-    getDiff.mockClear();
-    selection.toggleViewMode();
-    expect(selection.viewMode.value).toBe('diff');
-    expect(getDiff).toHaveBeenCalledWith('src/a.js', false);
-  });
-
-  it('select resets view mode to diff', () => {
-    selection.select('src/a.js', 'unstaged');
-    selection.toggleViewMode();
-    expect(selection.viewMode.value).toBe('edit');
-
-    selection.select('src/b.js', 'unstaged');
-    expect(selection.viewMode.value).toBe('diff');
-  });
-
-  it('editorDirty clears on select, clear, and leaving edit mode', () => {
-    selection.select('src/a.js', 'unstaged');
-    selection.toggleViewMode();
-    selection.editorDirty.value = true;
-    expect(selection.editorDirty.value).toBe(true);
-
-    selection.toggleViewMode();
-    expect(selection.viewMode.value).toBe('diff');
-    expect(selection.editorDirty.value).toBe(false);
-
-    selection.toggleViewMode();
-    selection.editorDirty.value = true;
-    selection.select('src/b.js', 'unstaged');
-    expect(selection.editorDirty.value).toBe(false);
-
-    selection.toggleViewMode();
-    selection.editorDirty.value = true;
-    selection.clear();
-    expect(selection.editorDirty.value).toBe(false);
-  });
-
-  it('openEditorAtLine enters edit mode with a one-shot goto line', () => {
-    selection.select('src/a.js', 'unstaged');
-    expect(selection.editorGotoLine.value).toBeNull();
-
-    selection.openEditorAtLine(12);
-    expect(selection.viewMode.value).toBe('edit');
-    expect(selection.isEditView.value).toBe(true);
-    expect(selection.editorGotoLine.value).toBe(12);
-  });
-
-  it('openEditorAtLine no-ops when cannot edit or line is invalid', () => {
-    selection.select('src/a.js', 'staged');
-    selection.openEditorAtLine(3);
-    expect(selection.viewMode.value).toBe('diff');
-    expect(selection.editorGotoLine.value).toBeNull();
-
-    selection.select('src/a.js', 'unstaged');
-    selection.openEditorAtLine(0);
-    expect(selection.viewMode.value).toBe('diff');
-    expect(selection.editorGotoLine.value).toBeNull();
-
-    selection.openEditorAtLine(NaN);
-    expect(selection.editorGotoLine.value).toBeNull();
-  });
-
-  it('editorGotoLine clears on select, clear, and leaving edit mode', () => {
-    selection.select('src/a.js', 'unstaged');
-    selection.openEditorAtLine(5);
-    expect(selection.editorGotoLine.value).toBe(5);
-
-    selection.toggleViewMode();
-    expect(selection.viewMode.value).toBe('diff');
-    expect(selection.editorGotoLine.value).toBeNull();
-
-    selection.openEditorAtLine(8);
-    selection.select('src/b.js', 'unstaged');
-    expect(selection.editorGotoLine.value).toBeNull();
-
-    selection.openEditorAtLine(2);
-    selection.clear();
-    expect(selection.editorGotoLine.value).toBeNull();
   });
 });

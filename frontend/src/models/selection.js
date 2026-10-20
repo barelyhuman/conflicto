@@ -2,41 +2,45 @@ import { createModel, signal, computed, effect } from '@preact/signals';
 import { api as defaultApi } from '../wails.js';
 
 /**
- * File / section / diff selection and diff fetching.
+ * Working-tree diff for the open tab.
+ *
+ * The visible file follows the active diff tab. The patch is remembered per
+ * worktree scope, so a result that arrives after a switch is stored for the
+ * scope that requested it and is not painted into the scope now on screen.
  *
  * @param {{
  *   workingTree: InstanceType<typeof import('./workingTree.js').WorkingTreeModel>,
- *   activePR: import('@preact/signals-core').Signal<number|null>,
+ *   api?: typeof defaultApi,
+ *   onError?: (title: string, message: string) => void,
  * }} opts
  */
-export const SelectionModel = createModel(({ workingTree, activePR, api = defaultApi }) => {
+export const SelectionModel = createModel(({ workingTree, api = defaultApi, onError }) => {
   const activeFile = signal(/** @type {string|null} */ (null));
-  /** @type {import('@preact/signals-core').Signal<null | 'conflict' | 'staged' | 'unstaged' | 'pr'>} */
+  /** @type {import('@preact/signals-core').Signal<null | 'conflict' | 'staged' | 'unstaged'>} */
   const activeSection = signal(null);
   const activeDiff = signal(/** @type {{ path?: string, patch?: string }|null} */ (null));
-  /** True while a diff request is in flight for the current selection. */
+  /** True while a diff request is in flight for the current selection and nothing is stored yet. */
   const diffLoading = signal(false);
   const showFullDiff = signal(false);
-  /** @type {import('@preact/signals-core').Signal<'diff' | 'edit'>} */
-  const viewMode = signal('diff');
-  /** True when the edit-mode buffer differs from the last saved disk contents. */
-  const editorDirty = signal(false);
-  /** One-shot 1-based line to focus when entering edit mode (e.g. diff double-click). */
-  const editorGotoLine = signal(/** @type {number|null} */ (null));
 
-  const isConflict = computed(
-    () => activePR.value == null && activeSection.value === 'conflict'
-  );
-
+  const isConflict = computed(() => activeSection.value === 'conflict');
   const isUnstaged = computed(() => activeSection.value === 'unstaged');
 
-  const canEdit = computed(
-    () => activePR.value == null && activeSection.value === 'unstaged'
-  );
+  /** @type {string | null} */
+  let scopeKey = null;
+  let seq = 0;
+  /** Latest request token per scope+section+path. */
+  const latest = new Map();
+  /** Last patch returned for that key. */
+  const remembered = new Map();
 
-  const isEditView = computed(
-    () => viewMode.value === 'edit' && canEdit.value
-  );
+  function cacheKey(scope, section, path) {
+    return `${scope ?? ''}\0${section ?? ''}\0${path ?? ''}`;
+  }
+
+  function rememberedDiff(section, path) {
+    return remembered.get(cacheKey(scopeKey, section, path)) ?? null;
+  }
 
   function requestDiff(file, section) {
     if (!file) {
@@ -52,22 +56,37 @@ export const SelectionModel = createModel(({ workingTree, activePR, api = defaul
       return;
     }
 
-    diffLoading.value = true;
-    const pr = activePR.peek();
+    const scope = scopeKey;
+    const key = cacheKey(scope, section, file);
+    const token = ++seq;
 
-    if (pr != null) {
-      api.getPRFileDiff(pr, file);
-    } else {
-      api.getDiff(file, section === 'staged');
-    }
+    latest.set(key, token);
+
+    const hit = remembered.get(key) ?? null;
+
+    if (hit) activeDiff.value = hit;
+    else diffLoading.value = true;
+
+    Promise.resolve(api.getDiff(file, section === 'staged'))
+      .then((data) => {
+        if (latest.get(key) !== token) return;
+        if (data?.path) remembered.set(key, data);
+        if (scopeKey !== scope || activeFile.peek() !== file || activeSection.peek() !== section) return;
+        if (!data?.path) return;
+        activeDiff.value = data;
+        diffLoading.value = false;
+      })
+      .catch((err) => {
+        if (latest.get(key) !== token || scopeKey !== scope || activeFile.peek() !== file) return;
+        diffLoading.value = false;
+        onError?.('Diff Error', err?.message ?? String(err));
+      });
   }
 
-  // Fetch when the selected file or active PR changes (path change path).
+  // Fetch when the selected file changes (path change path).
   effect(() => {
     const file = activeFile.value;
     const section = activeSection.value;
-    // Subscribe to PR so entering/leaving PR mode re-fetches.
-    activePR.value;
 
     if (!file) {
       diffLoading.value = false;
@@ -84,30 +103,32 @@ export const SelectionModel = createModel(({ workingTree, activePR, api = defaul
     activeDiff,
     diffLoading,
     showFullDiff,
-    viewMode,
-    editorDirty,
-    editorGotoLine,
     isConflict,
     isUnstaged,
-    canEdit,
-    isEditView,
     workingTree,
-    activePR,
+
+    /** Swap the visible diff to this worktree. Other scopes keep their patches. */
+    setScope(next) {
+      const key = next || null;
+
+      if (scopeKey === key) return;
+      scopeKey = key;
+      this.activeFile.value = null;
+      this.activeSection.value = null;
+      this.activeDiff.value = null;
+      this.diffLoading.value = false;
+      this.showFullDiff.value = false;
+    },
 
     select(path, section) {
-      const same =
-        this.activeFile.peek() === path && this.activeSection.peek() === section;
+      const same = this.activeFile.peek() === path && this.activeSection.peek() === section;
+      const hit = section === 'conflict' ? null : rememberedDiff(section, path);
 
-      // Drop stale viewer content immediately so we never flash the previous file.
-      this.activeDiff.value = null;
-      this.diffLoading.value = true;
+      this.activeDiff.value = hit;
+      this.diffLoading.value = section !== 'conflict' && !hit;
       this.showFullDiff.value = false;
-      this.viewMode.value = 'diff';
-      this.editorDirty.value = false;
-      this.editorGotoLine.value = null;
 
       if (same) {
-        // Same path is a signal no-op — effect won't re-run; fetch explicitly.
         requestDiff(path, section);
 
         return;
@@ -123,38 +144,10 @@ export const SelectionModel = createModel(({ workingTree, activePR, api = defaul
       this.activeDiff.value = null;
       this.diffLoading.value = false;
       this.showFullDiff.value = false;
-      this.viewMode.value = 'diff';
-      this.editorDirty.value = false;
-      this.editorGotoLine.value = null;
     },
 
     toggleShowFullDiff() {
       this.showFullDiff.value = !this.showFullDiff.value;
-    },
-
-    toggleViewMode() {
-      if (!this.canEdit.value) return;
-      const next = this.viewMode.value === 'diff' ? 'edit' : 'diff';
-      this.viewMode.value = next;
-
-      if (next === 'diff') {
-        this.editorDirty.value = false;
-        this.editorGotoLine.value = null;
-        this.refetch();
-      }
-    },
-
-    /**
-     * Switch to edit mode and request focus on a 1-based worktree line.
-     * No-op when the selection cannot be edited.
-     * @param {number} lineNumber
-     */
-    openEditorAtLine(lineNumber) {
-      if (!this.canEdit.value) return;
-
-      if (!Number.isFinite(lineNumber) || lineNumber < 1) return;
-      this.editorGotoLine.value = Math.floor(lineNumber);
-      this.viewMode.value = 'edit';
     },
 
     applyDiff(data) {
@@ -165,6 +158,7 @@ export const SelectionModel = createModel(({ workingTree, activePR, api = defaul
         return;
       }
 
+      if (path) remembered.set(cacheKey(scopeKey, this.activeSection.peek(), path), data);
       this.activeDiff.value = data ?? null;
       this.diffLoading.value = false;
     },
@@ -178,7 +172,7 @@ export const SelectionModel = createModel(({ workingTree, activePR, api = defaul
       this.select(next.path, next.section);
     },
 
-    /** Restore selection to first working-tree entry (e.g. leaving PR mode). */
+    /** Restore selection to first working-tree entry . */
     selectFirstFromWorkingTree() {
       const next = workingTree.firstEntry();
 
@@ -197,6 +191,7 @@ export const SelectionModel = createModel(({ workingTree, activePR, api = defaul
       const section = this.activeSection.value;
 
       if (!file) return;
+      remembered.delete(cacheKey(scopeKey, section, file));
       this.activeDiff.value = null;
       requestDiff(file, section);
     },

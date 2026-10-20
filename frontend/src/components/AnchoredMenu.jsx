@@ -15,6 +15,7 @@ const VIEWPORT_PAD = 8;
  * @param {'start'|'end'|'center'} [props.alignment='start']
  * @param {number} [props.offset=4]
  * @param {string} [props.className]
+ * @param {string|null} [props.role='listbox'] null omits the role (searchable menus own their listbox)
  * @param {import('preact').Ref<HTMLElement|null>} [props.menuRef]
  * @param {import('preact').ComponentChildren} props.children
  */
@@ -26,6 +27,7 @@ export function AnchoredMenu({
   alignment = 'start',
   offset = 4,
   className = '',
+  role = 'listbox',
   menuRef: menuRefProp,
   children,
 }) {
@@ -175,7 +177,7 @@ export function AnchoredMenu({
   const classes = ['anchored-menu', className].filter(Boolean).join(' ');
 
   return createPortal(
-    <div ref={setMenuRef} class={classes} role="listbox">
+    <div ref={setMenuRef} class={classes} role={role || undefined}>
       {children}
       <style>{`
         .anchored-menu {

@@ -1,12 +1,13 @@
 import { Signal } from '@preact/signals';
+import { IconHome } from '@tabler/icons-preact';
 import { Show } from '@preact/signals/utils';
 import { SidebarToggle } from './SidebarToggle.jsx';
 import { DiffExpandToggle } from './DiffExpandToggle.jsx';
 import { CopyPathButton } from './CopyPathButton.jsx';
-import { ViewModeToggle } from './ViewModeToggle.jsx';
-import { PRPicker } from './PRPicker.jsx';
-import { PRChecksStatus } from './PRChecksStatus.jsx';
-import { splitPath } from './ChangeTree.jsx';
+import { IconPencil } from '@tabler/icons-preact';
+import { TabStrip } from './tabs/TabStrip.jsx';
+import { openFileAt } from '../models/navigation.js';
+import { openPalette } from './palette/openPalette.js';
 
 function absoluteFilePath(projectRoot, relativePath) {
   if (!projectRoot) return relativePath;
@@ -16,92 +17,79 @@ function absoluteFilePath(projectRoot, relativePath) {
 }
 
 /**
- * Shared content-island header: sidebar toggle, file path, PR controls.
+ * Shared content-island header: sidebar toggle, editor tab strip, create-PR and PR browser buttons.
  *
  * @param {Object} props
  * @param {boolean} props.sidebarOpen
  * @param {() => void} props.onToggleSidebar
- * @param {import('@preact/signals-core').Signal<string|null>} props.activeFile
+ * @param {InstanceType<typeof import('../models/tabs.js').TabsModel>} props.tabs
  * @param {string} props.projectPath
- * @param {boolean} props.isPRMode
  * @param {import('@preact/signals-core').ReadonlySignal<boolean>|boolean} props.showFullDiff
  * @param {() => void} props.onToggleShowFullDiff
- * @param {import('@preact/signals-core').ReadonlySignal<boolean>|boolean} [props.canEdit]
- * @param {import('@preact/signals-core').Signal<'diff' | 'edit'>} [props.viewMode]
- * @param {() => void} [props.onToggleViewMode]
- * @param {import('@preact/signals-core').ReadonlySignal<boolean>|boolean} [props.dirty]
- * @param {number|null} props.selectedPR
- * @param {{ number: number, title: string, author: string, baseBranch: string }|null} props.currentPR
- * @param {(pr: { number: number, title: string, author: string, baseBranch: string } | null) => void} props.onSelectPR
- * @param {(title: string, message: string) => void} [props.onError]
  * @param {() => void} props.onCreatePR
- * @param {boolean} [props.showCIMonitor]
- * @param {{ status?: string, pending?: number, pass?: number, fail?: number, total?: number, checks?: unknown[], error?: string }|null} [props.prChecksSummary]
+ * @param {() => void} [props.onShowHome]
  */
 export function IslandHeader({
   sidebarOpen,
   onToggleSidebar,
-  activeFile,
+  tabs,
   projectPath,
-  isPRMode,
   showFullDiff,
   onToggleShowFullDiff,
-  canEdit = false,
-  viewMode,
-  onToggleViewMode,
-  dirty = false,
-  selectedPR,
-  currentPR,
-  onSelectPR,
-  onError,
   onCreatePR,
-  showCIMonitor = false,
-  prChecksSummary = null,
+  onShowHome,
 }) {
   const fullDiff = showFullDiff instanceof Signal ? showFullDiff.value : showFullDiff;
-  const editable = canEdit instanceof Signal ? canEdit.value : canEdit;
-  const mode = viewMode?.value ?? 'diff';
 
   return (
     <div class="island-header">
       <SidebarToggle open={sidebarOpen} onToggle={onToggleSidebar} />
+      {onShowHome && (
+        <button
+          type="button"
+          class="sidebar-toggle"
+          title="Home"
+          aria-label="Home"
+          onClick={onShowHome}
+        >
+          <IconHome size={16} stroke={1.75} />
+        </button>
+      )}
 
-      <Show
-        when={activeFile}
-        fallback={<div class="island-header-spacer" />}
-      >
-        {(path) => {
-          const { name, dir } = splitPath(path);
-          const fullPath = absoluteFilePath(projectPath, path);
+      <TabStrip tabs={tabs} />
+
+      <Show when={tabs.activeTab}>
+        {(tab) => {
+          // PR tabs carry their own header; there is no file path to act on.
+          if (tab.kind === 'pr') return null;
+          const fullPath = absoluteFilePath(projectPath, tab.path);
 
           return (
-            <div class="island-header-file" title={fullPath}>
-              <Show when={dirty}>
-                <span
-                  class="island-header-dirty"
-                  title="Unsaved changes"
-                  aria-label="Unsaved changes"
-                />
-              </Show>
-              <span class="island-header-filename">{name}</span>
-              {dir !== './' && <span class="island-header-dir">{dir}</span>}
-              {!isPRMode && editable ? (
-                <ViewModeToggle mode={mode} onToggle={onToggleViewMode} />
+            <div class="island-header-tools">
+              {tab.kind === 'diff' ? (
+                <button
+                  type="button"
+                  class="header-icon-btn"
+                  title="Open file to edit"
+                  aria-label="Open file to edit"
+                  onClick={() => openFileAt(tab.path, 1)}
+                >
+                  <IconPencil size={13} stroke={1.75} />
+                </button>
               ) : null}
-              {!isPRMode ? (
+              {tab.kind === 'diff' ? (
                 <DiffExpandToggle
                   expanded={fullDiff}
                   onToggle={onToggleShowFullDiff}
                 />
               ) : null}
-              <CopyPathButton absolutePath={fullPath} relativePath={path} />
+              <CopyPathButton absolutePath={fullPath} relativePath={tab.path} />
             </div>
           );
         }}
       </Show>
 
       <div class="island-header-actions">
-        <PRChecksStatus active={showCIMonitor} summary={prChecksSummary} />
         <button
           type="button"
           class="create-pr-trigger"
@@ -110,12 +98,14 @@ export function IslandHeader({
         >
           +PR
         </button>
-        <PRPicker
-          selectedPR={selectedPR}
-          currentPR={currentPR}
-          onSelect={onSelectPR}
-          onError={onError}
-        />
+        <button
+          type="button"
+          class="pr-browse-trigger"
+          onClick={openPalette}
+          title="Find pull requests, worktrees and repos (⌘K)"
+        >
+          PRs
+        </button>
       </div>
     </div>
   );

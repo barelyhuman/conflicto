@@ -132,27 +132,22 @@ func (gs *GitService) ListWorktrees() ([]WorktreeInfo, error) {
 			continue
 		}
 
-		fields := strings.Fields(line)
-		if len(fields) < 2 {
-			continue
-		}
-
-		switch fields[0] {
+		key, value, _ := strings.Cut(line, " ")
+		switch key {
 		case "worktree":
 			flush()
-			current = &WorktreeInfo{Path: fields[1]}
+			current = &WorktreeInfo{Path: value}
 		case "HEAD":
-			if current != nil && len(fields) >= 2 {
-				head := fields[1]
+			if current != nil {
+				head := value
 				if len(head) > 7 {
 					head = head[:7]
 				}
 				current.Head = head
 			}
 		case "branch":
-			if current != nil && len(fields) >= 2 {
-				ref := fields[1]
-				current.Branch = strings.TrimPrefix(ref, "refs/heads/")
+			if current != nil {
+				current.Branch = strings.TrimPrefix(value, "refs/heads/")
 			}
 		case "detached":
 			// leave Branch empty
@@ -249,10 +244,111 @@ func (gs *GitService) RemoveWorktree(path string) error {
 	return nil
 }
 
+// samePath reports whether two filesystem paths refer to the same location,
+// tolerating symlinks (e.g. /var vs /private/var on macOS) when both exist.
+func samePath(a, b string) bool {
+	if filepath.Clean(a) == filepath.Clean(b) {
+		return true
+	}
+	ra, errA := filepath.EvalSymlinks(a)
+	rb, errB := filepath.EvalSymlinks(b)
+	return errA == nil && errB == nil && ra == rb
+}
+
+// findWorktreeOwner returns the main repository that owns the worktree at path.
+// When the worktree directory exists, git answers from the worktree itself.
+// When it has been deleted on disk, candidates (typically recents) are scanned
+// for a repo whose worktree list still contains path.
+func findWorktreeOwner(path string, candidates []RecentProject) (string, error) {
+	if info, err := os.Stat(path); err == nil && info.IsDir() {
+		main, err := (&GitService{path: path}).MainRepoPath()
+		if err != nil {
+			return "", fmt.Errorf("%s is not a git worktree: %w", path, err)
+		}
+		return main, nil
+	}
+
+	for _, r := range candidates {
+		if info, err := os.Stat(r.Path); err != nil || !info.IsDir() {
+			continue
+		}
+		main, err := (&GitService{path: r.Path}).MainRepoPath()
+		if err != nil {
+			continue
+		}
+		wts, err := (&GitService{path: main}).ListWorktrees()
+		if err != nil {
+			continue
+		}
+		for _, wt := range wts {
+			if samePath(wt.Path, path) {
+				return main, nil
+			}
+		}
+	}
+	return "", fmt.Errorf("worktree %s not found in any known repository", path)
+}
+
+// removeWorktreeFromOwner removes the worktree at path from whichever repo owns it,
+// independent of the active project. It also drops the branch's conflicto-pr config entry.
+func removeWorktreeFromOwner(path string, candidates []RecentProject) error {
+	owner, err := findWorktreeOwner(path, candidates)
+	if err != nil {
+		return err
+	}
+	ogs := &GitService{path: owner}
+
+	// Look up the branch before removal; the entry is still listed while admin data exists.
+	branch := ""
+	if wts, err := ogs.ListWorktrees(); err == nil {
+		for _, wt := range wts {
+			if samePath(wt.Path, path) {
+				branch = wt.Branch
+				break
+			}
+		}
+	}
+
+	if _, err := os.Stat(path); os.IsNotExist(err) {
+		// Directory already gone: only the stale administrative entry needs pruning.
+		prune := appCommand("git", "worktree", "prune")
+		prune.Dir = owner
+		if out, err := prune.CombinedOutput(); err != nil {
+			return fmt.Errorf("%s: %w", strings.TrimSpace(string(out)), err)
+		}
+	} else if err := ogs.RemoveWorktree(path); err != nil {
+		return err
+	}
+
+	if branch != "" {
+		// Best effort: the key may not exist, which is not an error.
+		_, _ = ogs.runGit("config", "--unset", "branch."+branch+"."+prConfigKey)
+	}
+	return nil
+}
+
 func randomHex(n int) (string, error) {
 	buf := make([]byte, n)
 	if _, err := rand.Read(buf); err != nil {
 		return "", err
 	}
 	return hex.EncodeToString(buf), nil
+}
+
+// recentsPath is the path recorded in recents for the open project. Worktrees under
+// WorktreeBaseDir are created by the app (PR worktrees), so they collapse into their
+// main repo instead of crowding real projects out of the capped list.
+func (gs *GitService) recentsPath() string {
+	mainRepo, err := gs.MainRepoPath()
+	if err != nil || samePath(mainRepo, gs.path) {
+		return gs.path
+	}
+	base, err := gs.WorktreeBaseDir()
+	if err != nil {
+		return gs.path
+	}
+	if rel, err := filepath.Rel(base, gs.path); err == nil && rel != "." && !strings.HasPrefix(rel, "..") {
+		return mainRepo
+	}
+	return gs.path
 }

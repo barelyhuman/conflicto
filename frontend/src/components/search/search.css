@@ -1,0 +1,254 @@
+.search-summary {
+  padding: 8px 14px 4px;
+  color: var(--text-muted);
+  font-size: 11.5px;
+  min-height: 14px;
+}
+
+/* Shared results list */
+.results-list {
+  padding-bottom: 8px;
+}
+
+.result-file {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 6px 14px 2px;
+  color: var(--text);
+  font-weight: 500;
+  font-size: 12px;
+  min-width: 0;
+}
+
+.result-file-name {
+  flex-shrink: 0;
+}
+
+.result-file-dir {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-muted);
+  font-weight: 400;
+  font-size: 11px;
+}
+
+.result-file-count {
+  flex-shrink: 0;
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 400;
+}
+
+.result-row {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  width: 100%;
+  padding: 1px 14px;
+  border: none;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.result-row:hover,
+.result-row:focus-visible {
+  background: var(--accent-bg);
+  outline: none;
+}
+
+.result-line {
+  flex-shrink: 0;
+  min-width: 28px;
+  text-align: right;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: 11px;
+}
+
+.result-text {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: pre;
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+}
+
+.result-text mark {
+  background: rgba(127, 127, 127, 0.35);
+  color: inherit;
+  border-radius: 2px;
+  font-weight: 600;
+}
+
+/* References / definition candidates panel (under the editor) */
+.refs-panel {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  height: 220px;
+  border-top: 1px solid var(--border);
+  background: var(--surface-raised);
+  min-height: 0;
+}
+
+.refs-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 10px 6px 14px;
+  font-size: 12px;
+  font-weight: 500;
+  flex-shrink: 0;
+}
+
+.refs-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border: none;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.refs-close:hover {
+  background: var(--accent-bg);
+  color: var(--text);
+}
+
+.refs-body {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
+
+/* Language server status pill (bottom-right of a file editor) */
+.lsp-pill-wrap {
+  position: absolute;
+  right: 12px;
+  bottom: 10px;
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+  pointer-events: none;
+}
+
+.lsp-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 520px;
+  padding: 3px 9px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface-raised);
+  color: var(--text-muted);
+  font-size: 11px;
+  pointer-events: auto;
+  white-space: nowrap;
+}
+
+.lsp-pill-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.lsp-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--text-muted);
+  flex-shrink: 0;
+}
+
+.lsp-pill.tone-busy .lsp-dot {
+  animation: lsp-pulse 1.2s ease-in-out infinite;
+}
+
+.lsp-pill.tone-ok .lsp-dot {
+  background: var(--text);
+}
+
+.lsp-pill.tone-error {
+  color: var(--text);
+}
+
+.lsp-pill-hint {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: var(--text-muted);
+}
+
+.lsp-restart {
+  border: none;
+  background: var(--accent-bg);
+  color: var(--text);
+  border-radius: 4px;
+  padding: 1px 6px;
+  font: inherit;
+  cursor: pointer;
+}
+
+@keyframes lsp-pulse {
+  50% {
+    opacity: 0.25;
+  }
+}
+
+/* Hover tooltip content */
+.cm-lsp-hover {
+  max-width: 560px;
+  max-height: 320px;
+  overflow: auto;
+  padding: 6px 10px;
+  font-family: var(--font-sans);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.cm-lsp-hover .lsp-md p {
+  margin: 0 0 6px;
+}
+
+.cm-lsp-hover .lsp-md > :last-child {
+  margin-bottom: 0;
+}
+
+.cm-lsp-hover .lsp-md pre {
+  margin: 0 0 6px;
+  white-space: pre-wrap;
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+}
+
+.cm-lsp-hover .lsp-md code {
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+}
+
+.cm-lsp-hover .lsp-md hr {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 6px 0;
+}
+
+.cm-lsp-hover .lsp-md-link {
+  text-decoration: underline;
+  text-decoration-color: var(--text-muted);
+}

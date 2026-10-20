@@ -82,4 +82,16 @@ describe('WorktreeModel', () => {
       expect(worktree.previewHash.value).toBe('');
     });
   });
+
+  describe('remove', () => {
+    it('resolves true when the worktree was removed', async () => {
+      removeWorktree.mockResolvedValue(undefined);
+      await expect(worktree.remove('/repo/wt')).resolves.toBe(true);
+    });
+
+    it('resolves false (so callers keep tabs and terminals) when git refuses', async () => {
+      removeWorktree.mockRejectedValue(new Error('contains modified files'));
+      await expect(worktree.remove('/repo/wt')).resolves.toBe(false);
+    });
+  });
 });

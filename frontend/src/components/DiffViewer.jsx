@@ -1,11 +1,13 @@
 import { Signal } from '@preact/signals';
-import { useMemo, useRef, useState, useLayoutEffect, useCallback } from 'preact/hooks';
+import { useMemo, useRef, useState, useLayoutEffect, useCallback, useEffect } from 'preact/hooks';
 import { FileDiff } from '@pierre/diffs/react';
 import { IconExternalLink } from '@tabler/icons-preact';
 import { BrowserOpenURL } from '../wailsjs/runtime/runtime.js';
 import { useTheme } from '../theme/ThemeProvider.jsx';
 import { api } from '../wails.js';
-import { buildPRLineAnnotations } from './prLineAnnotations.js';
+import { buildReviewAnnotations } from './prLineAnnotations.js';
+import { ReviewComposer, ReviewDraftCard, reviewStyles } from './ReviewComposer.jsx';
+import { isTerminalFocusTarget } from './terminal/TerminalDock.jsx';
 import { mapDiffLineToEditorLine } from './diffLineToEditorLine.js';
 import {
   annotationUnsafeCSS,
@@ -129,9 +131,13 @@ const diffViewerStyles = `
  * @param {boolean} props.isPRMode
  * @param {import('@preact/signals-core').ReadonlySignal<boolean>|boolean} props.isUnstaged
  * @param {import('@preact/signals-core').ReadonlySignal<boolean>|boolean} [props.showFullDiff]
- * @param {{ path: string, line: number, side?: string, body: string, html_url?: string, user: { login: string } }[]} props.comments
+ * @param {{ path: string, line: number, side?: string, body: string, html_url?: string, user: { login: string } }[] | import('@preact/signals-core').ReadonlySignal<any[]>} props.comments
  * @param {import('@preact/signals-core').ReadonlySignal<boolean>|boolean} [props.canOpenInEditor]
  * @param {(lineNumber: number) => void} [props.onOpenLineInEditor]
+ * @param {InstanceType<typeof import('../models/review.js').ReviewModel>} [props.review] pending-review model (PR mode)
+ * @param {(path: string) => void} [props.onSelectFile] navigate to another PR file
+ * @param {(path: string) => Promise<any>} [props.loadContents] both sides of a file for expanding
+ *   context (GetFileContents shape); defaults to index/HEAD vs worktree
  */
 export function DiffViewer({
   activeDiff,
@@ -139,9 +145,12 @@ export function DiffViewer({
   isPRMode = false,
   isUnstaged = false,
   showFullDiff = false,
-  comments = [],
+  comments: commentsProp = [],
   canOpenInEditor = false,
   onOpenLineInEditor,
+  review,
+  onSelectFile,
+  loadContents,
 }) {
   const { theme, themeType } = useTheme();
   const isLoading = loading instanceof Signal ? loading.value : loading;
@@ -150,6 +159,7 @@ export function DiffViewer({
   const filename = diff?.path ?? '';
   const unstaged = isUnstaged instanceof Signal ? isUnstaged.value : isUnstaged;
   const fullDiff = showFullDiff instanceof Signal ? showFullDiff.value : showFullDiff;
+  const comments = commentsProp instanceof Signal ? commentsProp.value : commentsProp;
 
   const openInEditor =
     canOpenInEditor instanceof Signal ? canOpenInEditor.value : canOpenInEditor;
@@ -180,12 +190,68 @@ export function DiffViewer({
 
   const fileDiff = useMemo(() => fileDiffFromPatch(patch), [patch]);
 
+  const reviewActive = isPRMode && review != null;
+  const drafts = reviewActive ? review.drafts.value : undefined;
+  const composer = reviewActive ? review.composer.value : null;
+  const outdatedIds = reviewActive ? review.outdatedIds.value : undefined;
+
   const lineAnnotations = useMemo(
-    () => buildPRLineAnnotations({ isPRMode, comments, filename }),
-    [comments, filename, isPRMode]
+    () => buildReviewAnnotations({ isPRMode, comments, drafts, composer, filename, outdatedIds }),
+    [comments, drafts, composer, outdatedIds, filename, isPRMode]
   );
 
+  // New file: drop the previous file's line selection.
+  useEffect(() => {
+    review?.setSelection(null, null);
+  }, [filename, review]);
+
+  // Composer targeted another file (clipboard path:line): navigate there.
+  const composerPath = composer?.path;
+
+  useEffect(() => {
+    if (composerPath && composerPath !== filename) onSelectFile?.(composerPath);
+  }, [composerPath, filename, onSelectFile]);
+
+  // Shortcuts: Cmd/Ctrl+Shift+M comment on selection, Cmd/Ctrl+Shift+V comment from clipboard.
+  useEffect(() => {
+    if (!reviewActive) return undefined;
+
+    function onKey(e) {
+      if (!(e.metaKey || e.ctrlKey) || !e.shiftKey || e.altKey) return;
+      if (isTerminalFocusTarget(e.target)) return;
+      const key = e.key.toLowerCase();
+
+      if (key === 'm') {
+        e.preventDefault();
+        review.openFromSelection();
+      } else if (key === 'v') {
+        e.preventDefault();
+        review.openFromClipboard();
+      }
+    }
+
+    document.addEventListener('keydown', onKey);
+
+    return () => document.removeEventListener('keydown', onKey);
+  }, [reviewActive, review]);
+
   const renderAnnotation = useCallback((annotation) => {
+    const kind = annotation.metadata?.kind;
+
+    if (kind === 'composer') {
+      return <ReviewComposer key={annotation.metadata.composerRev} review={review} />;
+    }
+
+    if (kind === 'draft') {
+      return (
+        <ReviewDraftCard
+          review={review}
+          draft={annotation.metadata.draft}
+          outdated={annotation.metadata.outdated}
+        />
+      );
+    }
+
     const htmlUrl = annotation.metadata?.html_url;
 
     return (
@@ -210,7 +276,7 @@ export function DiffViewer({
         <span class="diff-comment-body">{annotation.metadata?.body}</span>
       </div>
     );
-  }, []);
+  }, [review]);
 
   const handleLineClick = useCallback(
     (props) => {
@@ -271,10 +337,22 @@ export function DiffViewer({
           collapsedContextThreshold: 1,
           unsafeCSS: annotationUnsafeCSS(isPRMode),
           onLineClick: openInEditor ? handleLineClick : undefined,
+          enableLineSelection: reviewActive || undefined,
+          enableGutterUtility: reviewActive || undefined,
+          onLineSelected: reviewActive
+            ? (range) => review.setSelection(filename, range)
+            : undefined,
+          onGutterUtilityClick: reviewActive
+            ? (range) => {
+                review.setSelection(filename, range);
+                review.openFromRange(filename, range);
+              }
+            : undefined,
           lineHoverHighlight: openInEditor ? 'line' : undefined,
           loadDiffFiles: loadDiffFilesForDiff(isPRMode, async (meta) => {
-            const staged = !unstaged;
-            const res = await api.getFileContents(meta.name, staged);
+            const res = loadContents
+              ? await loadContents(meta.name)
+              : await api.getFileContents(meta.name, !unstaged);
 
             return mapFileContentsToDiffFiles(meta, res);
           }),
@@ -283,6 +361,7 @@ export function DiffViewer({
         renderAnnotation={lineAnnotations ? renderAnnotation : undefined}
       />
       <style>{diffViewerStyles}</style>
+      <style>{reviewStyles}</style>
     </div>
   );
 }

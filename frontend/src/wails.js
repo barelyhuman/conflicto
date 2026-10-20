@@ -5,6 +5,20 @@ import { ClipboardSetText } from './wailsjs/runtime/runtime.js';
 const terminalDataListeners = new Set();
 const terminalExitListeners = new Set();
 
+// LSP event fan-out (the LSP client subscribes via api.onLSPMessage/Status)
+const lspMessageListeners = new Set();
+const lspStatusListeners = new Set();
+
+function fanOut(listeners, data) {
+  listeners.forEach((fn) => {
+    try {
+      fn(data);
+    } catch {
+      // ignore listener errors
+    }
+  });
+}
+
 function emitTerminalData(data) {
   terminalDataListeners.forEach((fn) => {
     try {
@@ -39,26 +53,8 @@ export function setupWailsEvents(callbacks) {
   window.runtime.EventsOn('aheadBehindUpdated', (data) => {
     callbacks.onAheadBehindUpdated?.(data);
   });
-  window.runtime.EventsOn('diffLoaded', (data) => {
-    callbacks.onDiffLoaded?.(data);
-  });
   window.runtime.EventsOn('ghStatusChanged', (data) => {
     callbacks.onGHStatusChanged?.(data);
-  });
-  window.runtime.EventsOn('prListUpdated', (data) => {
-    callbacks.onPRListUpdated?.(data);
-  });
-  window.runtime.EventsOn('prFilesUpdated', (data) => {
-    callbacks.onPRFilesUpdated?.(data);
-  });
-  window.runtime.EventsOn('prCommentsUpdated', (data) => {
-    callbacks.onPRCommentsUpdated?.(data);
-  });
-  window.runtime.EventsOn('prCommentPosted', (data) => {
-    callbacks.onPRCommentPosted?.(data);
-  });
-  window.runtime.EventsOn('prCheckoutCompleted', (data) => {
-    callbacks.onPRCheckoutCompleted?.(data);
   });
   window.runtime.EventsOn('prCreated', (data) => {
     callbacks.onPRCreated?.(data);
@@ -69,6 +65,9 @@ export function setupWailsEvents(callbacks) {
   window.runtime.EventsOn('openPreferences', () => {
     callbacks.onOpenPreferences?.();
   });
+  window.runtime.EventsOn('menu:close-tab', () => {
+    callbacks.onMenuCloseTab?.();
+  });
   window.runtime.EventsOn('projectChanged', (data) => {
     callbacks.onProjectChanged?.(data);
   });
@@ -78,6 +77,9 @@ export function setupWailsEvents(callbacks) {
   window.runtime.EventsOn('worktreesUpdated', (data) => {
     callbacks.onWorktreesUpdated?.(data);
   });
+  window.runtime.EventsOn('workspace:index-updated', (data) => {
+    callbacks.onWorkspaceIndexUpdated?.(data);
+  });
   window.runtime.EventsOn('refreshCompleted', () => {
     callbacks.onRefreshCompleted?.();
   });
@@ -86,6 +88,13 @@ export function setupWailsEvents(callbacks) {
   });
   window.runtime.EventsOn('terminal:exit', (data) => {
     emitTerminalExit(data);
+  });
+
+  window.runtime.EventsOn('lsp:message', (data) => {
+    fanOut(lspMessageListeners, data);
+  });
+  window.runtime.EventsOn('lsp:status', (data) => {
+    fanOut(lspStatusListeners, data);
   });
 
   // Request initial data via the public Refresh method
@@ -111,6 +120,8 @@ export const api = {
   getFileContents: (path, staged = false) =>
     window.go.main.App.GetFileContents(path, !!staged),
 
+  filesExist: (paths) => window.go.main.App.FilesExist(paths),
+
   getConflictFile: (path) => window.go.main.App.GetConflictFile(path),
 
   writeFile: (path, content) => window.go.main.App.WriteFile(path, content),
@@ -125,22 +136,47 @@ export const api = {
 
   detectGH: () => window.go.main.App.DetectGH(),
 
-  searchPRList: (limit, search) => window.go.main.App.SearchPRList(limit, search),
+  getPRDetails: (number) => window.go.main.App.GetPRDetails(number),
 
-  getPRFiles: (number) => window.go.main.App.GetPRFiles(number),
+  getPRFilesList: (number) => window.go.main.App.GetPRFilesList(number),
 
-  getPRFileDiff: (number, path) => window.go.main.App.GetPRFileDiff(number, path),
+  getPRFilePatch: (number, path) => window.go.main.App.GetPRFilePatch(number, path),
 
-  getPRComments: (number) => window.go.main.App.GetPRComments(number),
+  getPRReviewComments: (number) => window.go.main.App.GetPRReviewComments(number),
+
+  getPRTimeline: (number) => window.go.main.App.GetPRTimeline(number),
+
+  searchPRs: (query, state = 'open', limit = 30) => window.go.main.App.SearchPRs(query, state, limit),
+
+  openPRLocally: (number) => window.go.main.App.OpenPRLocally(number),
+
+  // Compare tabs: the working tree against any ref (see compare.go).
+  listRefs: () => window.go.main.App.ListRefs(),
+
+  getCompareFiles: (ref, mergeBase = false) => window.go.main.App.GetCompareFiles(ref, mergeBase),
+
+  getCompareFilePatch: (base, path, oldPath = '', untracked = false) =>
+    window.go.main.App.GetCompareFilePatch(base, path, oldPath, untracked),
+
+  getCompareFileContents: (base, path, oldPath = '') =>
+    window.go.main.App.GetCompareFileContents(base, path, oldPath),
 
   postPRComment: (number, path, body, line, side, startLine, startSide) =>
     window.go.main.App.PostPRComment(number, path, body, line, side, startLine, startSide),
 
-  checkoutPR: (number) => window.go.main.App.CheckoutPR(number),
+  getReviewState: (number) => window.go.main.App.GetReviewState(number),
+
+  getReviewDrafts: (number) => window.go.main.App.GetReviewDrafts(number),
+
+  saveReviewDraft: (number, draft) => window.go.main.App.SaveReviewDraft(number, draft),
+
+  deleteReviewDraft: (number, id) => window.go.main.App.DeleteReviewDraft(number, id),
+
+  submitReview: (number, event, body) => window.go.main.App.SubmitReview(number, event, body),
+
+  clipboardGetText: () => window.runtime.ClipboardGetText(),
 
   previewWorktreePath: () => window.go.main.App.PreviewWorktreePath(),
-
-  checkoutPRToWorktree: (number, hash) => window.go.main.App.CheckoutPRToWorktree(number, hash ?? ''),
 
   createPR: (title, body, baseBranch, draft) =>
     window.go.main.App.CreatePR(title, body, baseBranch, draft),
@@ -151,9 +187,19 @@ export const api = {
 
   getRecentProjects: () => window.go.main.App.GetRecentProjects(),
 
+  checkRecentProjects: () => window.go.main.App.CheckRecentProjects(),
+
+  removeRecentProject: (path) => window.go.main.App.RemoveRecentProject(path),
+
   getWorktrees: () => window.go.main.App.GetWorktrees(),
 
   removeWorktree: (path) => window.go.main.App.RemoveWorktree(path),
+
+  getWorkspaceIndex: () => window.go.main.App.GetWorkspaceIndex(),
+
+  refreshWorkspaceIndex: () => window.go.main.App.RefreshWorkspaceIndex(),
+
+  openWorkspace: (id) => window.go.main.App.OpenWorkspace(id),
 
   getCurrentProject: () => window.go.main.App.GetCurrentProject(),
 
@@ -176,6 +222,28 @@ export const api = {
   startPRChecksMonitor: (number) => window.go.main.App.StartPRChecksMonitor(number),
 
   stopPRChecksMonitor: () => window.go.main.App.StopPRChecksMonitor(),
+
+  lspServers: () => window.go.main.App.LSPServers(),
+
+  lspStart: (id) => window.go.main.App.LSPStart(id),
+
+  lspSend: (id, message) => window.go.main.App.LSPSend(id, message),
+
+  lspStop: (id) => window.go.main.App.LSPStop(id),
+
+  searchText: (opts) => window.go.main.App.SearchText(opts),
+
+  onLSPMessage: (fn) => {
+    lspMessageListeners.add(fn);
+
+    return () => lspMessageListeners.delete(fn);
+  },
+
+  onLSPStatus: (fn) => {
+    lspStatusListeners.add(fn);
+
+    return () => lspStatusListeners.delete(fn);
+  },
 
   onTerminalData: (fn) => {
     terminalDataListeners.add(fn);

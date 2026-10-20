@@ -98,10 +98,16 @@ button {
 }
 
 button:focus-visible,
-textarea:focus-visible,
-input:focus-visible {
+input[type='checkbox']:focus-visible,
+input[type='radio']:focus-visible {
   outline: 1px solid var(--grey);
   outline-offset: 1px;
+}
+
+/* Text fields show focus on their own (rounded) containers; a rectangular ring inside them is noise. */
+textarea:focus-visible,
+input:not([type='checkbox']):not([type='radio']):focus-visible {
+  outline: none;
 }
 
 @keyframes spin {

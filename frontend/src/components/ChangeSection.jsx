@@ -3,7 +3,7 @@ import { Show } from '@preact/signals/utils';
 import { IconChevronRight } from '@tabler/icons-preact';
 
 /**
- * Collapsible sidebar section header + body (shared by FileTree, WorktreesPanel).
+ * Collapsible sidebar section header + body (shared by FileTree).
  *
  * @param {Object} props
  * @param {string} props.title

@@ -14,6 +14,9 @@ type Settings struct {
 
 	// CINotificationMode: "off" (default), "all" (entire PR), or "workflow" (per workflow group).
 	CINotificationMode string `json:"ciNotificationMode,omitempty"`
+
+	// LSPServers overrides the built-in language server command per server ID.
+	LSPServers map[string]LSPServerOverride `json:"lspServers,omitempty"`
 }
 
 // settingsFilePath returns the path to the settings file

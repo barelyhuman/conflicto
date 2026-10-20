@@ -227,3 +227,30 @@
   font-size: 12px;
   user-select: none;
 }
+
+.terminal-bg {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-right: 8px;
+  font-size: 11px;
+  color: var(--text-muted, #8b8b8b);
+  white-space: nowrap;
+}
+
+.terminal-bg-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+  opacity: 0.5;
+}
+
+.terminal-bg.unread {
+  color: var(--text, inherit);
+}
+
+.terminal-bg.unread .terminal-bg-dot {
+  background: #3fb950;
+  opacity: 1;
+}

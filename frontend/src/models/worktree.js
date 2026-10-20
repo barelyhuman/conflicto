@@ -98,10 +98,16 @@ export const WorktreeModel = createModel(({ currentPath: externalCurrentPath, on
       previewActive.value = false;
     },
 
+    /** @returns {Promise<boolean>} whether the worktree was removed */
     remove(path) {
-      return api.removeWorktree(path).catch((err) => {
-        report('Remove Worktree Error', err);
-      });
+      return api.removeWorktree(path).then(
+        () => true,
+        (err) => {
+          report('Remove Worktree Error', err);
+
+          return false;
+        }
+      );
     },
   };
 });

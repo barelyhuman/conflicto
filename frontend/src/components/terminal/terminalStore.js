@@ -5,10 +5,12 @@
  * visible tabs/panes; other scopes' panes stay in the snapshot so their dock
  * slots never unmount and PTYs, output, and scrollback survive. */
 
+import { signal } from '@preact/signals';
+
 let nextLocalId = 1;
 let nextLayoutId = 1;
 
-/** @typedef {{ localId: string, sessionId: string | null, scopePath: string | null, cwd: string | null, title: string }} TerminalPane */
+/** @typedef {{ localId: string, sessionId: string | null, scopePath: string | null, cwd: string | null, title: string, unread?: boolean }} TerminalPane */
 
 /** @typedef {{ layoutId: string, paneIds: string[], splitRatio: number }} TerminalLayout */
 
@@ -23,7 +25,39 @@ let currentScopePath = null;
 /** @type {Set<() => void>} */
 const listeners = new Set();
 
+/**
+ * Running terminals in scopes other than the active one. Other UI (palette,
+ * home screen, worktree list) can read this to badge worktrees:
+ * `[{ scopePath, sessions, unread }]`, only scopes with at least one live session.
+ * @type {import('@preact/signals').Signal<{ scopePath: string, sessions: number, unread: boolean }[]>}
+ */
+export const backgroundTerminals = signal([]);
+
+let backgroundKey = '[]';
+
+function computeBackground() {
+  const out = [];
+
+  for (const [key, scope] of scopes) {
+    if (key === currentScopePath || key == null) continue;
+    const live = scope.panes.filter((p) => p.sessionId);
+
+    if (live.length === 0) continue;
+    out.push({ scopePath: key, sessions: live.length, unread: live.some((p) => p.unread) });
+  }
+
+  return out;
+}
+
 function notify() {
+  const bg = computeBackground();
+  const k = JSON.stringify(bg);
+
+  if (k !== backgroundKey) {
+    backgroundKey = k;
+    backgroundTerminals.value = bg;
+  }
+
   listeners.forEach((fn) => fn());
 }
 
@@ -74,6 +108,26 @@ function pruneScopeIfEmpty(key) {
   }
 }
 
+function clearUnread(scope) {
+  if (scope?.panes.some((p) => p.unread)) {
+    scope.panes = scope.panes.map((p) => (p.unread ? { ...p, unread: false } : p));
+  }
+}
+
+/**
+ * Record PTY output for a session. Marks it unread when its worktree is not
+ * the active one (so the dock / other UI can show background activity).
+ * Cheap and silent for foreground sessions — called on every data chunk.
+ */
+export function markSessionOutput(sessionId) {
+  if (!sessionId) return;
+  const found = findPane((p) => p.sessionId === sessionId);
+
+  if (!found || found.key === currentScopePath || found.pane.unread) return;
+  found.scope.panes = found.scope.panes.map((p) => (p === found.pane ? { ...p, unread: true } : p));
+  notify();
+}
+
 export function subscribeTerminalStore(fn) {
   listeners.add(fn);
 
@@ -98,6 +152,8 @@ export function getTerminalStoreSnapshot() {
       paneIds: l.paneIds.slice(),
       splitRatio: l.splitRatio,
     })),
+    /** Active scope key (worktree path); lets the dock react to worktree switches. */
+    scopePath: currentScopePath,
     activeLayoutId: scope.activeLayoutId,
     activeLocalId: scope.activeLocalId,
     /** Visible pane ids for the active layout (empty if none). */
@@ -134,6 +190,7 @@ export function setTerminalScope(path) {
   }
 
   currentScopePath = key;
+  clearUnread(scopes.get(key));
   notify();
 
   return scopeHasTabs(key);
@@ -150,12 +207,9 @@ export function removeTerminalScope(path) {
 
   if (!scope) return [];
   const sessionIds = scope.panes.map((p) => p.sessionId).filter(Boolean);
+  // Stays on key when it is current: moving to the null scope would make the dock start a
+  // cwd-less shell. The scope is re-created empty on demand until the next project event.
   scopes.delete(key);
-
-  if (currentScopePath === key) {
-    currentScopePath = null;
-  }
-
   notify();
 
   return sessionIds;

@@ -1,35 +1,45 @@
 import { useState, useCallback, useEffect, useRef } from 'preact/hooks';
-import { useModel, useSignal } from '@preact/signals';
+import { useModel, useSignal, useComputed, useSignalEffect } from '@preact/signals';
 import { Show } from '@preact/signals/utils';
 import './app.css';
 import { setupWailsEvents, api, watchFullscreen, getPlatform } from './wails.js';
 import { WorkingTreeModel } from './models/workingTree.js';
 import { SelectionModel } from './models/selection.js';
+import { createNavigator, registerNavigator } from './models/navigation.js';
+import { tabsStore as tabs, modeForSection } from './models/tabs.js';
+import { bindTabsToSelection } from './models/tabsSelection.js';
 import { SyncModel } from './models/sync.js';
 import { WorktreeModel } from './models/worktree.js';
+import { WorkspaceIndexModel } from './models/workspaceIndex.js';
+import { prTabs } from './models/prTab.js';
+import { compareTabs } from './models/compareTab.js';
 import { ThemeProvider } from './theme/ThemeProvider.jsx';
-import { EditProvider } from './components/EditProvider.jsx';
 import { FileTree } from './components/FileTree.jsx';
-import { DiffViewer } from './components/DiffViewer.jsx';
-import { FileEditor } from './components/FileEditor.jsx';
-import { ConflictViewer } from './components/ConflictViewer.jsx';
+import { EditorArea } from './components/tabs/EditorArea.jsx';
+import { closeActiveTab } from './components/tabs/useTabShortcuts.js';
 import { ConfirmDialog } from './components/ConfirmDialog.jsx';
 import { ToastContainer } from './components/ToastContainer.jsx';
 import { PreferencesPage } from './components/PreferencesPage.jsx';
 import { ProjectPicker } from './components/ProjectPicker.jsx';
-import { PRCheckoutPrompt } from './components/PRCheckoutPrompt.jsx';
 import { CreatePRModal } from './components/CreatePRModal.jsx';
 import { TerminalDock, isTerminalFocusTarget } from './components/terminal/TerminalDock.jsx';
 import { setTerminalScope, removeTerminalScope } from './components/terminal/terminalStore.js';
 import { SidebarActions } from './components/SidebarActions.jsx';
 import { IslandHeader } from './components/IslandHeader.jsx';
-import { WorktreesPanel } from './components/WorktreesPanel.jsx';
+import { WorktreePicker } from './components/WorktreePicker.jsx';
+import { resetLspForProject } from './lsp/index.js';
+import { useCodeShortcuts } from './lsp/useCodeShortcuts.js';
+import { CommandPalette } from './components/palette/CommandPalette.jsx';
+import { HomeScreen } from './components/home/HomeScreen.jsx';
 
-/** Stable empty list so FileTree does not remount on unrelated App re-renders. */
-const EMPTY_FILES = [];
+/** The visible compare tab follows working-tree changes (background refresh). */
+function refreshActiveCompare() {
+  const tab = tabs.activeTab.peek();
+
+  if (tab?.kind === 'compare') compareTabs.peek(tabs.currentScope(), tab.path)?.refresh({ silent: true });
+}
 
 export function App() {
-  const [activePR, setActivePR] = useState(null);
   const [branches, setBranches] = useState({ current: 'main', local: [], remote: [] });
   // Confirmation dialog state
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -45,6 +55,8 @@ export function App() {
 
   // Toast notifications
   const [toasts, setToasts] = useState([]);
+  const pushToastRef = useRef(pushToast);
+  pushToastRef.current = pushToast;
 
   // Preferences state
   const [preferencesOpen, setPreferencesOpen] = useState(false);
@@ -61,14 +73,12 @@ export function App() {
 
   // GitHub / PR state
   const [ghStatus, setGhStatus] = useState({ installed: false, version: '', user: '' });
-  const [prList, setPrList] = useState([]);
-  const [prComments, setPrComments] = useState([]);
-  const [prChecksSummary, setPrChecksSummary] = useState(null);
   const [ciNotifyMode, setCiNotifyMode] = useState(/** @type {'off' | 'all' | 'workflow'} */ ('off'));
-  const [prPrompt, setPrPrompt] = useState(null);
-  const [prCheckoutPending, setPrCheckoutPending] = useState(/** @type {null | 'local' | 'worktree'} */ (null));
   // Create PR modal
   const [createPROpen, setCreatePROpen] = useState(false);
+
+  // Home screen (full-size workspace index). Shown at launch when no project is open.
+  const homeOpen = useSignal(false);
 
   // Sidebar visibility (toggled from the content island)
   const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -82,16 +92,6 @@ export function App() {
   useEffect(() => { terminalOpenRef.current = terminalOpen; }, [terminalOpen]);
   useEffect(() => { terminalHeightRef.current = terminalHeight; }, [terminalHeight]);
 
-  // Bridge remaining PR useState into a live signal for SelectionModel.
-  // Keep writes synchronous so selection's diff-fetch effect never sees a stale PR.
-  const activePRSignal = useSignal(/** @type {number|null} */ (null));
-
-  const setActivePRBoth = useCallback((next) => {
-    const value = next instanceof Function ? next(activePRSignal.peek()) : next;
-    activePRSignal.value = value;
-    setActivePR(value);
-  }, [activePRSignal]);
-
   const workingTree = useModel(() => new WorkingTreeModel({
     onError: (title, message) => {
       setToasts((prev) => [...prev, { id: Date.now().toString(), title, message }]);
@@ -104,37 +104,92 @@ export function App() {
     },
   }));
 
-  const selection = useModel(() => new SelectionModel({
-    workingTree,
-    activePR: activePRSignal,
+  const workspaceIndex = useModel(() => new WorkspaceIndexModel({
+    onError: (title, message) => {
+      setToasts((prev) => [...prev, { id: Date.now().toString(), title, message }]);
+    },
   }));
 
-  // Models / PR bridge are stable for App lifetime; keep refs for the mount-once event effect.
+  const selection = useModel(() => new SelectionModel({
+    workingTree,
+    onError: (title, message) => {
+      setToasts((prev) => [...prev, { id: Date.now().toString(), title, message }]);
+    },
+  }));
+
+  // Models are stable for App lifetime; keep refs for the mount-once event effect.
   const workingTreeRef = useRef(workingTree);
   const worktreeRef = useRef(worktree);
   const selectionRef = useRef(selection);
-  const activePRSignalRef = useRef(activePRSignal);
+  const workspaceIndexRef = useRef(workspaceIndex);
   workingTreeRef.current = workingTree;
   worktreeRef.current = worktree;
   selectionRef.current = selection;
-  activePRSignalRef.current = activePRSignal;
+  workspaceIndexRef.current = workspaceIndex;
 
-  const activePRRef = useRef(activePR);
-  const prCheckoutPendingRef = useRef(prCheckoutPending);
-  useEffect(() => { activePRRef.current = activePR; }, [activePR]);
-  useEffect(() => { prCheckoutPendingRef.current = prCheckoutPending; }, [prCheckoutPending]);
+  useCodeShortcuts({ isMac: isMacOS });
 
-  const isPRMode = activePR != null;
-  const currentPR = isPRMode ? prList.find((p) => p.number === activePR) : null;
+  // Terminal links, palette, search and PR browsing open things through the navigation seam.
+  useEffect(
+    () =>
+      registerNavigator(
+        createNavigator({
+          tabs,
+          workingTree,
+          prTabs,
+          onError: (title, message) => pushToastRef.current(title, message),
+        })
+      ),
+    [workingTree]
+  );
+
+  // PR tab state follows the tab lifecycle; its errors surface as toasts.
+  useEffect(() => {
+    prTabs.setOnError((title, message) => pushToastRef.current(title, message));
+
+    return prTabs.bindTabs(tabs);
+  }, []);
+
+  useEffect(() => compareTabs.bindTabs(tabs), []);
+
+  // Only the visible PR tab polls checks; the backend monitor also drives CI notifications.
+  const activePRKey = useComputed(() => {
+    const tab = tabs.activeTab.value;
+    const scope = tabs.scope.value ?? '';
+
+    return tab?.kind === 'pr' ? `${scope}\u0000${tab.number}` : null;
+  });
+  useSignalEffect(() => {
+    const key = activePRKey.value;
+
+    if (!key) return undefined;
+    api.startPRChecksMonitor(Number(key.slice(key.indexOf('\u0000') + 1)));
+
+    return () => {
+      api.stopPRChecksMonitor();
+    };
+  });
+
+  // The active diff tab drives the selection model (diff fetching + shared viewers).
+  useEffect(() => bindTabsToSelection({ tabs, selection }), [selection]);
 
   // Setup Wails events
   useEffect(() => {
     setupWailsEvents({
       onFileStatusChanged: (data) => {
         const wt = workingTreeRef.current;
-        const sel = selectionRef.current;
         wt.applyStatus(data);
-        sel.selectFirstFromWorkingTreeIfNeeded();
+        refreshActiveCompare();
+
+        // First file of a fresh worktree opens as a preview diff tab (once per worktree).
+        if (tabs.canSeed()) {
+          const first = wt.firstEntry();
+
+          if (first) {
+            tabs.markSeeded();
+            tabs.open({ kind: 'diff', path: first.path, mode: modeForSection(first.section), preview: true });
+          }
+        }
       },
       onBranchChanged: (data) => {
         setBranches(data);
@@ -142,64 +197,18 @@ export function App() {
       onAheadBehindUpdated: (data) => {
         sync.setAheadBehind(data);
       },
-      onDiffLoaded: (data) => {
-        selectionRef.current.applyDiff(data);
-      },
       onGHStatusChanged: (data) => {
         setGhStatus(data ?? { installed: false, version: '', user: '' });
       },
-      onPRListUpdated: (data) => {
-        setPrList(data?.prs ?? []);
-      },
       onPRChecksUpdated: (data) => {
-        if (activePRRef.current == null || data?.number !== activePRRef.current) return;
-        setPrChecksSummary(data);
-      },
-      onPRFilesUpdated: (data) => {
-        const number = data?.number;
-        const files = data?.files ?? [];
-
-        if (number == null) return;
-        setPrList((prev) =>
-          prev.map((pr) =>
-            pr.number === number ? { ...pr, files } : pr
-          )
-        );
-
-        if (
-          activePRSignalRef.current.peek() === number &&
-          !selectionRef.current.activeFile.peek() &&
-          files.length > 0
-        ) {
-          selectionRef.current.select(files[0].path, 'pr');
-        }
-      },
-      onPRCommentsUpdated: (data) => {
-        try {
-          const raw = JSON.parse(data?.raw ?? '[]');
-          setPrComments(Array.isArray(raw) ? raw : []);
-        } catch {
-          setPrComments([]);
-        }
-      },
-      onPRCommentPosted: () => {
-        if (activePRRef.current != null) {
-          api.getPRComments(activePRRef.current);
-        }
-      },
-      onPRCheckoutCompleted: () => {
-        setPrCheckoutPending(null);
-        setPrPrompt(null);
+        // Monitor events carry the PR number; only the open tab for it cares.
+        prTabs.peek(tabs.currentScope(), data?.number)?.applyChecks(data);
       },
       onPRCreated: () => {
         setCreatePROpen(false);
       },
       onError: (data) => {
         selectionRef.current.diffLoading.value = false;
-
-        if (prCheckoutPendingRef.current) {
-          setPrCheckoutPending(null);
-        }
 
         const toast = {
           id: Date.now().toString(),
@@ -216,12 +225,12 @@ export function App() {
         setProjectName(data.name ?? '');
         setProjectPath(data.path ?? '');
         worktreeRef.current.setCurrentPath(data.path ?? '');
-        selectionRef.current.clear();
-        activePRSignalRef.current.value = null;
-        setActivePR(null);
-        setPrChecksSummary(null);
-        api.stopPRChecksMonitor();
+        selectionRef.current.setScope(data.path ?? '');
+        tabs.setScope(data.path ?? '');
+        resetLspForProject(data.path ?? '');
         setTerminalScope(data.path ?? '');
+
+        if (data.path) homeOpen.value = false;
       },
       onRecentProjectsUpdated: (data) => {
         setRecentProjects(data.projects ?? []);
@@ -229,11 +238,18 @@ export function App() {
       onWorktreesUpdated: (data) => {
         worktreeRef.current.applyWorktrees(data);
       },
+      onWorkspaceIndexUpdated: (data) => {
+        workspaceIndexRef.current.applyIndex(data);
+      },
+      onMenuCloseTab: () => {
+        closeActiveTab(tabs);
+      },
       onRefreshCompleted: () => {
         selectionRef.current.refetch();
+        refreshActiveCompare();
       },
     });
-  }, [sync]);
+  }, [sync, homeOpen]);
 
   // Resolve platform via the Wails runtime (GOOS)
   useEffect(() => {
@@ -262,6 +278,25 @@ export function App() {
 
     return () => document.removeEventListener('keydown', onKey);
   }, []);
+
+  // Cmd/Ctrl+Shift+H toggles the home screen. Capture phase so the terminal cannot swallow it.
+  useEffect(() => {
+    function onKey(e) {
+      if (e.key !== 'h' && e.key !== 'H') return;
+
+      if (!e.shiftKey || e.altKey) return;
+      const mod = isMacOS ? e.metaKey && !e.ctrlKey : e.ctrlKey && !e.metaKey;
+
+      if (!mod) return;
+      e.preventDefault();
+      e.stopPropagation();
+      homeOpen.value = !homeOpen.peek();
+    }
+
+    document.addEventListener('keydown', onKey, true);
+
+    return () => document.removeEventListener('keydown', onKey, true);
+  }, [isMacOS, homeOpen]);
 
   // Ctrl+R refresh on Linux/Windows. macOS keeps the View → Reload menu accel
   // (Cmd+R). Skip the terminal so readline reverse-i-search still works.
@@ -341,17 +376,21 @@ export function App() {
   // Seed initial project state
   useEffect(() => {
     api.getCurrentProject().then((proj) => {
-      if (proj) {
+      if (proj?.path) {
         setProjectName(proj.name ?? '');
         setProjectPath(proj.path ?? '');
         worktreeRef.current.setCurrentPath(proj.path ?? '');
+        selectionRef.current.setScope(proj.path ?? '');
         setTerminalScope(proj.path ?? '');
+        tabs.setScope(proj.path ?? '');
+      } else {
+        homeOpen.value = true;
       }
     });
     api.getRecentProjects().then((list) => {
       setRecentProjects(list ?? []);
     });
-  }, []);
+  }, [homeOpen]);
 
   // macOS titlebar: watch fullscreen state once we know we're on macOS
   useEffect(() => {
@@ -364,44 +403,6 @@ export function App() {
     return () => cleanup();
   }, [isMacOS]);
 
-  // Fetch PR comments when active PR changes
-  useEffect(() => {
-    if (isPRMode && activePR != null) {
-      api.getPRComments(activePR);
-    } else {
-      setPrComments([]);
-    }
-  }, [isPRMode, activePR]);
-
-  // Poll CI checks while a PR is open in review mode
-  useEffect(() => {
-    if (!isPRMode || activePR == null) {
-      setPrChecksSummary(null);
-      api.stopPRChecksMonitor();
-
-      return;
-    }
-
-    setPrChecksSummary(null);
-    api.startPRChecksMonitor(activePR);
-
-    return () => {
-      api.stopPRChecksMonitor();
-    };
-  }, [isPRMode, activePR]);
-
-  const handleSelectPR = useCallback((pr) => {
-    if (pr) {
-      setPrList((prev) =>
-        prev.some((p) => p.number === pr.number) ? prev : [...prev, pr]
-      );
-      setPrPrompt(pr);
-    } else {
-      setActivePRBoth(null);
-      selection.selectFirstFromWorkingTree();
-    }
-  }, [selection, setActivePRBoth]);
-
   function pushToast(title, message) {
     setToasts((prev) => [...prev, { id: Date.now().toString(), title, message }]);
   }
@@ -410,39 +411,20 @@ export function App() {
     setToasts((prev) => prev.filter((t) => t.id !== id));
   }
 
-  const handleViewPRDiff = useCallback((pr) => {
-    setPrPrompt(null);
-    // Clear selection before entering PR mode so the diff-fetch effect does not
-    // call GetPRFileDiff with a stale working-tree path against an empty cache.
-    selection.clear();
-    setActivePRBoth(pr.number);
-    api.getPRFiles(pr.number);
-  }, [selection, setActivePRBoth]);
-
-  const handleCheckoutPRLocal = useCallback((pr) => {
-    setPrCheckoutPending('local');
-    api.checkoutPR(pr.number).catch(() => {
-      setPrCheckoutPending(null);
-    });
-  }, []);
-
-  const handleCheckoutPRWorktree = useCallback((pr, hash) => {
-    setPrCheckoutPending('worktree');
-    api.checkoutPRToWorktree(pr.number, hash).catch(() => {
-      setPrCheckoutPending(null);
-    });
-  }, []);
-
   const handleSelectBranch = useCallback((branch) => {
     if (branch) {
       api.switchBranch(branch);
     }
+  }, []);
 
-    if (isPRMode) {
-      setActivePRBoth(null);
-      selection.clear();
-    }
-  }, [isPRMode, selection, setActivePRBoth]);
+  // Left-list click: preview diff tab; double click (pin) keeps it.
+  const handleOpenDiff = useCallback((path, section, opts) => {
+    tabs.open({ kind: 'diff', path, mode: modeForSection(section), preview: !opts?.pin });
+  }, []);
+
+  const handleEditFile = useCallback((path) => {
+    tabs.open({ kind: 'file', path, preview: false });
+  }, []);
 
   const handleStage = useCallback((path) => {
     const conflictFile = workingTree.conflicts.peek().find((f) => f.path === path);
@@ -479,11 +461,15 @@ export function App() {
     setConfirmKind(null);
 
     if (kind === 'remove-worktree' && worktreePath) {
-      // Kill terminals scoped to the removed worktree before the dir goes away.
-      removeTerminalScope(worktreePath).forEach((sessionId) => {
-        api.terminalStop(sessionId).catch(() => {});
+      // Git refuses to remove a dirty worktree; only tear down its tabs and shells once
+      // it is really gone. Go re-emits the workspace index after a successful removal.
+      worktree.remove(worktreePath).then((removed) => {
+        if (!removed) return;
+        tabs.removeScope(worktreePath);
+        removeTerminalScope(worktreePath).forEach((sessionId) => {
+          api.terminalStop(sessionId).catch(() => {});
+        });
       });
-      worktree.remove(worktreePath);
 
       return;
     }
@@ -515,13 +501,6 @@ export function App() {
   }, []);
 
 
-
-  const handlePostComment = useCallback((path, body, line, side) => {
-    if (activePR == null) return;
-    api.postPRComment(activePR, path, body, line, side, 0, '').catch((err) => {
-      pushToast('Comment Error', err.message);
-    });
-  }, [activePR]);
 
   const handleCreatePR = useCallback((title, body, baseBranch, draft) => {
     api.createPR(title, body, baseBranch, draft).catch((err) => {
@@ -563,7 +542,6 @@ export function App() {
 
   return (
     <ThemeProvider>
-      <EditProvider>
         <div class={shellClass}>
           <div class="window">
             <div class={`window-body${sidebarOpen ? '' : ' sidebar-collapsed'}`}>
@@ -578,6 +556,13 @@ export function App() {
                   />
                 </div>
 
+                <WorktreePicker
+                  worktree={worktree}
+                  workspaceIndex={workspaceIndex}
+                  onSwitch={handleSwitchProject}
+                  onRemove={handleRemoveWorktree}
+                />
+
                 <SidebarActions
                   currentBranch={branches.current}
                   localBranches={branches.local}
@@ -586,17 +571,11 @@ export function App() {
                   sync={sync}
                 />
 
-                <WorktreesPanel
-                  worktree={worktree}
-                  onSwitch={handleSwitchProject}
-                  onRemove={handleRemoveWorktree}
-                />
-
                 <FileTree
                   workingTree={workingTree}
-                  selection={selection}
-                  prFiles={isPRMode ? (currentPR?.files ?? EMPTY_FILES) : EMPTY_FILES}
-                  isPRMode={isPRMode}
+                  activeTab={tabs.activeTab}
+                  onOpenDiff={handleOpenDiff}
+                  onEditFile={handleEditFile}
                   currentBranch={branches.current}
                   onStage={handleStage}
                   onUnstage={(path) => workingTree.unstage(path)}
@@ -614,62 +593,19 @@ export function App() {
                     <IslandHeader
                       sidebarOpen={sidebarOpen}
                       onToggleSidebar={() => setSidebarOpen((open) => !open)}
-                      activeFile={selection.activeFile}
+                      tabs={tabs}
                       projectPath={projectPath}
-                      isPRMode={isPRMode}
                       showFullDiff={selection.showFullDiff}
                       onToggleShowFullDiff={() => selection.toggleShowFullDiff()}
-                      canEdit={selection.canEdit}
-                      viewMode={selection.viewMode}
-                      onToggleViewMode={() => selection.toggleViewMode()}
-                      dirty={selection.editorDirty}
-                      selectedPR={activePR}
-                      currentPR={currentPR}
-                      onSelectPR={handleSelectPR}
-                      onError={pushToast}
+                      onShowHome={() => { homeOpen.value = true; }}
                       onCreatePR={() => setCreatePROpen(true)}
-                      showCIMonitor={isPRMode}
-                      prChecksSummary={prChecksSummary}
                     />
-                    <Show
-                      when={selection.activeFile}
-                      fallback={
-                        <div class="diff-empty">Select a file to view changes</div>
-                      }
-                    >
-                      {() => (
-                        <Show
-                          when={selection.isConflict}
-                          fallback={
-                            <Show
-                              when={selection.isEditView}
-                              fallback={
-                                <DiffViewer
-                                  activeDiff={selection.activeDiff}
-                                  loading={selection.diffLoading}
-                                  isPRMode={isPRMode}
-                                  isUnstaged={selection.isUnstaged}
-                                  showFullDiff={selection.showFullDiff}
-                                  comments={isPRMode ? prComments : []}
-                                  onPostComment={handlePostComment}
-                                  canOpenInEditor={selection.canEdit}
-                                  onOpenLineInEditor={(line) => selection.openEditorAtLine(line)}
-                                />
-                              }
-                            >
-                              <FileEditor
-                                path={selection.activeFile}
-                                onError={pushToast}
-                                editorDirty={selection.editorDirty}
-                                editorGotoLine={selection.editorGotoLine}
-                              />
-                            </Show>
-                          }
-                        >
-                          <ConflictViewer file={selection.activeFile} />
-                        </Show>
-                      )}
-                    </Show>
+                    <EditorArea
+                      tabs={tabs}
+                      selection={selection}
+                      isMac={isMacOS}
+                      onError={pushToast}
+                    />
                   </main>
 
                   <TerminalDock
@@ -686,6 +622,18 @@ export function App() {
                 </div>
               </div>
             </div>
+
+            <Show when={homeOpen}>
+              {() => (
+                <HomeScreen
+                  index={workspaceIndex}
+                  ghStatus={ghStatus}
+                  onClose={projectPath ? () => { homeOpen.value = false; } : null}
+                  onRemoveWorktree={handleRemoveWorktree}
+                  onOpenProject={handleOpenProject}
+                />
+              )}
+            </Show>
           </div>
 
           <ConfirmDialog
@@ -738,6 +686,12 @@ export function App() {
             onCancel={handleCancelConfirm}
           />
 
+          <CommandPalette
+            index={workspaceIndex}
+            onHome={() => { homeOpen.value = true; }}
+            onOpened={() => { homeOpen.value = false; }}
+          />
+
           <ToastContainer
             toasts={toasts}
             onDismiss={dismissToast}
@@ -750,6 +704,7 @@ export function App() {
             onRefreshGH={() => api.detectGH()}
             ciNotifyMode={ciNotifyMode}
             onCINotifyModeChange={setCiNotifyMode}
+            isMac={isMacOS}
           />
 
           <CreatePRModal
@@ -759,17 +714,7 @@ export function App() {
             onSubmit={handleCreatePR}
           />
 
-          <PRCheckoutPrompt
-            pr={prPrompt}
-            worktree={worktree}
-            checkoutPending={prCheckoutPending}
-            onViewDiff={() => handleViewPRDiff(prPrompt)}
-            onCheckoutLocal={() => handleCheckoutPRLocal(prPrompt)}
-            onCheckoutWorktree={(hash) => handleCheckoutPRWorktree(prPrompt, hash)}
-            onClose={() => setPrPrompt(null)}
-          />
         </div>
-      </EditProvider>
     </ThemeProvider>
   );
 }
